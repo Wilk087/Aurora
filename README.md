@@ -4,6 +4,20 @@ Aurora Player is a local music player for Linux and Windows, built with Electron
 
 > **Note:** This project was developed with the assistance of AI tools. All code has been reviewed and tested by the maintainer.
 
+## Screenshots
+
+| Library | Fullscreen |
+|---------|------------|
+| ![Library grid view](docs/images/librarygrid.png) | ![Fullscreen mode](docs/images/fullscreen.png) |
+
+| Artist page | Synced lyrics |
+|-------------|---------------|
+| ![Artist page](docs/images/artistpage.png) | ![Lyrics sync](docs/images/lyricssync.png) |
+
+| Queue |
+|-------|
+| ![Queue panel](docs/images/queue.png) |
+
 ## Features
 
 ### Library and browsing
