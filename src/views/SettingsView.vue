@@ -191,7 +191,7 @@
         </div>
         <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05] opacity-50">
           <div>
-            <p class="text-sm text-white/80">Exclusive Mode</p>
+            <p class="text-sm text-white/80">Exclusive Mode <span class="ml-1.5 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded bg-yellow-500/20 text-yellow-400/80">WIP</span></p>
             <p class="text-xs text-white/30 mt-0.5">Not available — Chromium audio backend does not support exclusive device access</p>
           </div>
           <button
@@ -319,7 +319,7 @@
         <!-- Auto-fullscreen toggle -->
         <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
           <div>
-            <p class="text-sm text-white/80">Auto-Fullscreen on Idle</p>
+            <p class="text-sm text-white/80">Auto-Fullscreen on Idle <span class="ml-1.5 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded bg-yellow-500/20 text-yellow-400/80">WIP</span></p>
             <p class="text-xs text-white/30 mt-0.5">Automatically enter fullscreen mode when the mouse is idle during playback</p>
           </div>
           <button

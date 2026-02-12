@@ -34,23 +34,65 @@
         :key="i"
         :ref="(el) => { if (el) lineRefs[i] = el as HTMLElement }"
         @click="seekToLine(i)"
-        class="lyric-line py-2 cursor-pointer transition-all duration-500 ease-out"
-        :class="getLyricClass(i)"
+        @click.right.prevent="toggleSelectLine(i)"
+        class="lyric-line py-2 cursor-pointer transition-all duration-500 ease-out relative"
+        :class="[getLyricClass(i), selectedLines.has(i) ? 'ring-1 ring-accent/40 rounded-lg bg-accent/10' : '']"
       >
         <p class="text-center leading-relaxed" :class="getLyricTextClass(i)">
           {{ line.text || '\u266A' }}
         </p>
+        <!-- Selection indicator -->
+        <div v-if="selectedLines.has(i)" class="absolute left-1 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-accent" />
       </div>
 
       <div class="h-[40%]" />
     </div>
+
+    <!-- Selection bar -->
+    <Transition name="slide-up">
+      <div
+        v-if="selectedLines.size > 0"
+        class="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-black/80 backdrop-blur-xl border border-white/10 shadow-xl"
+      >
+        <span class="text-xs text-white/50">{{ selectedLines.size }} line{{ selectedLines.size > 1 ? 's' : '' }}</span>
+        <button
+          @click="openCard"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-accent text-white text-xs font-medium hover:bg-accent-hover transition-colors"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          Create Card
+        </button>
+        <button
+          @click="clearSelection"
+          class="text-white/30 hover:text-white/60 transition-colors p-1"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    </Transition>
+
+    <!-- Lyrics Card modal -->
+    <LyricsCard
+      :visible="showCard"
+      :lyrics="selectedLyricsText"
+      :title="player.currentTrack?.title || ''"
+      :artist="player.currentTrack?.artist || ''"
+      :album="player.currentTrack?.album || ''"
+      :cover-url="coverUrl"
+      @close="showCard = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { parseLRC, findCurrentLine, type LyricLine } from '@/utils/lrcParser'
+import LyricsCard from '@/components/LyricsCard.vue'
 
 const player = usePlayerStore()
 
@@ -148,6 +190,43 @@ function getLyricTextClass(index: number): string {
   if (index === currentLineIndex.value) return 'text-2xl font-bold text-white text-glow'
   return 'text-lg font-medium text-white/60 hover:text-white/40'
 }
+
+// ── Lyrics selection & card ──────────────────────────────────────────
+const selectedLines = ref<Set<number>>(new Set())
+const showCard = ref(false)
+
+const coverUrl = computed(() =>
+  player.currentTrack?.coverArt ? window.api.getMediaUrl(player.currentTrack.coverArt) : null,
+)
+
+const selectedLyricsText = computed(() =>
+  [...selectedLines.value].sort((a, b) => a - b).map((i) => lyrics.value[i]?.text || '').filter(Boolean),
+)
+
+function toggleSelectLine(index: number) {
+  const next = new Set(selectedLines.value)
+  if (next.has(index)) {
+    next.delete(index)
+  } else {
+    next.add(index)
+  }
+  selectedLines.value = next
+}
+
+function clearSelection() {
+  selectedLines.value = new Set()
+}
+
+function openCard() {
+  if (selectedLines.value.size === 0) return
+  showCard.value = true
+}
+
+// Clear selection when track changes
+watch(() => player.currentTrack?.path, () => {
+  selectedLines.value = new Set()
+  showCard.value = false
+})
 </script>
 
 <style scoped>
@@ -163,5 +242,14 @@ function getLyricTextClass(index: number): string {
 }
 .lyrics-scroll::-webkit-scrollbar {
   display: none;
+}
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: all 0.25s ease;
+}
+.slide-up-enter-from,
+.slide-up-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(12px);
 }
 </style>

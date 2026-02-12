@@ -31,23 +31,67 @@
         :key="i"
         :ref="(el) => { if (el) lineRefs[i] = el as HTMLElement }"
         @click="seekToLine(i)"
-        class="fs-lyric-line py-3 cursor-pointer"
-        :class="i === currentLineIndex ? 'is-active' : (Math.abs(i - currentLineIndex) === 1 ? 'is-near' : (Math.abs(i - currentLineIndex) === 2 ? 'is-far' : 'is-hidden'))"
+        @click.right.prevent="toggleSelectLine(i)"
+        class="fs-lyric-line py-3 cursor-pointer relative"
+        :class="[
+          i === currentLineIndex ? 'is-active' : (Math.abs(i - currentLineIndex) === 1 ? 'is-near' : (Math.abs(i - currentLineIndex) === 2 ? 'is-far' : 'is-hidden')),
+          selectedLines.has(i) ? 'ring-1 ring-accent/40 rounded-lg !bg-accent/10' : ''
+        ]"
       >
         <p class="text-[2rem] font-extrabold leading-snug">
           {{ line.text || '♪' }}
         </p>
+        <div v-if="selectedLines.has(i)" class="absolute left-2 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-accent" />
       </div>
 
       <div class="h-[45%]" />
     </div>
+
+    <!-- Selection bar -->
+    <Transition name="fs-slide-up">
+      <div
+        v-if="selectedLines.size > 0"
+        class="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-3 px-5 py-3 rounded-2xl bg-black/80 backdrop-blur-xl border border-white/10 shadow-xl"
+      >
+        <span class="text-sm text-white/50">{{ selectedLines.size }} line{{ selectedLines.size > 1 ? 's' : '' }}</span>
+        <button
+          @click="openCard"
+          class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-white text-sm font-medium hover:bg-accent-hover transition-colors"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          Create Card
+        </button>
+        <button
+          @click="clearSelection"
+          class="text-white/30 hover:text-white/60 transition-colors p-1"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    </Transition>
+
+    <!-- Lyrics Card modal -->
+    <LyricsCard
+      :visible="showCard"
+      :lyrics="selectedLyricsText"
+      :title="player.currentTrack?.title || ''"
+      :artist="player.currentTrack?.artist || ''"
+      :album="player.currentTrack?.album || ''"
+      :cover-url="coverUrl"
+      @close="showCard = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { parseLRC, findCurrentLine, type LyricLine } from '@/utils/lrcParser'
+import LyricsCard from '@/components/LyricsCard.vue'
 
 const player = usePlayerStore()
 
@@ -129,6 +173,43 @@ function seekToLine(index: number) {
     player.seek(lyrics.value[index].time)
   }
 }
+
+// ── Lyrics selection & card ──────────────────────────────────────────
+const selectedLines = ref<Set<number>>(new Set())
+const showCard = ref(false)
+
+const coverUrl = computed(() =>
+  player.currentTrack?.coverArt ? window.api.getMediaUrl(player.currentTrack.coverArt) : null,
+)
+
+const selectedLyricsText = computed(() =>
+  [...selectedLines.value].sort((a, b) => a - b).map((i) => lyrics.value[i]?.text || '').filter(Boolean),
+)
+
+function toggleSelectLine(index: number) {
+  const next = new Set(selectedLines.value)
+  if (next.has(index)) {
+    next.delete(index)
+  } else {
+    next.add(index)
+  }
+  selectedLines.value = next
+}
+
+function clearSelection() {
+  selectedLines.value = new Set()
+}
+
+function openCard() {
+  if (selectedLines.value.size === 0) return
+  showCard.value = true
+}
+
+// Clear selection when track changes
+watch(() => player.currentTrack?.path, () => {
+  selectedLines.value = new Set()
+  showCard.value = false
+})
 </script>
 
 <style scoped>
@@ -140,8 +221,6 @@ function seekToLine(index: number) {
   display: none;
 }
 
-/* Use only opacity and transform for GPU-composited, lag-free transitions.
-   No font-size or color transitions — those trigger expensive layout/paint. */
 .fs-lyric-line {
   transition: opacity 0.35s ease-out, transform 0.35s ease-out;
   will-change: opacity, transform;
@@ -176,5 +255,15 @@ function seekToLine(index: number) {
 
 .fs-lyric-line:hover {
   color: rgba(255, 255, 255, 0.3);
+}
+
+.fs-slide-up-enter-active,
+.fs-slide-up-leave-active {
+  transition: all 0.25s ease;
+}
+.fs-slide-up-enter-from,
+.fs-slide-up-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(12px);
 }
 </style>
