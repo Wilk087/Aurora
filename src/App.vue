@@ -34,6 +34,9 @@
 
     <!-- Toast notifications -->
     <ToastContainer />
+
+    <!-- Update available banner (shown once per version) -->
+    <UpdateBanner />
   </div>
 </template>
 
@@ -48,6 +51,7 @@ import Titlebar from '@/components/Titlebar.vue'
 import Sidebar from '@/components/Sidebar.vue'
 import PlayerBar from '@/components/PlayerBar.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
+import UpdateBanner from '@/components/UpdateBanner.vue'
 
 const router = useRouter()
 const route = useRoute()

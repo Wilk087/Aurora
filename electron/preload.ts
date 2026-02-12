@@ -89,6 +89,10 @@ contextBridge.exposeInMainWorld('api', {
   // Save lyrics
   saveLyrics: (trackPath: string, lrcContent: string) => ipcRenderer.invoke('lyrics:save', trackPath, lrcContent),
 
+  // App version & update checking
+  getAppVersion: (): Promise<string> => ipcRenderer.invoke('app:get-version'),
+  checkForUpdate: (): Promise<{ currentVersion: string; latestVersion: string; url: string } | null> => ipcRenderer.invoke('app:check-update'),
+
   // Utility – build a localfile:// URL for local file playback (pass through http(s) URLs)
   getMediaUrl: (filePath: string) => {
     if (!filePath) return ''

@@ -14,6 +14,7 @@
       {
         packages.default = pkgs.stdenv.mkDerivation rec {
           pname = "aurora-player";
+          # NOTE: Update version to match the version in package.json
           version = "2.1.0";
 
           src = ./.;

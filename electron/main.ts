@@ -96,6 +96,18 @@ function fetchJSON(url: string, retries = 2): Promise<string> {
   })
 }
 
+/** Compare two semver strings. Returns > 0 if a > b, < 0 if a < b, 0 if equal. */
+function compareVersions(a: string, b: string): number {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const va = pa[i] || 0
+    const vb = pb[i] || 0
+    if (va !== vb) return va - vb
+  }
+  return 0
+}
+
 async function getAlbumArtUrl(artist: string, album: string): Promise<string | null> {
   const cacheKey = `${artist}---${album}`.toLowerCase()
   if (albumArtCache.has(cacheKey)) return albumArtCache.get(cacheKey)!
@@ -1050,6 +1062,25 @@ app.whenReady().then(async () => {
   // ── IPC: Settings ──
   ipcMain.handle('settings:get', async () => await loadSettings())
   ipcMain.handle('settings:set', async (_, settings: any) => await saveSettings(settings))
+
+  // ── IPC: Update checker ──
+  ipcMain.handle('app:check-update', async () => {
+    try {
+      const currentVersion = app.getVersion()
+      const raw = await fetchJSON('https://api.github.com/repos/Wilk087/Aurora/releases/latest')
+      const data = JSON.parse(raw)
+      const latestTag: string = data.tag_name || ''
+      // Strip leading 'v' from tag (e.g. "v2.2.0" → "2.2.0")
+      const latestVersion = latestTag.replace(/^v/, '')
+      if (!latestVersion) return null
+      const isNewer = compareVersions(latestVersion, currentVersion) > 0
+      return isNewer ? { currentVersion, latestVersion, url: data.html_url || `https://github.com/Wilk087/Aurora/releases/tag/${latestTag}` } : null
+    } catch {
+      return null
+    }
+  })
+
+  ipcMain.handle('app:get-version', () => app.getVersion())
 
   // ── IPC: Favorites ──
   ipcMain.handle('favorites:get', async () => await loadFavorites())

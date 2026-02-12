@@ -680,7 +680,7 @@
           A beautiful local music player for Linux. Supports MP3, FLAC, OGG, WAV, M4A and more.
           Place .lrc files alongside your music for synced lyrics.
         </p>
-        <p class="text-xs text-white/30 mt-2">Version 2.0.0</p>
+        <p class="text-xs text-white/30 mt-2">Version {{ appVersion }}</p>
       </div>
     </section>
   </div>
@@ -695,6 +695,8 @@ import { useToast } from '@/composables/useToast'
 const library = useLibraryStore()
 const player = usePlayerStore()
 const toast = useToast()
+
+const appVersion = __APP_VERSION__
 
 const discordEnabled = ref(true)
 const discordFormat = ref('title-artist')

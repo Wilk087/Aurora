@@ -1,4 +1,5 @@
 # Maintainer: Wilk087
+# NOTE: Update pkgver to match the version in package.json
 pkgname=aurora-player
 pkgver=2.1.0
 pkgrel=1

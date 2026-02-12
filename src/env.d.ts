@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+declare const __APP_VERSION__: string
+
 declare module '*.vue' {
   import type { DefineComponent } from 'vue'
   const component: DefineComponent<{}, {}, any>
@@ -168,5 +170,8 @@ interface Window {
     subsonicGetCoverUrl: (coverArtId: string) => Promise<string>
     // LRC save
     saveLyrics: (trackPath: string, lrcContent: string) => Promise<void>
+    // App version & update checking
+    getAppVersion: () => Promise<string>
+    checkForUpdate: () => Promise<{ currentVersion: string; latestVersion: string; url: string } | null>
   }
 }
