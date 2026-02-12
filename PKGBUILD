@@ -1,11 +1,11 @@
 # Maintainer: Wilk087
 pkgname=aurora-player
-pkgver=1.0.0
+pkgver=2.1.0
 pkgrel=1
 pkgdesc="A beautiful local music player for Linux"
 arch=('x86_64')
 url="https://github.com/Wilk087/Aurora"
-license=('MIT')
+license=('GPL-3.0-or-later')
 depends=('electron28' 'gstreamer' 'gst-plugins-base' 'gst-plugins-good')
 makedepends=('npm' 'nodejs')
 source=("${pkgname}-${pkgver}.tar.gz::${url}/archive/refs/tags/v${pkgver}.tar.gz")
@@ -49,11 +49,13 @@ EOF
 
   # License
   install -Dm644 /dev/stdin "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE" << 'EOF'
-MIT License
+GNU GENERAL PUBLIC LICENSE
+Version 3, 29 June 2007
 
-Copyright (c) 2024 Wilk087
+Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
+Everyone is permitted to copy and distribute verbatim copies
+of this license document, but changing it is not allowed.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
