@@ -143,6 +143,7 @@ interface Window {
     resetCache: (targets: string[]) => Promise<Record<string, boolean>>
     // File explorer
     showInExplorer: (filePath: string) => Promise<void>
+    openPath: (dirPath: string) => Promise<void>
     // MPRIS (renderer → main)
     mprisSendMetadata: (data: { title?: string; artist?: string; album?: string; artUrl?: string; length?: number; trackId?: string }) => void
     mprisSendPlaybackStatus: (status: 'Playing' | 'Paused' | 'Stopped') => void
@@ -155,6 +156,11 @@ interface Window {
     // MPRIS commands (main → renderer)
     onMprisCommand: (callback: (command: string, data?: any) => void) => void
     removeMprisCommandListener: () => void
+    // Export / Import
+    exportRun: (customPath?: string) => Promise<string>
+    exportImport: () => Promise<{ settings: boolean; favorites: number; playlists: number } | null>
+    exportChooseDir: () => Promise<string | null>
+    exportGetDefaultPath: () => Promise<string>
     // Subsonic / Navidrome
     subsonicTest: (config: { url: string; username: string; password: string; useLegacyAuth: boolean }) => Promise<boolean>
     subsonicFetchLibrary: () => Promise<Track[]>

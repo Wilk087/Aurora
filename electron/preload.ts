@@ -71,6 +71,13 @@ contextBridge.exposeInMainWorld('api', {
 
   // File explorer
   showInExplorer: (filePath: string) => ipcRenderer.invoke('shell:show-in-explorer', filePath),
+  openPath: (dirPath: string) => ipcRenderer.invoke('shell:open-path', dirPath),
+
+  // Export / Import
+  exportRun: (customPath?: string): Promise<string> => ipcRenderer.invoke('export:run', customPath),
+  exportImport: (): Promise<{ settings: boolean; favorites: number; playlists: number } | null> => ipcRenderer.invoke('export:import'),
+  exportChooseDir: (): Promise<string | null> => ipcRenderer.invoke('export:choose-dir'),
+  exportGetDefaultPath: (): Promise<string> => ipcRenderer.invoke('export:get-default-path'),
 
   // Subsonic / Navidrome
   subsonicTest: (config: { url: string; username: string; password: string; useLegacyAuth: boolean }) =>

@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog, protocol, net, shell, screen } from 'electron'
 import { join, extname, basename, dirname } from 'path'
-import { readdir, readFile, writeFile, mkdir, stat, rm } from 'fs/promises'
+import { readdir, readFile, writeFile, mkdir, stat, rm, copyFile } from 'fs/promises'
 import { existsSync, createReadStream } from 'fs'
 import { createHash } from 'crypto'
 import { request as httpsRequest, get as httpsGet } from 'https'
@@ -418,6 +418,75 @@ async function loadSettings(): Promise<any> {
 
 async function saveSettings(settings: any): Promise<void> {
   await writeFile(settingsPath, JSON.stringify(settings, null, 2))
+  scheduleAutoExport()
+}
+
+// ── Auto-export / backup ───────────────────────────────────────────────────
+const defaultExportPath = join(userDataPath, 'backups')
+let autoExportTimer: ReturnType<typeof setTimeout> | null = null
+
+function scheduleAutoExport() {
+  if (autoExportTimer) return
+  autoExportTimer = setTimeout(async () => {
+    autoExportTimer = null
+    try {
+      const settings = await loadSettings()
+      if (settings.autoExport === false) return
+      const exportDir = settings.exportPath || defaultExportPath
+      await performExport(exportDir, true) // silent auto-export
+    } catch {}
+  }, 10_000) // debounce 10 seconds
+}
+
+async function performExport(exportDir: string, isAuto = false): Promise<string> {
+  await mkdir(exportDir, { recursive: true })
+
+  const timestamp = isAuto ? 'latest' : new Date().toISOString().replace(/[:.]/g, '-')
+  const exportFile = join(exportDir, `aurora-backup-${timestamp}.json`)
+
+  const settings = await loadSettings()
+  const favorites = [...favoriteIds]
+  const playlistData = [...playlists]
+
+  const bundle = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    settings,
+    favorites,
+    playlists: playlistData,
+  }
+
+  await writeFile(exportFile, JSON.stringify(bundle, null, 2))
+  return exportFile
+}
+
+async function performImport(importPath: string): Promise<{ settings: boolean; favorites: number; playlists: number }> {
+  const raw = await readFile(importPath, 'utf-8')
+  const bundle = JSON.parse(raw)
+
+  const result = { settings: false, favorites: 0, playlists: 0 }
+
+  if (bundle.settings && typeof bundle.settings === 'object') {
+    // Merge — preserve exportPath and autoExport from current settings
+    const current = await loadSettings()
+    const merged = { ...bundle.settings, exportPath: current.exportPath, autoExport: current.autoExport }
+    await writeFile(settingsPath, JSON.stringify(merged, null, 2))
+    result.settings = true
+  }
+
+  if (Array.isArray(bundle.favorites)) {
+    favoriteIds = bundle.favorites
+    await writeFile(favoritesPath, JSON.stringify(favoriteIds, null, 2))
+    result.favorites = favoriteIds.length
+  }
+
+  if (Array.isArray(bundle.playlists)) {
+    playlists = bundle.playlists
+    await writeFile(playlistsPath, JSON.stringify(playlists, null, 2))
+    result.playlists = playlists.length
+  }
+
+  return result
 }
 
 // ── Favorites persistence ──────────────────────────────────────────────────
@@ -435,6 +504,7 @@ async function loadFavorites(): Promise<string[]> {
 
 async function saveFavorites(): Promise<void> {
   await writeFile(favoritesPath, JSON.stringify(favoriteIds, null, 2))
+  scheduleAutoExport()
 }
 
 // ── Playlist persistence ───────────────────────────────────────────────────
@@ -464,6 +534,7 @@ async function loadPlaylists(): Promise<Playlist[]> {
 
 async function savePlaylists(): Promise<void> {
   await writeFile(playlistsPath, JSON.stringify(playlists, null, 2))
+  scheduleAutoExport()
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -1384,6 +1455,10 @@ app.whenReady().then(async () => {
     shell.showItemInFolder(filePath)
   })
 
+  ipcMain.handle('shell:open-path', async (_, dirPath: string) => {
+    await shell.openPath(dirPath)
+  })
+
   // ── IPC: Subsonic / Navidrome ──
   ipcMain.handle('subsonic:test', async (_, cfg: { url: string; username: string; password: string; useLegacyAuth: boolean }) => {
     setSubsonicConfig(cfg)
@@ -1405,6 +1480,39 @@ app.whenReady().then(async () => {
   // ── IPC: Save lyrics ──
   ipcMain.handle('lyrics:save', async (_, trackPath: string, lrcContent: string) => {
     await saveLyricsFile(trackPath, lrcContent)
+  })
+
+  // ── IPC: Export / Import ──
+  ipcMain.handle('export:run', async (_, customPath?: string) => {
+    const settings = await loadSettings()
+    const exportDir = customPath || settings.exportPath || defaultExportPath
+    const filePath = await performExport(exportDir, false)
+    return filePath
+  })
+
+  ipcMain.handle('export:import', async () => {
+    if (!mainWindow) return null
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Import Aurora Backup',
+      filters: [{ name: 'Aurora Backup', extensions: ['json'] }],
+      properties: ['openFile'],
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    return await performImport(result.filePaths[0])
+  })
+
+  ipcMain.handle('export:choose-dir', async () => {
+    if (!mainWindow) return null
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Choose Export Folder',
+      properties: ['openDirectory', 'createDirectory'],
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths[0]
+  })
+
+  ipcMain.handle('export:get-default-path', async () => {
+    return defaultExportPath
   })
 
   // ── IPC: Reset caches ──

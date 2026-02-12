@@ -359,7 +359,10 @@
 
     <!-- ── Scrobbling ─────────────────────────────────────────────── -->
     <section class="mb-8">
-      <h2 class="text-lg font-semibold text-white mb-4">Scrobbling</h2>
+      <h2 class="text-lg font-semibold text-white mb-4">
+        Scrobbling
+        <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-yellow-500/20 text-yellow-400 uppercase tracking-wider align-middle">WIP</span>
+      </h2>
       <div class="space-y-4">
         <!-- Enable scrobbling -->
         <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
@@ -585,6 +588,86 @@
       </div>
     </section>
 
+    <!-- ── Export / Import ──────────────────────────────────────── -->
+    <section class="mb-8">
+      <h2 class="text-lg font-semibold text-white mb-4">
+        Export / Import
+        <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-yellow-500/20 text-yellow-400 uppercase tracking-wider align-middle">WIP</span>
+      </h2>
+
+      <div class="px-4 py-4 rounded-xl bg-white/[0.05] space-y-4">
+        <p class="text-xs text-white/40">Backup your settings, favorites, and playlists. Auto-exports run in the background whenever data changes.</p>
+
+        <!-- Auto-export toggle -->
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm text-white/80">Auto-Export on Change</p>
+            <p class="text-xs text-white/30 mt-0.5">Automatically save a backup when settings, favorites, or playlists change</p>
+          </div>
+          <button
+            @click="toggleAutoExport"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="autoExport ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              :class="autoExport ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
+
+        <!-- Export path -->
+        <div>
+          <p class="text-sm text-white/70 mb-2">Export Location</p>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white/50 truncate select-text">
+              {{ exportPath || exportDefaultPath || 'Default (app data)' }}
+            </div>
+            <button
+              @click="openExportFolder"
+              class="p-2 rounded-lg bg-white/[0.08] hover:bg-white/[0.12] text-white/40 hover:text-white/70 transition-all shrink-0"
+              title="Open folder"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+              </svg>
+            </button>
+            <button
+              @click="chooseExportPath"
+              class="px-3 py-2 rounded-lg bg-white/[0.08] hover:bg-white/[0.12] text-sm font-medium text-white/60 hover:text-white/80 transition-all shrink-0"
+            >
+              Browse
+            </button>
+            <button
+              v-if="exportPath"
+              @click="resetExportPath"
+              class="px-3 py-2 rounded-lg bg-white/[0.08] hover:bg-white/[0.12] text-xs text-white/40 hover:text-white/60 transition-all shrink-0"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="flex items-center gap-2 pt-1">
+          <button
+            @click="runExport"
+            :disabled="exporting"
+            class="px-5 py-2 rounded-lg bg-accent hover:bg-accent-hover disabled:opacity-40 text-sm font-medium text-white transition-colors"
+          >
+            {{ exporting ? 'Exporting...' : 'Export Now' }}
+          </button>
+          <button
+            @click="runImport"
+            :disabled="importing"
+            class="px-5 py-2 rounded-lg bg-white/[0.08] hover:bg-white/[0.12] disabled:opacity-40 text-sm font-medium text-white/70 hover:text-white/90 transition-all"
+          >
+            {{ importing ? 'Importing...' : 'Import Backup' }}
+          </button>
+        </div>
+      </div>
+    </section>
+
     <!-- ── About ──────────────────────────────────────────────────── -->
     <section>
       <h2 class="text-lg font-semibold text-white mb-4">About</h2>
@@ -597,7 +680,7 @@
           A beautiful local music player for Linux. Supports MP3, FLAC, OGG, WAV, M4A and more.
           Place .lrc files alongside your music for synced lyrics.
         </p>
-        <p class="text-xs text-white/30 mt-2">Version 1.0.0</p>
+        <p class="text-xs text-white/30 mt-2">Version 2.0.0</p>
       </div>
     </section>
   </div>
@@ -636,6 +719,13 @@ const subsonicLegacyAuth = ref(false)
 const subsonicTesting = ref(false)
 const subsonicSyncing = ref(false)
 const subsonicConnected = ref(false)
+
+// Export / Import
+const autoExport = ref(true)
+const exportPath = ref('')
+const exportDefaultPath = ref('')
+const exporting = ref(false)
+const importing = ref(false)
 
 // Lyrics offset display
 const lyricsOffsetDisplay = computed(() => {
@@ -692,6 +782,11 @@ onMounted(async () => {
   subsonicPassword.value = settings.subsonicPassword || ''
   subsonicLegacyAuth.value = settings.subsonicLegacyAuth === true
   subsonicConnected.value = settings.subsonicConnected === true
+
+  // Load export settings
+  autoExport.value = settings.autoExport !== false // default true
+  exportPath.value = settings.exportPath || ''
+  exportDefaultPath.value = await window.api.exportGetDefaultPath()
 
   // Enumerate audio devices
   player.enumerateOutputDevices()
@@ -861,6 +956,74 @@ async function syncSubsonicLibrary() {
     toast.error(`Sync failed: ${e.message || e}`)
   } finally {
     subsonicSyncing.value = false
+  }
+}
+
+// ── Export / Import ───────────────────────
+async function toggleAutoExport() {
+  autoExport.value = !autoExport.value
+  const settings = await window.api.getSettings()
+  settings.autoExport = autoExport.value
+  await window.api.saveSettings(settings)
+  toast.success(`Auto-export ${autoExport.value ? 'enabled' : 'disabled'}`)
+}
+
+async function chooseExportPath() {
+  const dir = await window.api.exportChooseDir()
+  if (!dir) return
+  exportPath.value = dir
+  const settings = await window.api.getSettings()
+  settings.exportPath = dir
+  await window.api.saveSettings(settings)
+  toast.success('Export location updated')
+}
+
+async function resetExportPath() {
+  exportPath.value = ''
+  const settings = await window.api.getSettings()
+  delete settings.exportPath
+  await window.api.saveSettings(settings)
+  toast.success('Export location reset to default')
+}
+
+async function openExportFolder() {
+  const dir = exportPath.value || exportDefaultPath.value
+  if (dir) {
+    await window.api.openPath(dir)
+  }
+}
+
+async function runExport() {
+  exporting.value = true
+  try {
+    const filePath = await window.api.exportRun(exportPath.value || undefined)
+    toast.success(`Backup saved to ${filePath.split('/').pop()}`)
+  } catch (e: any) {
+    toast.error(`Export failed: ${e.message || e}`)
+  } finally {
+    exporting.value = false
+  }
+}
+
+async function runImport() {
+  importing.value = true
+  try {
+    const result = await window.api.exportImport()
+    if (!result) { importing.value = false; return }
+    const parts: string[] = []
+    if (result.settings) parts.push('settings')
+    if (result.favorites > 0) parts.push(`${result.favorites} favorites`)
+    if (result.playlists > 0) parts.push(`${result.playlists} playlists`)
+    toast.success(`Imported: ${parts.join(', ')}`)
+    // Reload everything
+    await library.loadLibrary()
+    const settings = await window.api.getSettings()
+    autoExport.value = settings.autoExport !== false
+    exportPath.value = settings.exportPath || ''
+  } catch (e: any) {
+    toast.error(`Import failed: ${e.message || e}`)
+  } finally {
+    importing.value = false
   }
 }
 
