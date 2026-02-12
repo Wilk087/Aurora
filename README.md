@@ -1,6 +1,6 @@
 # Aurora Player
 
-Aurora Player is a local music player for Linux and Windows, built with Electron, Vue 3, and Tailwind CSS. It focuses on a feature-rich, clean, modern interface for managing and playing your personal music library.
+Aurora Player is a local music player for Linux and Windows, built with Electron, Vue 3, and Tailwind CSS. It focuses on a feature-rich, clean and modern interface for managing and playing your personal music library.
 
 > **Note:** This project was developed with the assistance of AI tools. All code has been reviewed and tested by the maintainer.
 
@@ -33,7 +33,7 @@ Aurora Player is a local music player for Linux and Windows, built with Electron
 
 - Now playing view with synced lyrics, album art, and waveform bar
 - Adaptive accent colors extracted from album art
-- Sonoma-inspired fullscreen mode with background blur and lyrics
+- Fullscreen mode with background blur and lyrics
 - Auto-fullscreen on idle (configurable delay)
 
 ### Lyrics
