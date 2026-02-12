@@ -72,8 +72,21 @@ contextBridge.exposeInMainWorld('api', {
   // File explorer
   showInExplorer: (filePath: string) => ipcRenderer.invoke('shell:show-in-explorer', filePath),
 
-  // Utility – build a localfile:// URL for local file playback
+  // Subsonic / Navidrome
+  subsonicTest: (config: { url: string; username: string; password: string; useLegacyAuth: boolean }) =>
+    ipcRenderer.invoke('subsonic:test', config),
+  subsonicFetchLibrary: (): Promise<any[]> => ipcRenderer.invoke('subsonic:fetch-library'),
+  subsonicGetStreamUrl: (songId: string): Promise<string> => ipcRenderer.invoke('subsonic:stream-url', songId),
+  subsonicGetCoverUrl: (coverArtId: string): Promise<string> => ipcRenderer.invoke('subsonic:cover-url', coverArtId),
+
+  // Save lyrics
+  saveLyrics: (trackPath: string, lrcContent: string) => ipcRenderer.invoke('lyrics:save', trackPath, lrcContent),
+
+  // Utility – build a localfile:// URL for local file playback (pass through http(s) URLs)
   getMediaUrl: (filePath: string) => {
+    if (!filePath) return ''
+    // Pass through HTTP(S) URLs (e.g. subsonic cover art or streams)
+    if (filePath.startsWith('http://') || filePath.startsWith('https://')) return filePath
     // encodeURI doesn't encode #, ?, &, =, +, etc. which break URL parsing
     const encoded = encodeURI(filePath)
       .replace(/#/g, '%23')

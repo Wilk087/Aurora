@@ -390,20 +390,30 @@ export const usePlayerStore = defineStore('player', () => {
   })
 
   // ── Internal helpers ─────────────────────────────────────────────────────
-  function loadTrack(track: Track) {
+  async function loadTrack(track: Track) {
     currentTrack.value = track
     duration.value = track.duration || 0
     isLoading.value = true
-    audio.src = window.api.getMediaUrl(track.path)
+
+    // Resolve audio source
+    if (track.source === 'subsonic' && track.path.startsWith('subsonic://')) {
+      const songId = track.path.replace('subsonic://', '')
+      const streamUrl = await window.api.subsonicGetStreamUrl(songId)
+      audio.src = streamUrl
+    } else {
+      audio.src = window.api.getMediaUrl(track.path)
+    }
     audio.load()
 
     // Reset scrobble tracking for new track
     scrobbleReported = false
     if (scrobbleTimer) { clearTimeout(scrobbleTimer); scrobbleTimer = null }
 
-    // Generate waveform if enabled
-    if (waveformEnabled.value) {
+    // Generate waveform if enabled (only for local files)
+    if (waveformEnabled.value && track.source !== 'subsonic') {
       generateWaveform(track.path)
+    } else if (track.source === 'subsonic') {
+      waveformData.value = []
     }
 
     // Scrobble: update now playing
@@ -430,23 +440,35 @@ export const usePlayerStore = defineStore('player', () => {
 
     // MPRIS metadata (custom D-Bus service for Linux)
     if (track.coverArt) {
-      window.api.getCoverFileUrl(track.coverArt).then((artUrl: string) => {
+      if (track.source === 'subsonic') {
+        // Subsonic cover art is already an HTTP URL
         window.api.mprisSendMetadata({
           title: track.title,
           artist: track.artist,
           album: track.album,
-          artUrl,
+          artUrl: track.coverArt,
           length: track.duration || 0,
           trackId: `/org/mpris/MediaPlayer2/Track/${track.id?.replace(/[^a-zA-Z0-9]/g, '_') || 'unknown'}`,
         })
-      }).catch(() => {
-        window.api.mprisSendMetadata({
-          title: track.title,
-          artist: track.artist,
-          album: track.album,
-          length: track.duration || 0,
+      } else {
+        window.api.getCoverFileUrl(track.coverArt).then((artUrl: string) => {
+          window.api.mprisSendMetadata({
+            title: track.title,
+            artist: track.artist,
+            album: track.album,
+            artUrl,
+            length: track.duration || 0,
+            trackId: `/org/mpris/MediaPlayer2/Track/${track.id?.replace(/[^a-zA-Z0-9]/g, '_') || 'unknown'}`,
+          })
+        }).catch(() => {
+          window.api.mprisSendMetadata({
+            title: track.title,
+            artist: track.artist,
+            album: track.album,
+            length: track.duration || 0,
+          })
         })
-      })
+      }
     } else {
       window.api.mprisSendMetadata({
         title: track.title,

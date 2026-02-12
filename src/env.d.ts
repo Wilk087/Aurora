@@ -19,6 +19,7 @@ interface Track {
   genre: string
   year: number
   coverArt: string | null
+  source?: 'local' | 'subsonic'
   // Extended metadata for credits
   composer?: string
   lyricist?: string
@@ -142,5 +143,24 @@ interface Window {
     resetCache: (targets: string[]) => Promise<Record<string, boolean>>
     // File explorer
     showInExplorer: (filePath: string) => Promise<void>
+    // MPRIS (renderer → main)
+    mprisSendMetadata: (data: { title?: string; artist?: string; album?: string; artUrl?: string; length?: number; trackId?: string }) => void
+    mprisSendPlaybackStatus: (status: 'Playing' | 'Paused' | 'Stopped') => void
+    mprisSendPosition: (seconds: number) => void
+    mprisSendVolume: (vol: number) => void
+    mprisSendLoopStatus: (mode: string) => void
+    mprisSendShuffle: (enabled: boolean) => void
+    mprisSendSeeked: (seconds: number) => void
+    getCoverFileUrl: (coverPath: string) => Promise<string>
+    // MPRIS commands (main → renderer)
+    onMprisCommand: (callback: (command: string, data?: any) => void) => void
+    removeMprisCommandListener: () => void
+    // Subsonic / Navidrome
+    subsonicTest: (config: { url: string; username: string; password: string; useLegacyAuth: boolean }) => Promise<boolean>
+    subsonicFetchLibrary: () => Promise<Track[]>
+    subsonicGetStreamUrl: (songId: string) => Promise<string>
+    subsonicGetCoverUrl: (coverArtId: string) => Promise<string>
+    // LRC save
+    saveLyrics: (trackPath: string, lrcContent: string) => Promise<void>
   }
 }

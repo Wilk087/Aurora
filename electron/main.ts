@@ -9,6 +9,10 @@ import {
   updateMprisPosition, updateMprisVolume, updateMprisLoopStatus, updateMprisShuffle,
   emitMprisSeeked,
 } from './mpris'
+import {
+  setSubsonicConfig, subsonicPing, subsonicGetAllSongs,
+  getStreamUrl, getCoverArtUrl,
+} from './subsonic'
 
 // ── Discord Rich Presence ──────────────────────────────────────────────────
 // Uses discord-rpc to show what's currently playing
@@ -875,6 +879,16 @@ app.whenReady().then(async () => {
     if (settings.discordRPC !== false) {
       initDiscordRPC(settings.discordClientId)
     }
+
+    // Restore Subsonic config if previously connected
+    if (settings.subsonicUrl && settings.subsonicUsername && settings.subsonicPassword) {
+      setSubsonicConfig({
+        url: settings.subsonicUrl,
+        username: settings.subsonicUsername,
+        password: settings.subsonicPassword,
+        useLegacyAuth: settings.subsonicLegacyAuth === true,
+      })
+    }
   })
 
   // ── IPC: Dialogs ──
@@ -1368,6 +1382,29 @@ app.whenReady().then(async () => {
   // ── IPC: Show in file explorer ──
   ipcMain.handle('shell:show-in-explorer', async (_, filePath: string) => {
     shell.showItemInFolder(filePath)
+  })
+
+  // ── IPC: Subsonic / Navidrome ──
+  ipcMain.handle('subsonic:test', async (_, cfg: { url: string; username: string; password: string; useLegacyAuth: boolean }) => {
+    setSubsonicConfig(cfg)
+    return await subsonicPing()
+  })
+
+  ipcMain.handle('subsonic:fetch-library', async () => {
+    return await subsonicGetAllSongs()
+  })
+
+  ipcMain.handle('subsonic:stream-url', async (_, songId: string) => {
+    return getStreamUrl(songId)
+  })
+
+  ipcMain.handle('subsonic:cover-url', async (_, coverArtId: string) => {
+    return getCoverArtUrl(coverArtId)
+  })
+
+  // ── IPC: Save lyrics ──
+  ipcMain.handle('lyrics:save', async (_, trackPath: string, lrcContent: string) => {
+    await saveLyricsFile(trackPath, lrcContent)
   })
 
   // ── IPC: Reset caches ──

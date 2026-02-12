@@ -86,6 +86,7 @@ watch(
     }
 
     const img = new Image()
+    img.crossOrigin = 'anonymous'
     img.src = window.api.getMediaUrl(coverArt)
 
     img.onload = () => {

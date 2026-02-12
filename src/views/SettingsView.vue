@@ -433,6 +433,83 @@
       </div>
     </section>
 
+    <!-- ── Navidrome / Subsonic ─────────────────────────────────── -->
+    <section class="mb-8">
+      <h2 class="text-lg font-semibold text-white mb-4">
+        Navidrome / Subsonic
+        <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-yellow-500/20 text-yellow-400 uppercase tracking-wider align-middle">WIP</span>
+      </h2>
+
+      <div class="px-4 py-4 rounded-xl bg-white/[0.05] space-y-4">
+        <p class="text-xs text-white/40">Connect to a Navidrome or Subsonic-compatible server to stream your remote library alongside local files.</p>
+
+        <div class="space-y-2">
+          <input
+            v-model="subsonicUrl"
+            type="url"
+            placeholder="Server URL (e.g. https://navidrome.example.com)"
+            class="w-full px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white/80 placeholder:text-white/20 outline-none focus:border-accent/40 transition-colors"
+          />
+          <div class="grid grid-cols-2 gap-2">
+            <input
+              v-model="subsonicUsername"
+              type="text"
+              placeholder="Username"
+              class="px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white/80 placeholder:text-white/20 outline-none focus:border-accent/40 transition-colors"
+            />
+            <input
+              v-model="subsonicPassword"
+              type="password"
+              placeholder="Password"
+              class="px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white/80 placeholder:text-white/20 outline-none focus:border-accent/40 transition-colors"
+            />
+          </div>
+        </div>
+
+        <!-- Legacy auth toggle -->
+        <div class="flex items-center justify-between">
+          <div>
+            <span class="text-sm text-white/70">Legacy Authentication</span>
+            <p class="text-xs text-white/30">Use password-based auth instead of token (for older servers)</p>
+          </div>
+          <button
+            @click="subsonicLegacyAuth = !subsonicLegacyAuth"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="subsonicLegacyAuth ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              :class="subsonicLegacyAuth ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="flex items-center gap-2">
+          <button
+            @click="testSubsonic"
+            :disabled="subsonicTesting || !subsonicUrl || !subsonicUsername || !subsonicPassword"
+            class="px-4 py-2 rounded-lg bg-accent hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium text-white transition-colors"
+          >
+            {{ subsonicTesting ? 'Testing...' : 'Test Connection' }}
+          </button>
+          <button
+            @click="syncSubsonicLibrary"
+            :disabled="subsonicSyncing || !subsonicConnected"
+            class="px-4 py-2 rounded-lg bg-white/[0.08] hover:bg-white/[0.12] disabled:opacity-40 disabled:cursor-not-allowed text-sm font-medium text-white/70 hover:text-white/90 transition-all"
+          >
+            {{ subsonicSyncing ? 'Syncing...' : 'Sync Library' }}
+          </button>
+        </div>
+
+        <!-- Connection status -->
+        <div v-if="subsonicConnected" class="flex items-center gap-2">
+          <div class="w-2 h-2 rounded-full bg-green-400" />
+          <span class="text-xs text-green-400/80">Connected</span>
+        </div>
+      </div>
+    </section>
+
     <!-- ── Cache Management ─────────────────────────────────────── -->
     <section class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Cache</h2>
@@ -551,6 +628,15 @@ const lastfmApiSecret = ref('')
 const lastfmSessionKey = ref('')
 const listenbrainzToken = ref('')
 
+// Subsonic / Navidrome
+const subsonicUrl = ref('')
+const subsonicUsername = ref('')
+const subsonicPassword = ref('')
+const subsonicLegacyAuth = ref(false)
+const subsonicTesting = ref(false)
+const subsonicSyncing = ref(false)
+const subsonicConnected = ref(false)
+
 // Lyrics offset display
 const lyricsOffsetDisplay = computed(() => {
   const v = player.lyricsOffset
@@ -599,6 +685,13 @@ onMounted(async () => {
   lastfmApiSecret.value = settings.lastfmApiSecret || ''
   lastfmSessionKey.value = settings.lastfmSessionKey || ''
   listenbrainzToken.value = settings.listenbrainzToken || ''
+
+  // Load Subsonic settings
+  subsonicUrl.value = settings.subsonicUrl || ''
+  subsonicUsername.value = settings.subsonicUsername || ''
+  subsonicPassword.value = settings.subsonicPassword || ''
+  subsonicLegacyAuth.value = settings.subsonicLegacyAuth === true
+  subsonicConnected.value = settings.subsonicConnected === true
 
   // Enumerate audio devices
   player.enumerateOutputDevices()
@@ -724,6 +817,51 @@ async function saveListenbrainz() {
   settings.listenbrainzToken = listenbrainzToken.value
   await window.api.saveSettings(settings)
   toast.success('ListenBrainz token saved')
+}
+
+// ── Subsonic / Navidrome ──────────────────
+async function testSubsonic() {
+  subsonicTesting.value = true
+  try {
+    const ok = await window.api.subsonicTest({
+      url: subsonicUrl.value.replace(/\/+$/, ''),
+      username: subsonicUsername.value,
+      password: subsonicPassword.value,
+      useLegacyAuth: subsonicLegacyAuth.value,
+    })
+    if (ok) {
+      subsonicConnected.value = true
+      const settings = await window.api.getSettings()
+      settings.subsonicUrl = subsonicUrl.value.replace(/\/+$/, '')
+      settings.subsonicUsername = subsonicUsername.value
+      settings.subsonicPassword = subsonicPassword.value
+      settings.subsonicLegacyAuth = subsonicLegacyAuth.value
+      settings.subsonicConnected = true
+      await window.api.saveSettings(settings)
+      toast.success('Connected to server')
+    } else {
+      subsonicConnected.value = false
+      toast.error('Connection failed — check credentials')
+    }
+  } catch (e: any) {
+    subsonicConnected.value = false
+    toast.error(`Connection error: ${e.message || e}`)
+  } finally {
+    subsonicTesting.value = false
+  }
+}
+
+async function syncSubsonicLibrary() {
+  subsonicSyncing.value = true
+  try {
+    const tracks = await window.api.subsonicFetchLibrary()
+    library.mergeSubsonicTracks(tracks)
+    toast.success(`Synced ${tracks.length} tracks from server`)
+  } catch (e: any) {
+    toast.error(`Sync failed: ${e.message || e}`)
+  } finally {
+    subsonicSyncing.value = false
+  }
 }
 
 // ── Cache Management ──────────────────────

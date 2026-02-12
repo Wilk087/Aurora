@@ -25,7 +25,9 @@ function normalize(str: string): string {
 }
 
 export const useLibraryStore = defineStore('library', () => {
-  const tracks = shallowRef<Track[]>([])
+  const localTracks = shallowRef<Track[]>([])
+  const subsonicTracks = shallowRef<Track[]>([])
+  const tracks = computed<Track[]>(() => [...localTracks.value, ...subsonicTracks.value])
   const folders = ref<string[]>([])
   const isScanning = ref(false)
   const libraryReady = ref(false)
@@ -155,9 +157,12 @@ export const useLibraryStore = defineStore('library', () => {
       window.api.getLibrary(),
       window.api.getFolders(),
     ])
-    tracks.value = rawTracks.map((t: Track) => markRaw(t))
+    localTracks.value = rawTracks.map((t: Track) => markRaw(t))
     folders.value = rawFolders
     libraryReady.value = true
+
+    // Auto-load subsonic library if configured
+    autoLoadSubsonic()
   }
 
   async function addFolder() {
@@ -173,7 +178,7 @@ export const useLibraryStore = defineStore('library', () => {
 
     try {
       const rawTracks = await window.api.scanFolder(folderPath)
-      tracks.value = rawTracks.map((t: Track) => markRaw(t))
+      localTracks.value = rawTracks.map((t: Track) => markRaw(t))
       folders.value = await window.api.getFolders()
     } finally {
       isScanning.value = false
@@ -183,7 +188,7 @@ export const useLibraryStore = defineStore('library', () => {
 
   async function removeFolder(folderPath: string) {
     const result = await window.api.removeFolder(folderPath)
-    tracks.value = result.tracks.map((t: Track) => markRaw(t))
+    localTracks.value = result.tracks.map((t: Track) => markRaw(t))
     folders.value = result.folders
   }
 
@@ -197,7 +202,7 @@ export const useLibraryStore = defineStore('library', () => {
     try {
       for (const folder of folders.value) {
         const rawTracks = await window.api.scanFolder(folder)
-        tracks.value = rawTracks.map((t: Track) => markRaw(t))
+        localTracks.value = rawTracks.map((t: Track) => markRaw(t))
       }
     } finally {
       isScanning.value = false
@@ -207,6 +212,33 @@ export const useLibraryStore = defineStore('library', () => {
 
   function getAlbumById(id: string): Album | undefined {
     return albums.value.find((a) => a.id === id)
+  }
+
+  /** Merge Subsonic tracks from server into the library */
+  function mergeSubsonicTracks(rawTracks: Track[]) {
+    subsonicTracks.value = rawTracks.map((t: Track) => markRaw({ ...t, source: 'subsonic' as const }))
+  }
+
+  /** Auto-load subsonic library if previously connected */
+  async function autoLoadSubsonic() {
+    try {
+      const settings = await window.api.getSettings()
+      if (settings.subsonicConnected && settings.subsonicUrl && settings.subsonicUsername && settings.subsonicPassword) {
+        // Re-authenticate
+        const ok = await window.api.subsonicTest({
+          url: settings.subsonicUrl,
+          username: settings.subsonicUsername,
+          password: settings.subsonicPassword,
+          useLegacyAuth: settings.subsonicLegacyAuth === true,
+        })
+        if (ok) {
+          const remoteTracks = await window.api.subsonicFetchLibrary()
+          mergeSubsonicTracks(remoteTracks)
+        }
+      }
+    } catch {
+      // Silently ignore — subsonic is optional
+    }
   }
 
   return {
@@ -231,5 +263,6 @@ export const useLibraryStore = defineStore('library', () => {
     getAlbumById,
     setSortOrder,
     setAlbumSortOrder,
+    mergeSubsonicTracks,
   }
 })

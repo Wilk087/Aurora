@@ -10,7 +10,7 @@
     </div>
 
     <!-- No lyrics -->
-    <div v-else-if="lyrics.length === 0" class="text-center">
+    <div v-else-if="lyrics.length === 0 && !plainLyricsText" class="text-center">
       <svg class="w-16 h-16 text-white/10 mx-auto mb-4" fill="currentColor" viewBox="0 0 24 24">
         <path
           d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
@@ -18,6 +18,32 @@
       </svg>
       <p class="text-white/30 text-sm">No lyrics available</p>
       <p class="text-white/20 text-xs mt-1">No local .lrc file or online results found</p>
+    </div>
+
+    <!-- Plain / unsynced lyrics (no timestamps) -->
+    <div v-else-if="lyrics.length === 0 && plainLyricsText" class="flex flex-col items-center justify-center h-full px-6">
+      <div class="w-full max-w-lg overflow-y-auto max-h-[60vh] mb-6 px-4">
+        <p
+          v-for="(line, i) in plainLyricsLines"
+          :key="i"
+          class="text-center text-white/40 text-sm leading-relaxed py-1"
+        >
+          {{ line || '\u00A0' }}
+        </p>
+      </div>
+      <div class="text-center">
+        <p class="text-white/20 text-xs mb-3">These lyrics aren't synced yet</p>
+        <button
+          v-if="player.currentTrack?.source !== 'subsonic'"
+          @click="showSyncer = true"
+          class="px-5 py-2.5 rounded-full bg-accent hover:bg-accent-hover text-sm font-medium text-white transition-colors inline-flex items-center gap-2"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Sync Lyrics
+        </button>
+      </div>
     </div>
 
     <!-- Synced lyrics -->
@@ -85,6 +111,15 @@
       :cover-url="coverUrl"
       @close="showCard = false"
     />
+
+    <!-- LRC Syncer modal -->
+    <LrcSyncer
+      :visible="showSyncer"
+      :plain-lyrics="plainLyricsText"
+      :track-path="player.currentTrack?.path || ''"
+      @close="showSyncer = false"
+      @saved="onSyncSaved"
+    />
   </div>
 </template>
 
@@ -93,21 +128,26 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { parseLRC, findCurrentLine, type LyricLine } from '@/utils/lrcParser'
 import LyricsCard from '@/components/LyricsCard.vue'
+import LrcSyncer from '@/components/LrcSyncer.vue'
 
 const player = usePlayerStore()
 
 const lyrics = ref<LyricLine[]>([])
+const plainLyricsText = ref('')
 const loading = ref(false)
 const searchingOnline = ref(false)
 const currentLineIndex = ref(-1)
 const lyricsContainer = ref<HTMLElement | null>(null)
 const lineRefs = ref<Record<number, HTMLElement>>({})
+const showSyncer = ref(false)
 
+const plainLyricsLines = computed(() => plainLyricsText.value.split('\n').map(l => l.trim()))
 // Load lyrics when track changes
 watch(
   () => player.currentTrack?.path,
   async (path) => {
     lyrics.value = []
+    plainLyricsText.value = ''
     currentLineIndex.value = -1
     lineRefs.value = {}
     searchingOnline.value = false
@@ -122,7 +162,13 @@ watch(
       // 1. Try local .lrc file first
       const lrc = await window.api.getLyrics(path)
       if (lrc) {
-        lyrics.value = parseLRC(lrc)
+        const parsed = parseLRC(lrc)
+        if (parsed.length > 0) {
+          lyrics.value = parsed
+          return
+        }
+        // Local file exists but has no timestamps → treat as plain
+        plainLyricsText.value = lrc
         return
       }
 
@@ -137,7 +183,13 @@ watch(
         duration: track.duration,
       })
       if (onlineLrc) {
-        lyrics.value = parseLRC(onlineLrc)
+        const parsed = parseLRC(onlineLrc)
+        if (parsed.length > 0) {
+          lyrics.value = parsed
+        } else {
+          // Got plain/unsynced lyrics from online
+          plainLyricsText.value = onlineLrc
+        }
       }
     } catch (err) {
       console.error('Error loading lyrics:', err)
@@ -220,6 +272,13 @@ function clearSelection() {
 function openCard() {
   if (selectedLines.value.size === 0) return
   showCard.value = true
+}
+
+/** Called when the LRC syncer saves, re-parse the new synced content */
+function onSyncSaved(lrcContent: string) {
+  showSyncer.value = false
+  plainLyricsText.value = ''
+  lyrics.value = parseLRC(lrcContent)
 }
 
 // Clear selection when track changes
