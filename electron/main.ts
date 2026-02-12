@@ -53,7 +53,7 @@ function fetchJSON(url: string, retries = 2): Promise<string> {
   return new Promise((resolve, reject) => {
     const req = httpsGet(url, {
       headers: {
-        'User-Agent': 'AuroraPlayer/1.0.0 (https://github.com/Wilk087/Aurora)',
+        'User-Agent': `AuroraPlayer/${app.getVersion()} (https://github.com/Wilk087/Aurora)`,
         'Accept': 'application/json',
       },
       timeout: 10000,
@@ -661,7 +661,7 @@ async function findLocalLyrics(audioPath: string): Promise<string | null> {
 
 function lrclibFetch(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    httpsRequest(url, { headers: { 'User-Agent': 'AuroraPlayer/1.0' } }, (res) => {
+    httpsRequest(url, { headers: { 'User-Agent': `AuroraPlayer/${app.getVersion()}` } }, (res) => {
       let data = ''
       res.on('data', (chunk) => (data += chunk))
       res.on('end', () => resolve(data))
@@ -1375,13 +1375,20 @@ app.whenReady().then(async () => {
 
     try {
       const query = encodeURIComponent(artistName)
-      const mbUrl = `https://musicbrainz.org/ws/2/artist/?query=artist:${query}&fmt=json&limit=1`
+      // Use quoted exact match to avoid e.g. "bôa" returning "BoA"
+      const exactQuery = encodeURIComponent(`"${artistName}"`)
+      const mbUrl = `https://musicbrainz.org/ws/2/artist/?query=artist:${exactQuery}&fmt=json&limit=5`
       const mbRaw = await fetchJSON(mbUrl)
       const mbData = JSON.parse(mbRaw)
 
       if (!mbData.artists || mbData.artists.length === 0) return null
 
-      const artist = mbData.artists[0]
+      // Pick the best match: prefer exact name match (case-insensitive, accent-sensitive)
+      const normalize = (s: string) => s.toLowerCase().trim()
+      const target = normalize(artistName)
+      const artist = mbData.artists.find((a: any) => normalize(a.name) === target)
+        || mbData.artists.find((a: any) => normalize(a['sort-name'] || '') === target)
+        || mbData.artists[0]
       const info: any = {
         name: artist.name || artistName,
         disambiguation: artist.disambiguation || '',
