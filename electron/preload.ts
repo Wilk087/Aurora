@@ -94,8 +94,13 @@ contextBridge.exposeInMainWorld('api', {
     if (!filePath) return ''
     // Pass through HTTP(S) URLs (e.g. subsonic cover art or streams)
     if (filePath.startsWith('http://') || filePath.startsWith('https://')) return filePath
+    // Normalize Windows backslashes to forward slashes
+    let normalized = filePath.replace(/\\/g, '/')
+    // Ensure path starts with / so drive letters aren't parsed as URL host
+    // (Windows: C:/Users/... → /C:/Users/..., Linux already starts with /)
+    if (!normalized.startsWith('/')) normalized = '/' + normalized
     // encodeURI doesn't encode #, ?, &, =, +, etc. which break URL parsing
-    const encoded = encodeURI(filePath)
+    const encoded = encodeURI(normalized)
       .replace(/#/g, '%23')
       .replace(/\?/g, '%3F')
       .replace(/&/g, '%26')

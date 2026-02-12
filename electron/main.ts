@@ -874,9 +874,13 @@ app.whenReady().then(async () => {
   protocol.handle('localfile', async (request) => {
     try {
       const url = new URL(request.url)
-      const filePath = decodeURIComponent(url.pathname)
+      let filePath = decodeURIComponent(url.pathname)
       if (!filePath || filePath === '/') {
         return new Response('Not found', { status: 404 })
+      }
+      // On Windows, strip leading / from /C:/... paths
+      if (process.platform === 'win32' && /^\/[a-zA-Z]:/.test(filePath)) {
+        filePath = filePath.slice(1)
       }
 
       const fileStat = await stat(filePath)
