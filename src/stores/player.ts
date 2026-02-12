@@ -5,7 +5,37 @@ export const usePlayerStore = defineStore('player', () => {
   // ── Internal audio element ───────────────────────────────────────────────
   const audio = new Audio()
   audio.preload = 'auto'
+  // ── Web Audio API chain for normalization ───────────────────────────────
+  let audioCtx: AudioContext | null = null
+  let sourceNode: MediaElementAudioSourceNode | null = null
+  let compressorNode: DynamicsCompressorNode | null = null
+  let gainNode: GainNode | null = null
 
+  function initAudioChain() {
+    if (audioCtx) return
+    audioCtx = new AudioContext()
+    sourceNode = audioCtx.createMediaElementSource(audio)
+    compressorNode = audioCtx.createDynamicsCompressor()
+    // Gentle normalization settings
+    compressorNode.threshold.value = -24   // start compressing at -24dB
+    compressorNode.knee.value = 12         // soft knee
+    compressorNode.ratio.value = 4         // 4:1 compression
+    compressorNode.attack.value = 0.003    // fast attack
+    compressorNode.release.value = 0.25    // moderate release
+    gainNode = audioCtx.createGain()
+    gainNode.gain.value = 1.4              // make-up gain
+    // Chain: source -> compressor -> gain -> output
+    sourceNode.connect(compressorNode)
+    compressorNode.connect(gainNode)
+    gainNode.connect(audioCtx.destination)
+  }
+
+  function initAudioBypass() {
+    if (audioCtx) return
+    audioCtx = new AudioContext()
+    sourceNode = audioCtx.createMediaElementSource(audio)
+    sourceNode.connect(audioCtx.destination)
+  }
   // ── Reactive state ───────────────────────────────────────────────────────
   const currentTrack = ref<Track | null>(null)
   const queue = ref<Track[]>([])
@@ -76,6 +106,16 @@ export const usePlayerStore = defineStore('player', () => {
   // ── Adaptive accent ────────────────────────────────────────────────────
   const adaptiveAccent = ref(false)
   const currentAccentColor = ref<string | null>(null)
+
+  // ── iOS-style sliders ──────────────────────────────────────────────────
+  const iosSliders = ref(false)
+
+  // ── Auto-fullscreen on idle ─────────────────────────────────────────
+  const autoFullscreen = ref(false)
+  const autoFullscreenDelay = ref(30) // seconds
+
+  // ── Audio normalization ───────────────────────────────────────────────
+  const normalization = ref(false)
 
   // ── Scrobbling ──────────────────────────────────────────────────────────
   let scrobblingEnabled = false
@@ -162,10 +202,12 @@ export const usePlayerStore = defineStore('player', () => {
   })
 
   // ── Watchers ─────────────────────────────────────────────────────────────
-  audio.volume = volume.value
+  // Apply a quadratic curve so the slider feels more natural
+  // (perceived loudness is logarithmic; linear volume is way too loud at the top)
+  audio.volume = volume.value * volume.value
 
   watch(volume, (val) => {
-    audio.volume = val
+    audio.volume = val * val
     if (val > 0 && isMuted.value) isMuted.value = false
     // Persist volume
     window.api.getSettings().then((s: any) => {
@@ -186,10 +228,98 @@ export const usePlayerStore = defineStore('player', () => {
     if (s.lyricsOffset !== undefined) lyricsOffset.value = s.lyricsOffset
     if (s.waveformEnabled === true) waveformEnabled.value = true
     if (s.adaptiveAccent === true) adaptiveAccent.value = true
+    if (s.iosSliders === true) iosSliders.value = true
+    if (s.autoFullscreen === true) autoFullscreen.value = true
+    if (s.autoFullscreenDelay !== undefined) autoFullscreenDelay.value = s.autoFullscreenDelay
+    if (s.normalization === true) {
+      normalization.value = true
+      initAudioChain()
+    } else {
+      initAudioBypass()
+    }
     if (s.outputDeviceId) {
       setOutputDevice(s.outputDeviceId).catch(() => {})
     }
     scrobblingEnabled = s.scrobblingEnabled === true
+  })
+
+  // ── MediaSession action handlers (MPRIS integration) ─────────────────────
+  if ('mediaSession' in navigator) {
+    navigator.mediaSession.setActionHandler('play', () => play())
+    navigator.mediaSession.setActionHandler('pause', () => pause())
+    navigator.mediaSession.setActionHandler('previoustrack', () => previous())
+    navigator.mediaSession.setActionHandler('nexttrack', () => next())
+    navigator.mediaSession.setActionHandler('stop', () => { pause(); audio.currentTime = 0 })
+    navigator.mediaSession.setActionHandler('seekto', (details) => {
+      if (details.seekTime != null) seek(details.seekTime)
+    })
+    navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+      seek(Math.max(0, audio.currentTime - (details.seekOffset || 10)))
+    })
+    navigator.mediaSession.setActionHandler('seekforward', (details) => {
+      seek(Math.min(duration.value, audio.currentTime + (details.seekOffset || 10)))
+    })
+  }
+
+  // Keep MediaSession playback state in sync
+  watch(isPlaying, (playing) => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = playing ? 'playing' : 'paused'
+    }
+    // MPRIS playback status
+    window.api.mprisSendPlaybackStatus(playing ? 'Playing' : 'Paused')
+  })
+
+  // Update MediaSession position state periodically
+  function updatePositionState() {
+    if ('mediaSession' in navigator && duration.value > 0 && isFinite(duration.value)) {
+      try {
+        navigator.mediaSession.setPositionState({
+          duration: duration.value,
+          playbackRate: audio.playbackRate,
+          position: Math.min(currentTime.value, duration.value),
+        })
+      } catch { /* ignore invalid state errors */ }
+    }
+    // MPRIS position (send every timeupdate, the MPRIS module just stores the value)
+    window.api.mprisSendPosition(currentTime.value)
+  }
+  // Update position when time or duration changes
+  audio.addEventListener('timeupdate', updatePositionState)
+  audio.addEventListener('durationchange', updatePositionState)
+
+  // Send volume changes to MPRIS
+  watch(volume, (val) => {
+    window.api.mprisSendVolume(val)
+  })
+
+  // Send repeat/shuffle changes to MPRIS
+  watch(repeatMode, (mode) => {
+    window.api.mprisSendLoopStatus(mode)
+  })
+  watch(isShuffle, (val) => {
+    window.api.mprisSendShuffle(val)
+  })
+
+  // Listen for MPRIS commands from the main process
+  window.api.onMprisCommand((command: string, data?: any) => {
+    switch (command) {
+      case 'play': play(); break
+      case 'pause': pause(); break
+      case 'playPause': togglePlay(); break
+      case 'next': next(); break
+      case 'previous': previous(); break
+      case 'stop': pause(); audio.currentTime = 0; break
+      case 'seek': seek(Math.max(0, audio.currentTime + (data || 0))); window.api.mprisSendSeeked(audio.currentTime); break
+      case 'seekAbsolute': seek(data || 0); window.api.mprisSendSeeked(data || 0); break
+      case 'volume': setVolume(data || 0); break
+      case 'loop': {
+        const map: Record<string, 'off' | 'all' | 'one'> = { None: 'off', Playlist: 'all', Track: 'one' }
+        if (map[data]) repeatMode.value = map[data]
+        break
+      }
+      case 'shuffle': isShuffle.value = !!data; break
+    }
   })
 
   // Enumerate audio devices on init
@@ -295,6 +425,34 @@ export const usePlayerStore = defineStore('player', () => {
         artwork: track.coverArt
           ? [{ src: window.api.getMediaUrl(track.coverArt), sizes: '512x512', type: 'image/jpeg' }]
           : [],
+      })
+    }
+
+    // MPRIS metadata (custom D-Bus service for Linux)
+    if (track.coverArt) {
+      window.api.getCoverFileUrl(track.coverArt).then((artUrl: string) => {
+        window.api.mprisSendMetadata({
+          title: track.title,
+          artist: track.artist,
+          album: track.album,
+          artUrl,
+          length: track.duration || 0,
+          trackId: `/org/mpris/MediaPlayer2/Track/${track.id?.replace(/[^a-zA-Z0-9]/g, '_') || 'unknown'}`,
+        })
+      }).catch(() => {
+        window.api.mprisSendMetadata({
+          title: track.title,
+          artist: track.artist,
+          album: track.album,
+          length: track.duration || 0,
+        })
+      })
+    } else {
+      window.api.mprisSendMetadata({
+        title: track.title,
+        artist: track.artist,
+        album: track.album,
+        length: track.duration || 0,
       })
     }
   }
@@ -568,6 +726,40 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
+  function setIOSSliders(enabled: boolean) {
+    iosSliders.value = enabled
+    window.api.getSettings().then((s: any) => {
+      s.iosSliders = enabled
+      window.api.saveSettings(s)
+    })
+  }
+
+  function setAutoFullscreen(enabled: boolean) {
+    autoFullscreen.value = enabled
+    window.api.getSettings().then((s: any) => {
+      s.autoFullscreen = enabled
+      window.api.saveSettings(s)
+    })
+  }
+
+  function setAutoFullscreenDelay(seconds: number) {
+    autoFullscreenDelay.value = seconds
+    window.api.getSettings().then((s: any) => {
+      s.autoFullscreenDelay = seconds
+      window.api.saveSettings(s)
+    })
+  }
+
+  function setNormalization(enabled: boolean) {
+    normalization.value = enabled
+    window.api.getSettings().then((s: any) => {
+      s.normalization = enabled
+      window.api.saveSettings(s)
+    })
+    // Normalization requires a page reload since the AudioContext source can only be connected once
+    // We'll show a toast from the UI side prompting a restart
+  }
+
   function setScrobblingEnabled(enabled: boolean) {
     scrobblingEnabled = enabled
     window.api.getSettings().then((s: any) => {
@@ -629,6 +821,17 @@ export const usePlayerStore = defineStore('player', () => {
     adaptiveAccent,
     currentAccentColor,
     setAdaptiveAccent,
+    // iOS sliders
+    iosSliders,
+    setIOSSliders,
+    // Auto-fullscreen
+    autoFullscreen,
+    autoFullscreenDelay,
+    setAutoFullscreen,
+    setAutoFullscreenDelay,
+    // Audio normalization
+    normalization,
+    setNormalization,
     // Scrobbling
     setScrobblingEnabled,
     // Playback error

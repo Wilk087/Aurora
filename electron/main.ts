@@ -1,9 +1,14 @@
-import { app, BrowserWindow, ipcMain, dialog, protocol, net, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, protocol, net, shell, screen } from 'electron'
 import { join, extname, basename, dirname } from 'path'
 import { readdir, readFile, writeFile, mkdir, stat, rm } from 'fs/promises'
 import { existsSync, createReadStream } from 'fs'
 import { createHash } from 'crypto'
 import { request as httpsRequest, get as httpsGet } from 'https'
+import {
+  initMpris, destroyMpris, updateMprisMetadata, updateMprisPlaybackStatus,
+  updateMprisPosition, updateMprisVolume, updateMprisLoopStatus, updateMprisShuffle,
+  emitMprisSeeked,
+} from './mpris'
 
 // ── Discord Rich Presence ──────────────────────────────────────────────────
 // Uses discord-rpc to show what's currently playing
@@ -219,6 +224,17 @@ protocol.registerSchemesAsPrivileged([
     },
   },
 ])
+
+// ── MPRIS / Desktop identity ───────────────────────────────────────────────
+// Set proper app identity so MPRIS shows "Aurora Player" instead of "Chromium"
+app.setName('Aurora Player')
+// Tell Chromium our desktop entry name for proper MPRIS integration on Linux
+app.commandLine.appendSwitch('force-app-id', 'aurora-player')
+if (process.platform === 'linux') {
+  // This is read by Chromium's MPRIS backend to set Identity and DesktopEntry
+  app.commandLine.appendSwitch('gtk-application-prefer-dark-theme')
+  process.env.BAMF_DESKTOP_FILE_HINT = 'aurora-player.desktop'
+}
 
 // ── Globals ────────────────────────────────────────────────────────────────
 let mainWindow: BrowserWindow | null = null
@@ -727,9 +743,17 @@ async function listenbrainzSubmit(token: string, listenType: 'single' | 'playing
 
 // ── Window ─────────────────────────────────────────────────────────────────
 function createWindow() {
+  // Center window on the primary display (fixes Wayland multi-monitor placement)
+  const primary = screen.getPrimaryDisplay()
+  const { x, y, width: areaW, height: areaH } = primary.workArea
+  const winW = 1280
+  const winH = 800
+
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    width: winW,
+    height: winH,
+    x: Math.round(x + (areaW - winW) / 2),
+    y: Math.round(y + (areaH - winH) / 2),
     minWidth: 900,
     minHeight: 600,
     frame: false,
@@ -749,6 +773,9 @@ function createWindow() {
   } else {
     mainWindow.loadFile(join(__dirname, '../dist/index.html'))
   }
+
+  // Initialize custom MPRIS service (Linux only)
+  initMpris(mainWindow)
 }
 
 // ── App lifecycle ──────────────────────────────────────────────────────────
@@ -1038,6 +1065,20 @@ app.whenReady().then(async () => {
   ipcMain.on('window:exit-fullscreen', () => {
     if (!mainWindow) return
     mainWindow.setFullScreen(false)
+  })
+
+  // ── IPC: MPRIS updates (renderer → main → D-Bus) ──
+  ipcMain.on('mpris:metadata', (_, data) => updateMprisMetadata(data))
+  ipcMain.on('mpris:playback-status', (_, status) => updateMprisPlaybackStatus(status))
+  ipcMain.on('mpris:position', (_, seconds) => updateMprisPosition(seconds))
+  ipcMain.on('mpris:volume', (_, vol) => updateMprisVolume(vol))
+  ipcMain.on('mpris:loop-status', (_, mode) => updateMprisLoopStatus(mode))
+  ipcMain.on('mpris:shuffle', (_, enabled) => updateMprisShuffle(enabled))
+  ipcMain.on('mpris:seeked', (_, seconds) => emitMprisSeeked(seconds))
+  ipcMain.handle('mpris:cover-path', (_, coverArt: string) => {
+    // Return a file:// URL for the cover art path (used for MPRIS artwork)
+    if (!coverArt) return ''
+    return `file://${coverArt}`
   })
 
   // ── IPC: Track credits / extended metadata ──
@@ -1491,5 +1532,6 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', async () => {
   await forceFlush()
   destroyDiscordRPC()
+  destroyMpris()
   app.quit()
 })

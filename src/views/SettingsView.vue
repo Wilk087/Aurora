@@ -228,6 +228,24 @@
           </button>
         </div>
 
+        <!-- Audio normalization -->
+        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">Audio Normalization</p>
+            <p class="text-xs text-white/30 mt-0.5">Reduce volume differences between tracks using dynamic compression</p>
+          </div>
+          <button
+            @click="toggleNormalization"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="player.normalization ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              :class="player.normalization ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
+
         <!-- Lyrics offset -->
         <div class="px-4 py-3 rounded-xl bg-white/[0.05]">
           <div class="flex items-center justify-between mb-2">
@@ -274,6 +292,67 @@
               :class="player.adaptiveAccent ? 'translate-x-[22px]' : 'translate-x-0.5'"
             />
           </button>
+        </div>
+        <!-- iOS-style sliders -->
+        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">iOS-Style Sliders</p>
+            <p class="text-xs text-white/30 mt-0.5">Replace standard sliders with pill-shaped iOS-style controls</p>
+          </div>
+          <button
+            @click="toggleIOSSliders"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="player.iosSliders ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              :class="player.iosSliders ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>      </div>
+    </section>
+
+    <!-- ── Behavior ───────────────────────────────────────────────── -->
+    <section class="mb-8">
+      <h2 class="text-lg font-semibold text-white mb-4">Behavior</h2>
+      <div class="space-y-4">
+        <!-- Auto-fullscreen toggle -->
+        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">Auto-Fullscreen on Idle</p>
+            <p class="text-xs text-white/30 mt-0.5">Automatically enter fullscreen mode when the mouse is idle during playback</p>
+          </div>
+          <button
+            @click="toggleAutoFullscreen"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="player.autoFullscreen ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              :class="player.autoFullscreen ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
+        <!-- Auto-fullscreen delay -->
+        <div v-if="player.autoFullscreen" class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">Idle Timeout</p>
+            <p class="text-xs text-white/30 mt-0.5">Seconds of inactivity before entering fullscreen</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button @click="adjustAutoFullscreenDelay(-5)" class="w-7 h-7 rounded-lg bg-white/10 text-white/60 hover:text-white hover:bg-white/15 flex items-center justify-center text-sm transition-colors">&minus;</button>
+            <input
+              type="number"
+              :value="player.autoFullscreenDelay"
+              @change="onAutoFullscreenDelayChange"
+              min="5"
+              max="300"
+              step="5"
+              class="w-16 text-center text-sm text-white bg-white/10 rounded-lg px-2 py-1.5 border border-white/10 focus:outline-none focus:border-accent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+            <button @click="adjustAutoFullscreenDelay(5)" class="w-7 h-7 rounded-lg bg-white/10 text-white/60 hover:text-white hover:bg-white/15 flex items-center justify-center text-sm transition-colors">+</button>
+            <span class="text-xs text-white/30 ml-1">sec</span>
+          </div>
         </div>
       </div>
     </section>
@@ -579,6 +658,11 @@ async function toggleWaveform() {
   toast.success(`Waveform ${player.waveformEnabled ? 'enabled' : 'disabled'}`)
 }
 
+function toggleNormalization() {
+  player.setNormalization(!player.normalization)
+  toast.success(`Normalization ${player.normalization ? 'enabled' : 'disabled'} \u2014 restart app to apply`)
+}
+
 function onLyricsOffsetInput(e: Event) {
   const val = parseFloat((e.target as HTMLInputElement).value)
   player.setLyricsOffset(val)
@@ -596,6 +680,27 @@ function resetLyricsOffset() {
 async function toggleAdaptiveAccent() {
   player.setAdaptiveAccent(!player.adaptiveAccent)
   toast.success(`Adaptive accent ${player.adaptiveAccent ? 'enabled' : 'disabled'}`)
+}
+
+function toggleIOSSliders() {
+  player.setIOSSliders(!player.iosSliders)
+  toast.success(`iOS-style sliders ${player.iosSliders ? 'enabled' : 'disabled'}`)
+}
+
+// ── Behavior ──────────────────────────────
+function toggleAutoFullscreen() {
+  player.setAutoFullscreen(!player.autoFullscreen)
+  toast.success(`Auto-fullscreen ${player.autoFullscreen ? 'enabled' : 'disabled'}`)
+}
+
+function onAutoFullscreenDelayChange(e: Event) {
+  const val = Math.max(5, Math.min(300, parseInt((e.target as HTMLInputElement).value) || 30))
+  player.setAutoFullscreenDelay(val)
+}
+
+function adjustAutoFullscreenDelay(delta: number) {
+  const newVal = Math.max(5, Math.min(300, player.autoFullscreenDelay + delta))
+  player.setAutoFullscreenDelay(newVal)
 }
 
 // ── Scrobbling ────────────────────────────

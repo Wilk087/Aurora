@@ -117,7 +117,7 @@
         </span>
 
         <!-- Standard progress bar -->
-        <div class="flex-1 relative group">
+        <div v-if="!player.iosSliders" class="flex-1 relative group">
           <input
             type="range"
             min="0"
@@ -135,6 +135,19 @@
             :style="{ width: player.progress + '%' }"
           />
         </div>
+
+        <!-- iOS-style progress bar -->
+        <IOSSlider
+          v-else
+          :value="player.progress"
+          :min="0"
+          :max="100"
+          :step="0.1"
+          size="sm"
+          fill-color="bg-white/80"
+          class="flex-1"
+          @update="(v: number) => player.seekPercent(v)"
+        />
 
         <span class="text-[10px] text-white/40 w-10 tabular-nums">
           {{ formatTime(player.duration) }}
@@ -201,7 +214,7 @@
         </svg>
       </button>
 
-      <div class="w-24 relative group">
+      <div v-if="!player.iosSliders" class="w-24 relative group">
         <input
           type="range"
           min="0"
@@ -219,6 +232,16 @@
           :style="{ width: player.volume * 100 + '%' }"
         />
       </div>
+      <IOSSlider
+        v-else
+        :value="player.volume"
+        :min="0"
+        :max="1"
+        :step="0.01"
+        size="sm"
+        class="w-24"
+        @update="(v: number) => player.setVolume(v)"
+      />
     </div>
 
     <!-- Queue Panel -->
@@ -231,6 +254,7 @@ import { ref, computed } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { formatTime } from '@/utils/formatTime'
 import QueuePanel from '@/components/QueuePanel.vue'
+import IOSSlider from '@/components/IOSSlider.vue'
 
 const player = usePlayerStore()
 const showQueue = ref(false)

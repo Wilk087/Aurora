@@ -91,4 +91,30 @@ contextBridge.exposeInMainWorld('api', {
   removeScanProgressListener: () => {
     ipcRenderer.removeAllListeners('library:scan-progress')
   },
+
+  // MPRIS (renderer → main)
+  mprisSendMetadata: (data: { title?: string; artist?: string; album?: string; artUrl?: string; length?: number; trackId?: string }) =>
+    ipcRenderer.send('mpris:metadata', data),
+  mprisSendPlaybackStatus: (status: 'Playing' | 'Paused' | 'Stopped') =>
+    ipcRenderer.send('mpris:playback-status', status),
+  mprisSendPosition: (seconds: number) =>
+    ipcRenderer.send('mpris:position', seconds),
+  mprisSendVolume: (vol: number) =>
+    ipcRenderer.send('mpris:volume', vol),
+  mprisSendLoopStatus: (mode: string) =>
+    ipcRenderer.send('mpris:loop-status', mode),
+  mprisSendShuffle: (enabled: boolean) =>
+    ipcRenderer.send('mpris:shuffle', enabled),
+  mprisSendSeeked: (seconds: number) =>
+    ipcRenderer.send('mpris:seeked', seconds),
+  getCoverFileUrl: (coverPath: string): Promise<string> =>
+    ipcRenderer.invoke('mpris:cover-path', coverPath),
+
+  // MPRIS commands (main → renderer)
+  onMprisCommand: (callback: (command: string, data?: any) => void) => {
+    ipcRenderer.on('mpris:command', (_, command, data) => callback(command, data))
+  },
+  removeMprisCommandListener: () => {
+    ipcRenderer.removeAllListeners('mpris:command')
+  },
 })

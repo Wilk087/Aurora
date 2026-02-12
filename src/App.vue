@@ -38,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
@@ -192,6 +192,82 @@ watch(
         player.currentTrack = { ...saved!, coverArt: null }
         nextTick(() => { player.currentTrack = saved })
       }
+    }
+  },
+)
+
+// ── Auto-fullscreen on mouse idle ──────────────────────────────────────
+let idleTimer: ReturnType<typeof setTimeout> | null = null
+const autoFullscreenTriggered = ref(false)
+let previousRoute: string | null = null
+
+function resetIdleTimer() {
+  if (idleTimer) {
+    clearTimeout(idleTimer)
+    idleTimer = null
+  }
+
+  // If auto-fullscreen was triggered and mouse moved, exit fullscreen
+  if (autoFullscreenTriggered.value && isFullscreen.value) {
+    autoFullscreenTriggered.value = false
+    router.replace(previousRoute || '/')
+    previousRoute = null
+    return
+  }
+
+  // Start a new idle timer if conditions are met
+  if (player.autoFullscreen && player.isPlaying && !isFullscreen.value) {
+    idleTimer = setTimeout(() => {
+      if (player.autoFullscreen && player.isPlaying && !isFullscreen.value) {
+        previousRoute = route.path
+        autoFullscreenTriggered.value = true
+        router.push('/fullscreen')
+      }
+    }, player.autoFullscreenDelay * 1000)
+  }
+}
+
+function onMouseMove() {
+  resetIdleTimer()
+}
+
+onMounted(() => {
+  document.addEventListener('mousemove', onMouseMove)
+  document.addEventListener('mousedown', onMouseMove)
+  document.addEventListener('keydown', onMouseMove)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('mousemove', onMouseMove)
+  document.removeEventListener('mousedown', onMouseMove)
+  document.removeEventListener('keydown', onMouseMove)
+  if (idleTimer) clearTimeout(idleTimer)
+})
+
+// Re-evaluate idle timer when playback state or setting changes
+watch(
+  [() => player.isPlaying, () => player.autoFullscreen, () => player.autoFullscreenDelay],
+  () => {
+    if (idleTimer) {
+      clearTimeout(idleTimer)
+      idleTimer = null
+    }
+    // If auto-fullscreen is disabled while we're in auto-triggered fullscreen, exit
+    if (!player.autoFullscreen && autoFullscreenTriggered.value && isFullscreen.value) {
+      autoFullscreenTriggered.value = false
+      router.replace(previousRoute || '/')
+      previousRoute = null
+      return
+    }
+    // Start timer if conditions are met
+    if (player.autoFullscreen && player.isPlaying && !isFullscreen.value) {
+      idleTimer = setTimeout(() => {
+        if (player.autoFullscreen && player.isPlaying && !isFullscreen.value) {
+          previousRoute = route.path
+          autoFullscreenTriggered.value = true
+          router.push('/fullscreen')
+        }
+      }, player.autoFullscreenDelay * 1000)
     }
   },
 )
