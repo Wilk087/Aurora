@@ -1,13 +1,13 @@
 {
   "name": "aurora-player",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
-  "description": "A beautiful local music player for Linux and Windows, inspired by Cider 2",
+  "description": "A beautiful local music player for Linux and Windows",
   "author": {
     "name": "Wilk087",
     "email": "business@wilk087.dev"
   },
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
