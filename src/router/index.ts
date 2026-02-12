@@ -1,6 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 
-const PERSIST_ROUTES = ['/', '/albums', '/playlists', '/settings']
+const PERSIST_ROUTES = ['/', '/albums', '/playlists', '/settings', '/folders', '/favorites']
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -19,6 +19,21 @@ const router = createRouter({
       path: '/album/:id',
       name: 'album-detail',
       component: () => import('@/views/AlbumDetailView.vue'),
+    },
+    {
+      path: '/artist/:name',
+      name: 'artist-detail',
+      component: () => import('@/views/ArtistView.vue'),
+    },
+    {
+      path: '/folders',
+      name: 'folders',
+      component: () => import('@/views/FolderView.vue'),
+    },
+    {
+      path: '/favorites',
+      name: 'favorites',
+      component: () => import('@/views/FavoritesView.vue'),
     },
     {
       path: '/playlists',
@@ -48,13 +63,17 @@ const router = createRouter({
   ],
 })
 
-// Persist tab on navigation
+// Persist tab on navigation & scroll to top for detail views
 router.afterEach((to) => {
   if (PERSIST_ROUTES.includes(to.path)) {
     window.api.getSettings().then((s: any) => {
       s.lastTab = to.path
       window.api.saveSettings(s)
     })
+  } else {
+    // Detail views (album, artist, playlist, now-playing): scroll main to top
+    const main = document.querySelector('main')
+    if (main) main.scrollTop = 0
   }
 })
 

@@ -1,6 +1,6 @@
-import { app, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, protocol, net, shell } from 'electron'
 import { join, extname, basename, dirname } from 'path'
-import { readdir, readFile, writeFile, mkdir, stat } from 'fs/promises'
+import { readdir, readFile, writeFile, mkdir, stat, rm } from 'fs/promises'
 import { existsSync, createReadStream } from 'fs'
 import { createHash } from 'crypto'
 import { request as httpsRequest, get as httpsGet } from 'https'
@@ -40,17 +40,50 @@ async function initDiscordRPC(clientId?: string) {
 // ── Album art URL lookup (for Discord RPC) ────────────────────────────────
 const albumArtCache = new Map<string, string | null>()
 
-function fetchJSON(url: string): Promise<string> {
+function fetchJSON(url: string, retries = 2): Promise<string> {
   return new Promise((resolve, reject) => {
-    httpsGet(url, { headers: { 'User-Agent': 'AuroraPlayer/1.0' } }, (res) => {
+    const req = httpsGet(url, {
+      headers: {
+        'User-Agent': 'AuroraPlayer/1.0.0 (https://github.com/Wilk087/Aurora)',
+        'Accept': 'application/json',
+      },
+      timeout: 10000,
+    }, (res) => {
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return fetchJSON(res.headers.location).then(resolve, reject)
+        return fetchJSON(res.headers.location, retries).then(resolve, reject)
+      }
+      if (res.statusCode && res.statusCode === 503 && retries > 0) {
+        // Rate limited — wait and retry
+        setTimeout(() => fetchJSON(url, retries - 1).then(resolve, reject), 1500)
+        res.resume()
+        return
       }
       let data = ''
       res.on('data', (chunk) => (data += chunk))
       res.on('end', () => resolve(data))
-      res.on('error', reject)
-    }).on('error', reject)
+      res.on('error', (err) => {
+        if (retries > 0) {
+          setTimeout(() => fetchJSON(url, retries - 1).then(resolve, reject), 1000)
+        } else {
+          reject(err)
+        }
+      })
+    })
+    req.on('error', (err) => {
+      if (retries > 0) {
+        setTimeout(() => fetchJSON(url, retries - 1).then(resolve, reject), 1000)
+      } else {
+        reject(err)
+      }
+    })
+    req.on('timeout', () => {
+      req.destroy()
+      if (retries > 0) {
+        setTimeout(() => fetchJSON(url, retries - 1).then(resolve, reject), 1000)
+      } else {
+        reject(new Error('Request timeout'))
+      }
+    })
   })
 }
 
@@ -199,6 +232,46 @@ const storePath = join(userDataPath, 'library.json')
 const coverCachePath = join(userDataPath, 'cover-cache')
 const settingsPath = join(userDataPath, 'settings.json')
 const playlistsPath = join(userDataPath, 'playlists.json')
+const artistCachePath = join(userDataPath, 'artist-cache.json')
+const waveformCachePath = join(userDataPath, 'waveform-cache.json')
+
+// ── Artist info disk cache ─────────────────────────────────────────────────
+let artistInfoCache: Record<string, { data: any; ts: number }> = {}
+const ARTIST_CACHE_TTL = 7 * 24 * 60 * 60 * 1000 // 7 days
+
+async function loadArtistCache() {
+  try {
+    if (existsSync(artistCachePath)) {
+      artistInfoCache = JSON.parse(await readFile(artistCachePath, 'utf-8'))
+    }
+  } catch { artistInfoCache = {} }
+}
+
+async function saveArtistCache() {
+  try {
+    await writeFile(artistCachePath, JSON.stringify(artistInfoCache))
+  } catch {}
+}
+
+// ── Waveform disk cache ────────────────────────────────────────────────────
+let waveformDiskCache: Record<string, number[]> = {}
+
+async function loadWaveformCache() {
+  try {
+    if (existsSync(waveformCachePath)) {
+      waveformDiskCache = JSON.parse(await readFile(waveformCachePath, 'utf-8'))
+    }
+  } catch { waveformDiskCache = {} }
+}
+
+let waveformFlushTimer: ReturnType<typeof setTimeout> | null = null
+function scheduleWaveformFlush() {
+  if (waveformFlushTimer) return
+  waveformFlushTimer = setTimeout(async () => {
+    waveformFlushTimer = null
+    try { await writeFile(waveformCachePath, JSON.stringify(waveformDiskCache)) } catch {}
+  }, 5000)
+}
 
 // ── In-memory library cache ────────────────────────────────────────────────
 // Loaded once at startup, mutated in place, flushed to disk on changes.
@@ -327,6 +400,23 @@ async function saveSettings(settings: any): Promise<void> {
   await writeFile(settingsPath, JSON.stringify(settings, null, 2))
 }
 
+// ── Favorites persistence ──────────────────────────────────────────────────
+const favoritesPath = join(userDataPath, 'favorites.json')
+let favoriteIds: string[] = []
+
+async function loadFavorites(): Promise<string[]> {
+  try {
+    if (existsSync(favoritesPath)) {
+      favoriteIds = JSON.parse(await readFile(favoritesPath, 'utf-8'))
+    }
+  } catch { favoriteIds = [] }
+  return favoriteIds
+}
+
+async function saveFavorites(): Promise<void> {
+  await writeFile(favoritesPath, JSON.stringify(favoriteIds, null, 2))
+}
+
 // ── Playlist persistence ───────────────────────────────────────────────────
 interface Playlist {
   id: string
@@ -334,6 +424,9 @@ interface Playlist {
   trackIds: string[]
   createdAt: number
   updatedAt: number
+  smart?: boolean
+  rules?: any[]
+  ruleMatch?: 'all' | 'any'
 }
 
 let playlists: Playlist[] = []
@@ -421,6 +514,9 @@ async function parseTrack(filePath: string): Promise<any> {
       genre: metadata.common.genre?.[0] || '',
       year: metadata.common.year || 0,
       coverArt: coverArtPath,
+      composer: (metadata.common.composer || []).join(', '),
+      label: (metadata.common.label || []).join(', '),
+      comment: metadata.common.comment ? metadata.common.comment[0] || '' : '',
     }
   } catch (err) {
     console.error(`Error parsing ${filePath}:`, err)
@@ -515,6 +611,120 @@ async function saveLyricsFile(audioPath: string, lrcContent: string): Promise<vo
   }
 }
 
+// ── Last.fm scrobbling helpers ─────────────────────────────────────────────
+function md5(str: string): string {
+  return createHash('md5').update(str, 'utf-8').digest('hex')
+}
+
+function lastfmApiSign(params: Record<string, string>, secret: string): string {
+  const keys = Object.keys(params).sort()
+  let sig = ''
+  for (const k of keys) sig += k + params[k]
+  sig += secret
+  return md5(sig)
+}
+
+function httpPost(url: string, body: string, headers: Record<string, string> = {}): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const urlObj = new URL(url)
+    const req = httpsRequest(
+      {
+        hostname: urlObj.hostname,
+        path: urlObj.pathname + urlObj.search,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(body), ...headers },
+      },
+      (res) => {
+        let data = ''
+        res.on('data', (chunk) => (data += chunk))
+        res.on('end', () => resolve(data))
+        res.on('error', reject)
+      },
+    )
+    req.on('error', reject)
+    req.write(body)
+    req.end()
+  })
+}
+
+async function lastfmScrobble(apiKey: string, apiSecret: string, sessionKey: string, data: { title: string; artist: string; album: string; timestamp: number }) {
+  const params: Record<string, string> = {
+    method: 'track.scrobble',
+    api_key: apiKey,
+    sk: sessionKey,
+    artist: data.artist,
+    track: data.title,
+    album: data.album,
+    timestamp: String(Math.floor(data.timestamp / 1000)),
+  }
+  params.api_sig = lastfmApiSign(params, apiSecret)
+  params.format = 'json'
+  const body = new URLSearchParams(params).toString()
+  await httpPost('https://ws.audioscrobbler.com/2.0/', body)
+}
+
+async function lastfmUpdateNowPlaying(apiKey: string, apiSecret: string, sessionKey: string, data: { title: string; artist: string; album: string; duration: number }) {
+  const params: Record<string, string> = {
+    method: 'track.updateNowPlaying',
+    api_key: apiKey,
+    sk: sessionKey,
+    artist: data.artist,
+    track: data.title,
+    album: data.album,
+    duration: String(Math.round(data.duration)),
+  }
+  params.api_sig = lastfmApiSign(params, apiSecret)
+  params.format = 'json'
+  const body = new URLSearchParams(params).toString()
+  await httpPost('https://ws.audioscrobbler.com/2.0/', body)
+}
+
+async function listenbrainzSubmit(token: string, listenType: 'single' | 'playing_now', data: { title: string; artist: string; album: string; duration?: number; timestamp?: number }) {
+  const payload: any = {
+    listen_type: listenType === 'single' ? 'single' : 'playing_now',
+    payload: [
+      {
+        track_metadata: {
+          artist_name: data.artist,
+          track_name: data.title,
+          release_name: data.album,
+          additional_info: {
+            duration_ms: data.duration ? Math.round(data.duration * 1000) : undefined,
+          },
+        },
+      },
+    ],
+  }
+  if (listenType === 'single' && data.timestamp) {
+    payload.payload[0].listened_at = Math.floor(data.timestamp / 1000)
+  }
+  const body = JSON.stringify(payload)
+  const urlObj = new URL('https://api.listenbrainz.org/1/submit-listens')
+  return new Promise<void>((resolve, reject) => {
+    const req = httpsRequest(
+      {
+        hostname: urlObj.hostname,
+        path: urlObj.pathname,
+        method: 'POST',
+        headers: {
+          Authorization: `Token ${token}`,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+        },
+      },
+      (res) => {
+        let d = ''
+        res.on('data', (chunk) => (d += chunk))
+        res.on('end', () => resolve())
+        res.on('error', reject)
+      },
+    )
+    req.on('error', reject)
+    req.write(body)
+    req.end()
+  })
+}
+
 // ── Window ─────────────────────────────────────────────────────────────────
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -583,7 +793,7 @@ app.whenReady().then(async () => {
           const nodeStream = createReadStream(filePath, { start, end })
           const body = new ReadableStream({
             start(controller) {
-              nodeStream.on('data', (chunk: Buffer) => controller.enqueue(chunk))
+              nodeStream.on('data', (chunk: string | Buffer) => controller.enqueue(typeof chunk === 'string' ? Buffer.from(chunk) : chunk))
               nodeStream.on('end', () => controller.close())
               nodeStream.on('error', (err) => controller.error(err))
             },
@@ -606,7 +816,7 @@ app.whenReady().then(async () => {
       const nodeStream = createReadStream(filePath)
       const body = new ReadableStream({
         start(controller) {
-          nodeStream.on('data', (chunk: Buffer) => controller.enqueue(chunk))
+          nodeStream.on('data', (chunk: string | Buffer) => controller.enqueue(typeof chunk === 'string' ? Buffer.from(chunk) : chunk))
           nodeStream.on('end', () => controller.close())
           nodeStream.on('error', (err) => controller.error(err))
         },
@@ -629,6 +839,8 @@ app.whenReady().then(async () => {
 
   // Load library into memory cache on startup
   await loadCache()
+  await loadArtistCache()
+  await loadWaveformCache()
   console.log(`Library cache loaded: ${cache.tracks.length} tracks, ${cache.folders.length} folders`)
 
   // Initialize Discord Rich Presence
@@ -716,6 +928,24 @@ app.whenReady().then(async () => {
   // ── IPC: Settings ──
   ipcMain.handle('settings:get', async () => await loadSettings())
   ipcMain.handle('settings:set', async (_, settings: any) => await saveSettings(settings))
+
+  // ── IPC: Favorites ──
+  ipcMain.handle('favorites:get', async () => await loadFavorites())
+  ipcMain.handle('favorites:toggle', async (_, trackId: string) => {
+    const idx = favoriteIds.indexOf(trackId)
+    if (idx >= 0) {
+      favoriteIds.splice(idx, 1)
+    } else {
+      favoriteIds.push(trackId)
+    }
+    await saveFavorites()
+    return favoriteIds
+  })
+  ipcMain.handle('favorites:set', async (_, ids: string[]) => {
+    favoriteIds = ids
+    await saveFavorites()
+    return favoriteIds
+  })
 
   // ── IPC: Discord RPC ──
   ipcMain.handle('discord:update-presence', async (_, data) => {
@@ -808,6 +1038,449 @@ app.whenReady().then(async () => {
   ipcMain.on('window:exit-fullscreen', () => {
     if (!mainWindow) return
     mainWindow.setFullScreen(false)
+  })
+
+  // ── IPC: Track credits / extended metadata ──
+  ipcMain.handle('track:get-credits', async (_, trackPath: string) => {
+    try {
+      const mm = await import('music-metadata')
+      const metadata = await mm.parseFile(trackPath)
+      const c = metadata.common
+      const f = metadata.format
+      return {
+        composer: c.composer || [],
+        lyricist: c.lyricist || [],
+        conductor: c.conductor || [],
+        producer: (c as any).producer || [],
+        engineer: (c as any).engineer || [],
+        mixer: (c as any).mixer || [],
+        remixer: (c as any).remixer || [],
+        writer: (c as any).writer || [],
+        label: c.label || [],
+        copyright: c.copyright || '',
+        encodedBy: c.encodedby || '',
+        comment: c.comment ? c.comment[0] || '' : '',
+        bpm: c.bpm || null,
+        bitrate: f.bitrate ? Math.round(f.bitrate / 1000) : null,
+        sampleRate: f.sampleRate || null,
+        codec: f.codec || '',
+        lossless: f.lossless || false,
+      }
+    } catch (err) {
+      console.error('Failed to read track credits:', err)
+      return {
+        composer: [], lyricist: [], conductor: [], producer: [],
+        engineer: [], mixer: [], remixer: [], writer: [], label: [],
+        copyright: '', encodedBy: '', comment: '',
+        bpm: null, bitrate: null, sampleRate: null, codec: '', lossless: false,
+      }
+    }
+  })
+
+  // ── IPC: Waveform generation (runs in main process to avoid renderer OOM) ──
+  ipcMain.handle('track:generate-waveform', async (_, trackPath: string) => {
+    // Check disk cache first
+    const cacheKey = generateId(trackPath)
+    if (waveformDiskCache[cacheKey]) {
+      return waveformDiskCache[cacheKey]
+    }
+
+    let result: number[] = []
+    try {
+      const mm = await import('music-metadata')
+      const fstat = await stat(trackPath)
+      const fileSize = fstat.size
+      const BARS = 200
+      const MAX_MEMORY = 50 * 1024 * 1024
+
+      const metadata = await mm.parseFile(trackPath, { duration: true })
+      const sampleRate = metadata.format.sampleRate || 44100
+      const channels = metadata.format.numberOfChannels || 2
+      const bitsPerSample = metadata.format.bitsPerSample || 16
+      const bytesPerSample = bitsPerSample / 8
+      const duration = metadata.format.duration || 0
+
+      if (duration === 0) return []
+
+      const ext = extname(trackPath).toLowerCase()
+      const isPCM = ['.wav', '.aif', '.aiff'].includes(ext)
+
+      if (isPCM && fileSize <= MAX_MEMORY * 2) {
+        const buffer = await readFile(trackPath)
+        const headerSize = ext === '.wav' ? 44 : 0
+        const dataLen = buffer.length - headerSize
+        const totalSamples = Math.floor(dataLen / (bytesPerSample * channels))
+        const samplesPerBar = Math.floor(totalSamples / BARS)
+        const peaks: number[] = []
+        for (let bar = 0; bar < BARS; bar++) {
+          let sum = 0
+          const startSample = bar * samplesPerBar
+          const step = Math.max(1, Math.floor(samplesPerBar / 100))
+          let count = 0
+          for (let s = startSample; s < startSample + samplesPerBar && s < totalSamples; s += step) {
+            const byteOffset = headerSize + s * bytesPerSample * channels
+            if (byteOffset + bytesPerSample > buffer.length) break
+            let value: number
+            if (bytesPerSample === 2) { value = Math.abs(buffer.readInt16LE(byteOffset)) / 32768 }
+            else if (bytesPerSample === 3) {
+              value = buffer[byteOffset] | (buffer[byteOffset + 1] << 8) | (buffer[byteOffset + 2] << 16)
+              if (value > 0x7FFFFF) value -= 0x1000000
+              value = Math.abs(value) / 8388608
+            } else { value = Math.abs(buffer.readInt8(byteOffset)) / 128 }
+            sum += value; count++
+          }
+          peaks.push(count > 0 ? sum / count : 0)
+        }
+        const max = Math.max(...peaks, 0.001)
+        result = peaks.map(p => p / max)
+      } else {
+        // Try ffmpeg for compressed formats
+        try {
+          const { execFile } = await import('child_process')
+          const { promisify } = await import('util')
+          const execFileAsync = promisify(execFile)
+          const targetSampleRate = Math.min(8000, sampleRate)
+          const ffResult = await execFileAsync('ffmpeg', [
+            '-i', trackPath, '-ac', '1', '-ar', String(targetSampleRate),
+            '-f', 's16le', '-v', 'quiet', 'pipe:1'
+          ], { maxBuffer: targetSampleRate * 2 * Math.ceil(duration) + 1024, encoding: 'buffer' as any })
+          const pcmBuffer = ffResult.stdout as unknown as Buffer
+          const totalSamples = Math.floor(pcmBuffer.length / 2)
+          const samplesPerBar = Math.floor(totalSamples / BARS)
+          const peaks: number[] = []
+          for (let bar = 0; bar < BARS; bar++) {
+            let sum = 0, count = 0
+            const startSample = bar * samplesPerBar
+            for (let s = startSample; s < startSample + samplesPerBar && s < totalSamples; s++) {
+              sum += Math.abs(pcmBuffer.readInt16LE(s * 2)) / 32768; count++
+            }
+            peaks.push(count > 0 ? sum / count : 0)
+          }
+          const max = Math.max(...peaks, 0.001)
+          result = peaks.map(p => p / max)
+        } catch {
+          // ffmpeg not available — generate approximate waveform from file bytes
+          const CHUNK_SIZE = 4096
+          const chunkSpacing = Math.floor(fileSize / BARS)
+          const peaks: number[] = []
+          const { open, close, read: fsRead } = await import('fs')
+          const { promisify } = await import('util')
+          const openAsync = promisify(open)
+          const readAsync = promisify(fsRead)
+          const closeAsync = promisify(close)
+          const fd = await openAsync(trackPath, 'r')
+          try {
+            for (let i = 0; i < BARS; i++) {
+              const pos = Math.min(i * chunkSpacing, fileSize - CHUNK_SIZE)
+              const buf = Buffer.alloc(CHUNK_SIZE)
+              const { bytesRead } = await readAsync(fd, buf, 0, CHUNK_SIZE, pos)
+              let sum = 0
+              for (let j = 0; j < bytesRead; j += 2) {
+                if (j + 1 < bytesRead) sum += Math.abs(buf.readInt16LE(j))
+              }
+              peaks.push(sum / (bytesRead / 2))
+            }
+          } finally { await closeAsync(fd) }
+          const max = Math.max(...peaks, 0.001)
+          result = peaks.map(p => p / max)
+        }
+      }
+    } catch (err) {
+      console.error('Waveform generation error:', err)
+      return []
+    }
+
+    // Save to disk cache
+    if (result.length > 0) {
+      waveformDiskCache[cacheKey] = result
+      scheduleWaveformFlush()
+    }
+    return result
+  })
+
+  // ── IPC: Artist info (MusicBrainz + Wikipedia summary) ──
+  ipcMain.handle('artist:get-info', async (_, artistName: string) => {
+    // Check disk cache first (7-day TTL)
+    const cached = artistInfoCache[artistName]
+    if (cached && Date.now() - cached.ts < 7 * 24 * 60 * 60 * 1000) {
+      return cached.data
+    }
+
+    try {
+      const query = encodeURIComponent(artistName)
+      const mbUrl = `https://musicbrainz.org/ws/2/artist/?query=artist:${query}&fmt=json&limit=1`
+      const mbRaw = await fetchJSON(mbUrl)
+      const mbData = JSON.parse(mbRaw)
+
+      if (!mbData.artists || mbData.artists.length === 0) return null
+
+      const artist = mbData.artists[0]
+      const info: any = {
+        name: artist.name || artistName,
+        disambiguation: artist.disambiguation || '',
+        type: artist.type || '',
+        country: artist.country || artist.area?.name || '',
+        beginDate: artist['life-span']?.begin || '',
+        endDate: artist['life-span']?.end || '',
+        tags: (artist.tags || []).slice(0, 10).map((t: any) => t.name),
+        bio: '',
+        imageUrl: null,
+      }
+
+      // Helper to fetch Wikipedia summary + thumbnail for a given page title/lang
+      const fetchWikiSummary = async (pageTitle: string, lang = 'en') => {
+        const summaryUrl = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(pageTitle)}`
+        const summaryRaw = await fetchJSON(summaryUrl)
+        const summaryData = JSON.parse(summaryRaw)
+        if (summaryData.extract) info.bio = summaryData.extract
+        if (summaryData.thumbnail?.source) info.imageUrl = summaryData.thumbnail.source
+        // Get higher res image if available
+        if (summaryData.originalimage?.source && !info.imageUrl) {
+          info.imageUrl = summaryData.originalimage.source
+        }
+      }
+
+      // Try to fetch Wikipedia summary for bio using MusicBrainz relations
+      if (artist.id) {
+        try {
+          // Rate limit: MusicBrainz requires max 1 req/sec
+          await new Promise(r => setTimeout(r, 1200))
+          const relUrl = `https://musicbrainz.org/ws/2/artist/${artist.id}?inc=url-rels&fmt=json`
+          const relRaw = await fetchJSON(relUrl)
+          const relData = JSON.parse(relRaw)
+          const relations = relData.relations || []
+
+          // Try Wikipedia link first
+          const wikiRel = relations.find((r: any) => r.type === 'wikipedia')
+          if (wikiRel?.url?.resource) {
+            const wikiUrl = wikiRel.url.resource
+            const match = wikiUrl.match(/\/\/(\w+)\.wikipedia\.org\/wiki\/(.+)$/)
+            if (match) {
+              const lang = match[1]
+              const pageTitle = decodeURIComponent(match[2])
+              await fetchWikiSummary(pageTitle, lang)
+            }
+          }
+
+          // If no bio yet, try Wikidata → find English Wikipedia page
+          if (!info.bio) {
+            const wikidataRel = relations.find((r: any) => r.type === 'wikidata')
+            if (wikidataRel?.url?.resource) {
+              const wdMatch = wikidataRel.url.resource.match(/wikidata\.org\/wiki\/(Q\d+)/)
+              if (wdMatch) {
+                try {
+                  const wdUrl = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${wdMatch[1]}&props=sitelinks&format=json`
+                  const wdRaw = await fetchJSON(wdUrl)
+                  const wdData = JSON.parse(wdRaw)
+                  const entity = wdData.entities?.[wdMatch[1]]
+                  const enWikiTitle = entity?.sitelinks?.enwiki?.title
+                  if (enWikiTitle) {
+                    await fetchWikiSummary(enWikiTitle, 'en')
+                  }
+                } catch { /* wikidata fallback failed */ }
+              }
+            }
+          }
+
+          // Look for an image from MusicBrainz image relation
+          if (!info.imageUrl) {
+            const imgRel = relations.find((r: any) => r.type === 'image')
+            if (imgRel?.url?.resource) {
+              // Commons image URL — convert to thumbnail
+              const commonsMatch = imgRel.url.resource.match(/commons\.wikimedia\.org\/wiki\/File:(.+)/)
+              if (commonsMatch) {
+                const filename = decodeURIComponent(commonsMatch[1])
+                info.imageUrl = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}?width=400`
+              }
+            }
+          }
+        } catch (wikiErr) {
+          console.error('Wikipedia fetch error:', wikiErr)
+        }
+      }
+
+      // Final fallback: try direct Wikipedia search if still no bio
+      if (!info.bio) {
+        try {
+          const searchUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(artistName)}`
+          const searchRaw = await fetchJSON(searchUrl)
+          const searchData = JSON.parse(searchRaw)
+          if (searchData.extract && searchData.type !== 'disambiguation') {
+            info.bio = searchData.extract
+            if (!info.imageUrl && searchData.thumbnail?.source) {
+              info.imageUrl = searchData.thumbnail.source
+            }
+          }
+        } catch { /* direct search failed */ }
+      }
+
+      // Cache and return
+      artistInfoCache[artistName] = { data: info, ts: Date.now() }
+      saveArtistCache()
+      return info
+    } catch (err) {
+      console.error('Artist info fetch error:', err)
+      return null
+    }
+  })
+
+  // ── IPC: Show in file explorer ──
+  ipcMain.handle('shell:show-in-explorer', async (_, filePath: string) => {
+    shell.showItemInFolder(filePath)
+  })
+
+  // ── IPC: Reset caches ──
+  ipcMain.handle('cache:reset', async (_, targets: string[]) => {
+    const results: Record<string, boolean> = {}
+
+    if (targets.includes('library')) {
+      try {
+        cache.tracks = []
+        cache.trackMap.clear()
+        cache.folders = []
+        if (existsSync(storePath)) await rm(storePath)
+        results.library = true
+      } catch { results.library = false }
+    }
+
+    if (targets.includes('covers')) {
+      try {
+        if (existsSync(coverCachePath)) {
+          await rm(coverCachePath, { recursive: true })
+          await mkdir(coverCachePath, { recursive: true })
+        }
+        results.covers = true
+      } catch { results.covers = false }
+    }
+
+    if (targets.includes('artist')) {
+      try {
+        artistInfoCache = {}
+        if (existsSync(artistCachePath)) await rm(artistCachePath)
+        results.artist = true
+      } catch { results.artist = false }
+    }
+
+    if (targets.includes('waveform')) {
+      try {
+        waveformDiskCache = {}
+        if (existsSync(waveformCachePath)) await rm(waveformCachePath)
+        results.waveform = true
+      } catch { results.waveform = false }
+    }
+
+    return results
+  })
+
+  // ── IPC: Folder tree ──
+  ipcMain.handle('folder:get-tree', async (_, folderPath: string) => {
+    async function buildTree(dir: string, depth = 0): Promise<any[]> {
+      if (depth > 10) return [] // prevent infinite recursion
+      try {
+        const entries = await readdir(dir, { withFileTypes: true })
+        const result: any[] = []
+        for (const entry of entries.sort((a, b) => {
+          if (a.isDirectory() && !b.isDirectory()) return -1
+          if (!a.isDirectory() && b.isDirectory()) return 1
+          return a.name.localeCompare(b.name)
+        })) {
+          const fullPath = join(dir, entry.name)
+          if (entry.isDirectory()) {
+            const children = await buildTree(fullPath, depth + 1)
+            const trackCount = children.reduce(
+              (sum, c) => sum + (c.isDirectory ? (c.trackCount || 0) : (AUDIO_EXTENSIONS.has(extname(c.name).toLowerCase()) ? 1 : 0)),
+              0
+            )
+            result.push({
+              name: entry.name, path: fullPath, isDirectory: true,
+              children, trackCount,
+            })
+          } else if (AUDIO_EXTENSIONS.has(extname(entry.name).toLowerCase())) {
+            result.push({ name: entry.name, path: fullPath, isDirectory: false })
+          }
+        }
+        return result
+      } catch {
+        return []
+      }
+    }
+    return buildTree(folderPath)
+  })
+
+  // ── IPC: Scrobbling (Last.fm + ListenBrainz) ──
+  ipcMain.handle('scrobble:track', async (_, data: { title: string; artist: string; album: string; duration: number; timestamp: number }) => {
+    const settings = await loadSettings()
+
+    // Last.fm scrobble
+    if (settings.lastfmSessionKey && settings.lastfmApiKey) {
+      try {
+        await lastfmScrobble(settings.lastfmApiKey, settings.lastfmApiSecret, settings.lastfmSessionKey, data)
+      } catch (err) {
+        console.error('Last.fm scrobble error:', err)
+      }
+    }
+
+    // ListenBrainz scrobble
+    if (settings.listenbrainzToken) {
+      try {
+        await listenbrainzSubmit(settings.listenbrainzToken, 'single', data)
+      } catch (err) {
+        console.error('ListenBrainz scrobble error:', err)
+      }
+    }
+
+    return true
+  })
+
+  ipcMain.handle('scrobble:now-playing', async (_, data: { title: string; artist: string; album: string; duration: number }) => {
+    const settings = await loadSettings()
+
+    if (settings.lastfmSessionKey && settings.lastfmApiKey) {
+      try {
+        await lastfmUpdateNowPlaying(settings.lastfmApiKey, settings.lastfmApiSecret, settings.lastfmSessionKey, data)
+      } catch (err) {
+        console.error('Last.fm now-playing error:', err)
+      }
+    }
+
+    if (settings.listenbrainzToken) {
+      try {
+        await listenbrainzSubmit(settings.listenbrainzToken, 'playing_now', data)
+      } catch (err) {
+        console.error('ListenBrainz now-playing error:', err)
+      }
+    }
+
+    return true
+  })
+
+  // ── IPC: Smart playlists ──
+  ipcMain.handle('playlists:create-smart', async (_, name: string, rules: any[], ruleMatch: string) => {
+    const now = Date.now()
+    const playlist: Playlist = {
+      id: generateId(`smart-${name}-${now}`),
+      name,
+      trackIds: [],
+      createdAt: now,
+      updatedAt: now,
+      smart: true,
+      rules,
+      ruleMatch: ruleMatch as 'all' | 'any',
+    }
+    playlists.push(playlist)
+    await savePlaylists()
+    return playlist
+  })
+
+  ipcMain.handle('playlists:update-smart', async (_, id: string, rules: any[], ruleMatch: string) => {
+    const pl = playlists.find(p => p.id === id)
+    if (pl && pl.smart) {
+      pl.rules = rules
+      pl.ruleMatch = ruleMatch as 'all' | 'any'
+      pl.updatedAt = Date.now()
+      await savePlaylists()
+    }
+    return pl || null
   })
 
   app.on('activate', () => {

@@ -87,7 +87,19 @@
             <span class="text-sm text-white/50 w-14 text-right tabular-nums font-mono">
               {{ formatTime(player.currentTime) }}
             </span>
-            <div class="flex-1 relative group h-2">
+
+            <!-- Waveform mode (fullscreen only) -->
+            <div v-if="player.waveformEnabled && player.waveformData.length > 0" class="flex-1">
+              <WaveformBar
+                :data="player.waveformData"
+                :progress="player.progress"
+                :duration="player.duration"
+                @seek="(p) => player.seekPercent(p)"
+              />
+            </div>
+
+            <!-- Standard progress bar -->
+            <div v-else class="flex-1 relative group h-2">
               <input
                 type="range"
                 min="0"
@@ -106,6 +118,7 @@
                 </div>
               </div>
             </div>
+
             <span class="text-sm text-white/50 w-14 tabular-nums font-mono">
               {{ formatTime(player.duration) }}
             </span>
@@ -185,6 +198,7 @@ import { usePlayerStore } from '@/stores/player'
 import { formatTime } from '@/utils/formatTime'
 import FullscreenLyrics from '@/components/FullscreenLyrics.vue'
 import QueuePanel from '@/components/QueuePanel.vue'
+import WaveformBar from '@/components/WaveformBar.vue'
 
 const router = useRouter()
 const player = usePlayerStore()

@@ -2,6 +2,15 @@
   <div
     class="player-bar h-20 shrink-0 border-t border-white/[0.06] glass flex items-center px-4 gap-4 relative z-20"
   >
+    <!-- ── Playback error toast ─────────────────────────────────────── -->
+    <Transition name="fade">
+      <div
+        v-if="player.playbackError"
+        class="absolute -top-12 left-1/2 -translate-x-1/2 bg-red-500/90 text-white text-xs px-4 py-2 rounded-lg shadow-lg backdrop-blur-sm whitespace-nowrap z-50"
+      >
+        {{ player.playbackError }}
+      </div>
+    </Transition>
     <!-- ── Track info (left) ────────────────────────────────────────── -->
     <div class="flex items-center gap-3 w-60 min-w-0">
       <div
@@ -107,6 +116,7 @@
           {{ formatTime(player.currentTime) }}
         </span>
 
+        <!-- Standard progress bar -->
         <div class="flex-1 relative group">
           <input
             type="range"

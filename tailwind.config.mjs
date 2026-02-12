@@ -8,9 +8,9 @@ export default {
     extend: {
       colors: {
         accent: {
-          DEFAULT: '#8b5cf6',
-          hover: '#a78bfa',
-          dark: '#6d28d9',
+          DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
+          hover: 'rgb(var(--accent-hover) / <alpha-value>)',
+          dark: 'rgb(var(--accent-dark) / <alpha-value>)',
         },
         surface: {
           DEFAULT: 'rgba(18, 18, 18, 0.85)',

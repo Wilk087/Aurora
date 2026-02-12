@@ -131,6 +131,7 @@
 
       <!-- Virtual scrolled tracks -->
       <VirtualScroller
+        ref="virtualScrollerRef"
         :items="library.sortedTracks"
         :item-height="56"
         key-field="id"
@@ -141,26 +142,57 @@
           <SongRow
             :track="track"
             :index="i"
-            @play="playTrack(i)"
+            :selected="selection.isSelected(track.id)"
+            :selectable="selection.hasSelection.value"
+            @play="selection.hasSelection.value ? selection.handleSelect(i, $event ?? { ctrlKey: true, metaKey: false, shiftKey: false }) : playTrack(i)"
+            @select="selection.handleSelect(i, $event)"
           />
         </template>
       </VirtualScroller>
     </div>
+
+    <!-- Selection action bar -->
+    <SelectionBar
+      :count="selection.selectedCount.value"
+      :track-ids="selection.selectedItems.value.map(t => t.id)"
+      @play-next="onPlayNextSelected"
+      @add-to-queue="onAddToQueueSelected"
+      @select-all="selection.selectAll()"
+      @clear="selection.clearSelection()"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onActivated } from 'vue'
+import { onBeforeRouteLeave } from 'vue-router'
 import { useLibraryStore, type SortOrder } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
+import { useSelection } from '@/composables/useSelection'
 import SongRow from '@/components/SongRow.vue'
 import VirtualScroller from '@/components/VirtualScroller.vue'
+import SelectionBar from '@/components/SelectionBar.vue'
 
 const library = useLibraryStore()
 const player = usePlayerStore()
+const selection = useSelection(() => library.sortedTracks)
 
 const showSortMenu = ref(false)
 const sortDropdownRef = ref<HTMLElement | null>(null)
+const virtualScrollerRef = ref<InstanceType<typeof VirtualScroller> | null>(null)
+
+// ── Scroll memory ────────────────────────
+let savedScrollTop = 0
+onActivated(() => {
+  requestAnimationFrame(() => {
+    const el = virtualScrollerRef.value?.containerRef
+    if (el) el.scrollTop = savedScrollTop
+  })
+})
+onBeforeRouteLeave(() => {
+  const el = virtualScrollerRef.value?.containerRef
+  if (el) savedScrollTop = el.scrollTop
+})
 
 const sortOptions: { value: SortOrder; label: string }[] = [
   { value: 'title', label: 'Title' },
@@ -189,14 +221,41 @@ function onClickOutside(e: MouseEvent) {
   }
 }
 
-onMounted(() => document.addEventListener('click', onClickOutside))
-onUnmounted(() => document.removeEventListener('click', onClickOutside))
-
 function playTrack(index: number) {
   player.playAll(library.sortedTracks, index)
+}
+
+function onPlayNextSelected() {
+  player.playNext(selection.selectedItems.value)
+  selection.clearSelection()
+}
+
+function onAddToQueueSelected() {
+  player.addToQueue(selection.selectedItems.value)
+  selection.clearSelection()
 }
 
 function rescan() {
   library.rescanAll()
 }
-</script>
+
+// Clear selection on Escape
+function onKeyDown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && selection.hasSelection.value) {
+    selection.clearSelection()
+  }
+  // Ctrl/Cmd+A to select all
+  if ((e.ctrlKey || e.metaKey) && e.key === 'a' && library.sortedTracks.length > 0) {
+    e.preventDefault()
+    selection.selectAll()
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', onClickOutside)
+  document.addEventListener('keydown', onKeyDown)
+})
+onUnmounted(() => {
+  document.removeEventListener('click', onClickOutside)
+  document.removeEventListener('keydown', onKeyDown)
+})</script>

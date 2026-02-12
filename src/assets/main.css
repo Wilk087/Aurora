@@ -4,8 +4,9 @@
 
 @layer base {
   :root {
-    --accent: #8b5cf6;
-    --accent-hover: #a78bfa;
+    --accent: 139 92 246;
+    --accent-hover: 167 139 250;
+    --accent-dark: 109 40 217;
     --bg-primary: rgba(10, 10, 10, 0.95);
     --bg-secondary: rgba(18, 18, 18, 0.85);
     --bg-tertiary: rgba(30, 30, 30, 0.9);
@@ -78,14 +79,14 @@
 
   /* ── Decorative helpers ───────────────────────────────────────── */
   .accent-glow {
-    box-shadow: 0 0 20px rgba(139, 92, 246, 0.3),
-      0 0 60px rgba(139, 92, 246, 0.1);
+    box-shadow: 0 0 20px rgb(var(--accent) / 0.3),
+      0 0 60px rgb(var(--accent) / 0.1);
   }
   .cover-shadow {
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
   }
   .text-glow {
-    text-shadow: 0 0 30px rgba(139, 92, 246, 0.5);
+    text-shadow: 0 0 30px rgb(var(--accent) / 0.5);
   }
 
   /* ── Range inputs ─────────────────────────────────────────────── */

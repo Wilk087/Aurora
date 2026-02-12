@@ -20,6 +20,68 @@ export const usePlayerStore = defineStore('player', () => {
   const repeatMode = ref<'off' | 'all' | 'one'>('off')
   const isLoading = ref(false)
 
+  // ── Audio output device ─────────────────────────────────────────────────
+  const outputDeviceId = ref('')
+  const audioDevices = ref<MediaDeviceInfo[]>([])
+
+  async function enumerateOutputDevices() {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      audioDevices.value = devices.filter(d => d.kind === 'audiooutput')
+    } catch (err) {
+      console.error('Failed to enumerate devices:', err)
+    }
+  }
+
+  async function setOutputDevice(deviceId: string) {
+    try {
+      if ((audio as any).setSinkId) {
+        await (audio as any).setSinkId(deviceId)
+        outputDeviceId.value = deviceId
+        const s = await window.api.getSettings()
+        s.outputDeviceId = deviceId
+        await window.api.saveSettings(s)
+      }
+    } catch (err) {
+      console.error('Failed to set output device:', err)
+    }
+  }
+
+  // ── Lyrics offset ───────────────────────────────────────────────────────
+  const lyricsOffset = ref(0) // in seconds (positive = lyrics earlier, negative = later)
+
+  // ── Waveform data ──────────────────────────────────────────────────────
+  const waveformData = ref<number[]>([])
+  const waveformEnabled = ref(false)
+  const waveformCache = new Map<string, number[]>()
+
+  async function generateWaveform(trackPath: string) {
+    if (waveformCache.has(trackPath)) {
+      waveformData.value = waveformCache.get(trackPath)!
+      return
+    }
+    waveformData.value = []
+    try {
+      const result = await window.api.generateWaveform(trackPath)
+      if (result && result.length > 0) {
+        waveformCache.set(trackPath, result)
+        waveformData.value = result
+      }
+    } catch (err) {
+      console.error('Waveform generation error:', err)
+      waveformData.value = []
+    }
+  }
+
+  // ── Adaptive accent ────────────────────────────────────────────────────
+  const adaptiveAccent = ref(false)
+  const currentAccentColor = ref<string | null>(null)
+
+  // ── Scrobbling ──────────────────────────────────────────────────────────
+  let scrobblingEnabled = false
+  let scrobbleTimer: ReturnType<typeof setTimeout> | null = null
+  let scrobbleReported = false
+
   // ── Computed ─────────────────────────────────────────────────────────────
   const progress = computed(() => {
     if (duration.value === 0) return 0
@@ -39,6 +101,20 @@ export const usePlayerStore = defineStore('player', () => {
   // ── Audio event listeners ────────────────────────────────────────────────
   audio.addEventListener('timeupdate', () => {
     currentTime.value = audio.currentTime
+    // Scrobble after listening to 50% or 4 minutes, whichever is first
+    if (scrobblingEnabled && !scrobbleReported && currentTrack.value && duration.value > 30) {
+      const threshold = Math.min(duration.value * 0.5, 240)
+      if (audio.currentTime >= threshold) {
+        scrobbleReported = true
+        window.api.scrobbleTrack({
+          title: currentTrack.value.title,
+          artist: currentTrack.value.artist,
+          album: currentTrack.value.album,
+          duration: duration.value,
+          timestamp: Date.now(),
+        }).catch(() => {})
+      }
+    }
   })
   audio.addEventListener('durationchange', () => {
     duration.value = audio.duration
@@ -57,10 +133,32 @@ export const usePlayerStore = defineStore('player', () => {
   audio.addEventListener('canplay', () => {
     isLoading.value = false
   })
-  audio.addEventListener('error', (e) => {
-    console.error('Audio error:', e)
+
+  // Track playback errors with meaningful messages and auto-skip
+  const playbackError = ref<string | null>(null)
+  let errorSkipTimeout: ReturnType<typeof setTimeout> | null = null
+
+  audio.addEventListener('error', () => {
     isLoading.value = false
     isPlaying.value = false
+    const err = audio.error
+    const codes: Record<number, string> = {
+      1: 'Playback aborted',
+      2: 'Network error loading file',
+      3: 'Codec/decode error — format may not be supported',
+      4: 'Source not supported — file format not playable',
+    }
+    const msg = err ? (codes[err.code] || `Unknown error (code ${err.code})`) : 'Unknown playback error'
+    const trackName = currentTrack.value ? `${currentTrack.value.artist} - ${currentTrack.value.title}` : 'Unknown'
+    console.error(`Audio error for "${trackName}": ${msg}`)
+    playbackError.value = `Cannot play "${currentTrack.value?.title || 'track'}": ${msg}`
+
+    // Auto-skip to next track after a short delay (avoid rapid loops)
+    if (errorSkipTimeout) clearTimeout(errorSkipTimeout)
+    errorSkipTimeout = setTimeout(() => {
+      playbackError.value = null
+      if (queue.value.length > 1) next()
+    }, 2000)
   })
 
   // ── Watchers ─────────────────────────────────────────────────────────────
@@ -85,7 +183,18 @@ export const usePlayerStore = defineStore('player', () => {
     if (s.shuffle === true) isShuffle.value = true
     if (s.repeatMode && ['off', 'all', 'one'].includes(s.repeatMode)) repeatMode.value = s.repeatMode
     if (s.muted === true) { isMuted.value = true; audio.muted = true }
+    if (s.lyricsOffset !== undefined) lyricsOffset.value = s.lyricsOffset
+    if (s.waveformEnabled === true) waveformEnabled.value = true
+    if (s.adaptiveAccent === true) adaptiveAccent.value = true
+    if (s.outputDeviceId) {
+      setOutputDevice(s.outputDeviceId).catch(() => {})
+    }
+    scrobblingEnabled = s.scrobblingEnabled === true
   })
+
+  // Enumerate audio devices on init
+  enumerateOutputDevices()
+  navigator.mediaDevices?.addEventListener('devicechange', enumerateOutputDevices)
 
   // Persist shuffle / repeat / mute when they change
   watch(isShuffle, (val) => {
@@ -157,6 +266,25 @@ export const usePlayerStore = defineStore('player', () => {
     isLoading.value = true
     audio.src = window.api.getMediaUrl(track.path)
     audio.load()
+
+    // Reset scrobble tracking for new track
+    scrobbleReported = false
+    if (scrobbleTimer) { clearTimeout(scrobbleTimer); scrobbleTimer = null }
+
+    // Generate waveform if enabled
+    if (waveformEnabled.value) {
+      generateWaveform(track.path)
+    }
+
+    // Scrobble: update now playing
+    if (scrobblingEnabled) {
+      window.api.updateNowPlaying({
+        title: track.title,
+        artist: track.artist,
+        album: track.album,
+        duration: track.duration,
+      }).catch(() => {})
+    }
 
     // MediaSession metadata (for system integration)
     if ('mediaSession' in navigator) {
@@ -286,10 +414,23 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   function playAll(tracks: Track[], startIndex = 0) {
-    queue.value = [...tracks]
     originalQueue.value = [...tracks]
-    currentIndex.value = startIndex
-    loadTrack(tracks[startIndex])
+    if (isShuffle.value) {
+      // Keep the starting track first, shuffle the rest
+      const startTrack = tracks[startIndex]
+      const rest = tracks.filter((_, i) => i !== startIndex)
+      for (let i = rest.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [rest[i], rest[j]] = [rest[j], rest[i]]
+      }
+      queue.value = [startTrack, ...rest]
+      currentIndex.value = 0
+      loadTrack(startTrack)
+    } else {
+      queue.value = [...tracks]
+      currentIndex.value = startIndex
+      loadTrack(tracks[startIndex])
+    }
     play()
   }
 
@@ -339,33 +480,39 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   /** Insert a track right after the currently playing track */
-  function playNext(track: Track) {
+  function playNext(trackOrTracks: Track | Track[]) {
+    const tracks = Array.isArray(trackOrTracks) ? trackOrTracks : [trackOrTracks]
+    if (tracks.length === 0) return
+
     if (queue.value.length === 0 || currentIndex.value < 0) {
       // Nothing playing – just start it
-      queue.value = [track]
-      originalQueue.value = [track]
+      queue.value = [...tracks]
+      originalQueue.value = [...tracks]
       currentIndex.value = 0
-      loadTrack(track)
+      loadTrack(tracks[0])
       play()
       return
     }
     const insertAt = currentIndex.value + 1
-    queue.value.splice(insertAt, 0, track)
-    originalQueue.value.splice(insertAt, 0, track)
+    queue.value.splice(insertAt, 0, ...tracks)
+    originalQueue.value.splice(insertAt, 0, ...tracks)
   }
 
-  /** Append a track to the end of the queue */
-  function playLater(track: Track) {
+  /** Append a track or tracks to the end of the queue */
+  function playLater(trackOrTracks: Track | Track[]) {
+    const tracks = Array.isArray(trackOrTracks) ? trackOrTracks : [trackOrTracks]
+    if (tracks.length === 0) return
+
     if (queue.value.length === 0 || currentIndex.value < 0) {
-      queue.value = [track]
-      originalQueue.value = [track]
+      queue.value = [...tracks]
+      originalQueue.value = [...tracks]
       currentIndex.value = 0
-      loadTrack(track)
+      loadTrack(tracks[0])
       play()
       return
     }
-    queue.value.push(track)
-    originalQueue.value.push(track)
+    queue.value.push(...tracks)
+    originalQueue.value.push(...tracks)
   }
 
   /** Move a queue item from one index to another (for drag reorder) */
@@ -387,6 +534,46 @@ export const usePlayerStore = defineStore('player', () => {
         currentIndex.value++
       }
     }
+  }
+
+  function setLyricsOffset(offset: number) {
+    lyricsOffset.value = offset
+    window.api.getSettings().then((s: any) => {
+      s.lyricsOffset = offset
+      window.api.saveSettings(s)
+    })
+  }
+
+  function setWaveformEnabled(enabled: boolean) {
+    waveformEnabled.value = enabled
+    window.api.getSettings().then((s: any) => {
+      s.waveformEnabled = enabled
+      window.api.saveSettings(s)
+    })
+    if (enabled && currentTrack.value) {
+      generateWaveform(currentTrack.value.path)
+    }
+  }
+
+  function setAdaptiveAccent(enabled: boolean) {
+    adaptiveAccent.value = enabled
+    window.api.getSettings().then((s: any) => {
+      s.adaptiveAccent = enabled
+      window.api.saveSettings(s)
+    })
+    if (!enabled) {
+      currentAccentColor.value = null
+      document.documentElement.style.removeProperty('--accent')
+      document.documentElement.style.removeProperty('--accent-hover')
+    }
+  }
+
+  function setScrobblingEnabled(enabled: boolean) {
+    scrobblingEnabled = enabled
+    window.api.getSettings().then((s: any) => {
+      s.scrobblingEnabled = enabled
+      window.api.saveSettings(s)
+    })
   }
 
   return {
@@ -425,5 +612,26 @@ export const usePlayerStore = defineStore('player', () => {
     moveInQueue,
     setDiscordFormat,
     setDiscordEnabled,
+    // Audio output
+    outputDeviceId,
+    audioDevices,
+    enumerateOutputDevices,
+    setOutputDevice,
+    // Lyrics offset
+    lyricsOffset,
+    setLyricsOffset,
+    // Waveform
+    waveformData,
+    waveformEnabled,
+    setWaveformEnabled,
+    generateWaveform,
+    // Adaptive accent
+    adaptiveAccent,
+    currentAccentColor,
+    setAdaptiveAccent,
+    // Scrobbling
+    setScrobblingEnabled,
+    // Playback error
+    playbackError,
   }
 })

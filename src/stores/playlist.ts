@@ -2,9 +2,12 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useLibraryStore } from './library'
 
+export type PlaylistSortOrder = 'updated' | 'created' | 'name' | 'tracks'
+
 export const usePlaylistStore = defineStore('playlist', () => {
   const playlists = ref<Playlist[]>([])
   const loaded = ref(false)
+  const playlistSortOrder = ref<PlaylistSortOrder>('updated')
 
   async function loadPlaylists() {
     playlists.value = await window.api.getPlaylists()
@@ -79,14 +82,26 @@ export const usePlaylistStore = defineStore('playlist', () => {
       .filter((t): t is Track => !!t)
   }
 
-  const sortedPlaylists = computed(() =>
-    [...playlists.value].sort((a, b) => b.updatedAt - a.updatedAt)
-  )
+  const sortedPlaylists = computed(() => {
+    const list = [...playlists.value]
+    switch (playlistSortOrder.value) {
+      case 'name':
+        return list.sort((a, b) => a.name.localeCompare(b.name))
+      case 'created':
+        return list.sort((a, b) => b.createdAt - a.createdAt)
+      case 'tracks':
+        return list.sort((a, b) => b.trackIds.length - a.trackIds.length)
+      case 'updated':
+      default:
+        return list.sort((a, b) => b.updatedAt - a.updatedAt)
+    }
+  })
 
   return {
     playlists,
     loaded,
     sortedPlaylists,
+    playlistSortOrder,
     loadPlaylists,
     createPlaylist,
     deletePlaylist,

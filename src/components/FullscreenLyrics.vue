@@ -101,12 +101,12 @@ watch(
   { immediate: true },
 )
 
-// Highlight current line
+// Highlight current line (apply lyrics offset: positive = earlier = add to time)
 watch(
   () => player.currentTime,
   (time) => {
     if (lyrics.value.length === 0) return
-    const idx = findCurrentLine(lyrics.value, time)
+    const idx = findCurrentLine(lyrics.value, time + player.lyricsOffset)
     if (idx !== currentLineIndex.value) {
       currentLineIndex.value = idx
       scrollToLine(idx)

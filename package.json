@@ -3,10 +3,56 @@
   "version": "1.0.0",
   "private": true,
   "description": "A beautiful local music player for Linux, inspired by Cider 2",
+  "author": {
+    "name": "Wilk087",
+    "email": "business@wilk087.dev"
+  },
+  "license": "MIT",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc --noEmit && vite build"
+    "build": "vite build",
+    "dist": "npm run build && electron-builder --linux",
+    "dist:pacman": "npm run build && electron-builder --linux pacman",
+    "dist:appimage": "npm run build && electron-builder --linux AppImage",
+    "dist:all": "npm run build && electron-builder --linux pacman AppImage"
+  },
+  "build": {
+    "appId": "com.wilk087.aurora-player",
+    "productName": "Aurora Player",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "linux": {
+      "target": [
+        {
+          "target": "pacman",
+          "arch": ["x64"]
+        },
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "Audio",
+      "desktop": {
+        "Name": "Aurora Player",
+        "Comment": "A beautiful local music player",
+        "Categories": "Audio;Music;Player;AudioVideo",
+        "Keywords": "music;player;audio;flac;mp3"
+      }
+    },
+    "pacman": {
+      "depends": ["gstreamer", "gst-plugins-base", "gst-plugins-good"]
+    },
+    "appImage": {
+      "license": "LICENSE"
+    }
   },
   "dependencies": {
     "@xhayper/discord-rpc": "^1.3.0",

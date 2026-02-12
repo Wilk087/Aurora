@@ -1,5 +1,5 @@
 <template>
-  <div class="albums-view p-6">
+  <div class="albums-view p-6" ref="viewRoot">
     <div class="flex items-center justify-between mb-6">
       <div>
         <h1 class="text-3xl font-bold text-white mb-1">Albums</h1>
@@ -88,8 +88,21 @@
       </button>
     </div>
 
+    <!-- Loading skeleton -->
+    <div
+      v-if="!library.libraryReady"
+      class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5"
+    >
+      <div v-for="i in 24" :key="i" class="animate-pulse">
+        <div class="aspect-square rounded-xl bg-white/[0.06]" />
+        <div class="mt-2.5 h-3.5 bg-white/[0.06] rounded w-3/4" />
+        <div class="mt-1.5 h-3 bg-white/[0.04] rounded w-1/2" />
+      </div>
+    </div>
+
     <!-- Album grid -->
     <div
+      v-else
       class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5"
     >
       <AlbumCard
@@ -104,7 +117,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, onActivated } from 'vue'
+import { onBeforeRouteLeave } from 'vue-router'
 import { useLibraryStore, type AlbumSortOrder } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import AlbumCard from '@/components/AlbumCard.vue'
@@ -114,6 +128,20 @@ const player = usePlayerStore()
 
 const showSortMenu = ref(false)
 const sortDropdownRef = ref<HTMLElement | null>(null)
+const viewRoot = ref<HTMLElement | null>(null)
+
+// ── Scroll memory ────────────────────────
+let savedScrollTop = 0
+onActivated(() => {
+  requestAnimationFrame(() => {
+    const el = viewRoot.value?.closest('main')
+    if (el) el.scrollTop = savedScrollTop
+  })
+})
+onBeforeRouteLeave(() => {
+  const el = viewRoot.value?.closest('main')
+  if (el) savedScrollTop = el.scrollTop
+})
 
 const albumSortOptions: { value: AlbumSortOrder; label: string }[] = [
   { value: 'name', label: 'Name' },

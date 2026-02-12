@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, shallowRef, computed } from 'vue'
+import { ref, shallowRef, computed, markRaw } from 'vue'
 
 export type SortOrder = 'title' | 'artist' | 'album' | 'year' | 'duration'
 export type AlbumSortOrder = 'name' | 'artist' | 'year' | 'tracks'
@@ -28,6 +28,7 @@ export const useLibraryStore = defineStore('library', () => {
   const tracks = shallowRef<Track[]>([])
   const folders = ref<string[]>([])
   const isScanning = ref(false)
+  const libraryReady = ref(false)
   const scanProgress = ref({ current: 0, total: 0 })
   const searchQuery = ref('')
   const sortOrder = ref<SortOrder>('title')
@@ -154,8 +155,9 @@ export const useLibraryStore = defineStore('library', () => {
       window.api.getLibrary(),
       window.api.getFolders(),
     ])
-    tracks.value = rawTracks.map((t: Track) => Object.freeze(t))
+    tracks.value = rawTracks.map((t: Track) => markRaw(t))
     folders.value = rawFolders
+    libraryReady.value = true
   }
 
   async function addFolder() {
@@ -171,7 +173,7 @@ export const useLibraryStore = defineStore('library', () => {
 
     try {
       const rawTracks = await window.api.scanFolder(folderPath)
-      tracks.value = rawTracks.map((t: Track) => Object.freeze(t))
+      tracks.value = rawTracks.map((t: Track) => markRaw(t))
       folders.value = await window.api.getFolders()
     } finally {
       isScanning.value = false
@@ -181,7 +183,7 @@ export const useLibraryStore = defineStore('library', () => {
 
   async function removeFolder(folderPath: string) {
     const result = await window.api.removeFolder(folderPath)
-    tracks.value = result.tracks.map((t: Track) => Object.freeze(t))
+    tracks.value = result.tracks.map((t: Track) => markRaw(t))
     folders.value = result.folders
   }
 
@@ -195,7 +197,7 @@ export const useLibraryStore = defineStore('library', () => {
     try {
       for (const folder of folders.value) {
         const rawTracks = await window.api.scanFolder(folder)
-        tracks.value = rawTracks.map((t: Track) => Object.freeze(t))
+        tracks.value = rawTracks.map((t: Track) => markRaw(t))
       }
     } finally {
       isScanning.value = false
@@ -211,6 +213,7 @@ export const useLibraryStore = defineStore('library', () => {
     tracks,
     folders,
     isScanning,
+    libraryReady,
     scanProgress,
     searchQuery,
     sortOrder,
