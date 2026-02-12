@@ -28,12 +28,18 @@
       "dist/**/*",
       "dist-electron/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "build/icon.png",
+        "to": "icon.png"
+      }
+    ],
     "linux": {
       "target": [
         "pacman",
         "AppImage"
       ],
-      "icon": "build/icon.png",
+      "icon": "build/icons",
       "category": "Audio",
       "executableName": "aurora-player",
       "desktop": {

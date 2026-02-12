@@ -834,7 +834,9 @@ function createWindow() {
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
-    icon: join(__dirname, '../build/icon.png'),
+    icon: app.isPackaged
+      ? join(process.resourcesPath, 'icon.png')
+      : join(__dirname, '../build/icon.png'),
     webPreferences: {
       preload: join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -854,6 +856,10 @@ function createWindow() {
 }
 
 // ── App lifecycle ──────────────────────────────────────────────────────────
+if (process.platform === 'linux') {
+  app.setDesktopName('aurora-player.desktop')
+}
+
 app.whenReady().then(async () => {
   // Register localfile:// protocol to serve local files with range-request
   // support so that <audio> seeking works correctly.
