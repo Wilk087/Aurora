@@ -203,11 +203,11 @@ export async function initMpris(win: BrowserWindow) {
       },
     })
 
-    // Create instances
-    rootIface = new MediaPlayer2(SERVICE_NAME.replace(/\./g, '_'))
-    playerIface = new MediaPlayer2Player(SERVICE_NAME.replace(/\./g, '_') + '.Player')
+    // Create instances with proper D-Bus interface names
+    rootIface = new MediaPlayer2('org.mpris.MediaPlayer2')
+    playerIface = new MediaPlayer2Player('org.mpris.MediaPlayer2.Player')
 
-    // Export on the bus
+    // Export on the bus with the interface name
     bus.export(OBJECT_PATH, rootIface)
     bus.export(OBJECT_PATH, playerIface)
 
@@ -327,27 +327,9 @@ function Interface_emitPropertiesChanged(
 ) {
   try {
     const dbus = require('dbus-next')
-    const Variant = dbus.Variant
-    // Wrap each changed property value in a Variant if not already
-    const wrapped: Record<string, any> = {}
-    for (const [key, value] of Object.entries(changedProperties)) {
-      if (value instanceof Variant) {
-        wrapped[key] = value
-      } else if (typeof value === 'string') {
-        wrapped[key] = new Variant('s', value)
-      } else if (typeof value === 'boolean') {
-        wrapped[key] = new Variant('b', value)
-      } else if (typeof value === 'number') {
-        wrapped[key] = new Variant('d', value)
-      } else if (typeof value === 'object') {
-        wrapped[key] = new Variant('a{sv}', value)
-      }
-    }
-
-    // Use the interface's built-in emit if available
-    if (typeof iface.emitPropertiesChanged === 'function') {
-      iface.emitPropertiesChanged(changedProperties, invalidatedProperties)
-    }
+    const { Interface } = dbus.interface
+    // Use the static method on Interface — it auto-wraps values to Variants
+    Interface.emitPropertiesChanged(iface, changedProperties, invalidatedProperties)
   } catch (err) {
     // Silently fail — MPRIS property signals are non-critical
   }

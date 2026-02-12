@@ -222,6 +222,10 @@ export const usePlayerStore = defineStore('player', () => {
 
   // ── Restore persisted playback settings ────────────────────────────────────
   window.api.getSettings().then((s: any) => {
+    if (s.volume !== undefined) {
+      volume.value = s.volume
+      audio.volume = s.volume * s.volume
+    }
     if (s.shuffle === true) isShuffle.value = true
     if (s.repeatMode && ['off', 'all', 'one'].includes(s.repeatMode)) repeatMode.value = s.repeatMode
     if (s.muted === true) { isMuted.value = true; audio.muted = true }

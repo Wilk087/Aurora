@@ -230,13 +230,10 @@ protocol.registerSchemesAsPrivileged([
 ])
 
 // ── MPRIS / Desktop identity ───────────────────────────────────────────────
-// Set proper app identity so MPRIS shows "Aurora Player" instead of "Chromium"
 app.setName('Aurora Player')
-// Tell Chromium our desktop entry name for proper MPRIS integration on Linux
-app.commandLine.appendSwitch('force-app-id', 'aurora-player')
 if (process.platform === 'linux') {
-  // This is read by Chromium's MPRIS backend to set Identity and DesktopEntry
-  app.commandLine.appendSwitch('gtk-application-prefer-dark-theme')
+  // Disable Chromium's built-in MPRIS so our custom D-Bus service is the only one
+  app.commandLine.appendSwitch('disable-features', 'HardwareMediaKeyHandling,MediaSessionService')
   process.env.BAMF_DESKTOP_FILE_HINT = 'aurora-player.desktop'
 }
 
@@ -467,9 +464,16 @@ async function performImport(importPath: string): Promise<{ settings: boolean; f
   const result = { settings: false, favorites: 0, playlists: 0 }
 
   if (bundle.settings && typeof bundle.settings === 'object') {
-    // Merge — preserve exportPath and autoExport from current settings
+    // Merge — preserve device-specific settings from current install
     const current = await loadSettings()
-    const merged = { ...bundle.settings, exportPath: current.exportPath, autoExport: current.autoExport }
+    const merged = {
+      ...bundle.settings,
+      // These are device-specific and should not be overwritten
+      folders: current.folders,
+      outputDeviceId: current.outputDeviceId,
+      exportPath: current.exportPath,
+      autoExport: current.autoExport,
+    }
     await writeFile(settingsPath, JSON.stringify(merged, null, 2))
     result.settings = true
   }
@@ -856,10 +860,6 @@ function createWindow() {
 }
 
 // ── App lifecycle ──────────────────────────────────────────────────────────
-if (process.platform === 'linux') {
-  app.setDesktopName('aurora-player.desktop')
-}
-
 app.whenReady().then(async () => {
   // Register localfile:// protocol to serve local files with range-request
   // support so that <audio> seeking works correctly.
