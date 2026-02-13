@@ -1065,13 +1065,15 @@ app.whenReady().then(async () => {
 
   // ── IPC: Lyrics ──
   ipcMain.handle('lyrics:get', async (_, trackPath: string) => {
+    // Skip local lyrics lookup for remote/subsonic tracks
+    if (trackPath.startsWith('subsonic://')) return null
     return await findLocalLyrics(trackPath)
   })
 
   ipcMain.handle('lyrics:fetch-online', async (_, trackInfo: { path: string; title: string; artist: string; album: string; duration: number }) => {
     const online = await fetchLRCLIB(trackInfo)
-    if (online && trackInfo.path) {
-      // Save the fetched lyrics as .lrc file next to the audio
+    if (online && trackInfo.path && !trackInfo.path.startsWith('subsonic://')) {
+      // Save the fetched lyrics as .lrc file next to the audio (skip for remote/subsonic tracks)
       await saveLyricsFile(trackInfo.path, online)
     }
     return online
@@ -1099,6 +1101,14 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('app:get-version', () => app.getVersion())
+
+  // ── IPC: Open external URL in system browser ──
+  ipcMain.handle('app:open-external', async (_, url: string) => {
+    if (url && (url.startsWith('https://') || url.startsWith('http://'))) {
+      const { shell } = await import('electron')
+      await shell.openExternal(url)
+    }
+  })
 
   // ── IPC: Favorites ──
   ipcMain.handle('favorites:get', async () => await loadFavorites())
@@ -1550,6 +1560,7 @@ app.whenReady().then(async () => {
 
   // ── IPC: Save lyrics ──
   ipcMain.handle('lyrics:save', async (_, trackPath: string, lrcContent: string) => {
+    if (trackPath.startsWith('subsonic://')) return // Can't save to remote paths
     await saveLyricsFile(trackPath, lrcContent)
   })
 

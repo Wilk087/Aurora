@@ -35,14 +35,12 @@
 
         <!-- Actions -->
         <div class="flex gap-2 mt-3 ml-12">
-          <a
-            :href="releaseUrl"
-            target="_blank"
+          <button
+            @click="openRelease"
             class="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-white hover:brightness-110 transition-all"
-            @click="dismiss"
           >
             View release
-          </a>
+          </button>
           <button
             @click="dismiss"
             class="px-3 py-1.5 text-xs font-medium rounded-lg bg-white/[0.06] text-white/60 hover:text-white/80 hover:bg-white/[0.1] transition-all"
@@ -71,6 +69,13 @@ async function dismiss() {
     settings.dismissedUpdateVersion = latestVersion.value
     await window.api.saveSettings(settings)
   } catch {}
+}
+
+function openRelease() {
+  if (releaseUrl.value) {
+    window.api.openExternal(releaseUrl.value)
+  }
+  dismiss()
 }
 
 onMounted(async () => {

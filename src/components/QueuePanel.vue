@@ -58,7 +58,12 @@
             </div>
             <div class="flex-1 min-w-0">
               <p class="text-sm font-medium text-accent truncate">{{ currentTrack.title }}</p>
-              <p class="text-xs text-white/40 truncate">{{ currentTrack.artist }}</p>
+              <p class="text-xs text-white/40 truncate">
+                <span
+                  class="hover:text-white/60 hover:underline underline-offset-2 cursor-pointer transition-colors"
+                  @click.stop="goToArtist(currentTrack)"
+                >{{ currentTrack.artist }}</span>
+              </p>
             </div>
             <div class="flex items-center justify-center gap-[2px] shrink-0 w-6">
               <span class="w-[2px] h-2.5 bg-accent rounded-full animate-bounce" style="animation-delay: 0s" />
@@ -113,7 +118,12 @@
               </div>
               <div class="flex-1 min-w-0">
                 <p class="text-sm text-white truncate">{{ item.track.title }}</p>
-                <p class="text-xs text-white/40 truncate">{{ item.track.artist }}</p>
+                <p class="text-xs text-white/40 truncate">
+                  <span
+                    class="hover:text-white/60 hover:underline underline-offset-2 cursor-pointer transition-colors"
+                    @click.stop="goToArtist(item.track)"
+                  >{{ item.track.artist }}</span>
+                </p>
               </div>
               <span class="text-[11px] text-white/25 tabular-nums shrink-0">{{ formatTime(item.track.duration) }}</span>
               <button
@@ -155,7 +165,12 @@
                 </div>
                 <div class="flex-1 min-w-0">
                   <p class="text-sm text-white truncate">{{ item.track.title }}</p>
-                  <p class="text-xs text-white/40 truncate">{{ item.track.artist }}</p>
+                  <p class="text-xs text-white/40 truncate">
+                    <span
+                      class="hover:text-white/60 hover:underline underline-offset-2 cursor-pointer transition-colors"
+                      @click.stop="goToArtist(item.track)"
+                    >{{ item.track.artist }}</span>
+                  </p>
                 </div>
                 <span class="text-[11px] text-white/25 tabular-nums shrink-0">{{ formatTime(item.track.duration) }}</span>
               </div>
@@ -178,14 +193,21 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { formatTime } from '@/utils/formatTime'
 
 defineProps<{ show: boolean }>()
 defineEmits(['close'])
 
+const router = useRouter()
 const player = usePlayerStore()
 const showPrevious = ref(false)
+
+function goToArtist(track: Track) {
+  const artist = track.albumArtist || track.artist
+  router.push(`/artist/${encodeURIComponent(artist)}`)
+}
 
 // ── Drag & drop state ──────────────────────────────────────
 const draggedIndex = ref<number | null>(null)

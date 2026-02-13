@@ -33,7 +33,12 @@
 
       <div class="min-w-0">
         <p class="text-sm font-medium truncate text-white">{{ player.currentTrack?.title }}</p>
-        <p class="text-xs text-white/50 truncate">{{ player.currentTrack?.artist }}</p>
+        <p class="text-xs text-white/50 truncate">
+          <span
+            class="hover:text-white/80 hover:underline underline-offset-2 cursor-pointer transition-colors"
+            @click.stop="goToArtist"
+          >{{ player.currentTrack?.artist }}</span>
+        </p>
       </div>
     </div>
 
@@ -251,13 +256,23 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
+import { useLibraryStore } from '@/stores/library'
 import { formatTime } from '@/utils/formatTime'
 import QueuePanel from '@/components/QueuePanel.vue'
 import IOSSlider from '@/components/IOSSlider.vue'
 
+const router = useRouter()
 const player = usePlayerStore()
+const library = useLibraryStore()
 const showQueue = ref(false)
+
+function goToArtist() {
+  if (!player.currentTrack) return
+  const artist = player.currentTrack.albumArtist || player.currentTrack.artist
+  router.push(`/artist/${encodeURIComponent(artist)}`)
+}
 
 const coverUrl = computed(() =>
   player.currentTrack?.coverArt ? window.api.getMediaUrl(player.currentTrack.coverArt) : '',

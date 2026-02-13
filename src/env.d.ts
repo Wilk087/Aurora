@@ -178,5 +178,6 @@ interface Window {
     // App version & update checking
     getAppVersion: () => Promise<string>
     checkForUpdate: () => Promise<{ currentVersion: string; latestVersion: string; url: string } | null>
+    openExternal: (url: string) => Promise<void>
   }
 }

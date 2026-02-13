@@ -34,7 +34,10 @@
 
     <p class="text-sm font-medium text-white truncate">{{ album.name }}</p>
     <p class="text-xs text-white/40 truncate">
-      {{ album.artist }}{{ album.year ? ` \u2022 ${album.year}` : '' }}
+      <span
+        class="hover:text-white/60 hover:underline underline-offset-2 cursor-pointer transition-colors"
+        @click.stop="goToArtist"
+      >{{ album.artist }}</span>{{ album.year ? ` • ${album.year}` : '' }}
     </p>
 
     <!-- Context menu -->

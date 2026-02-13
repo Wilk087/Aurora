@@ -204,6 +204,8 @@ export const useLibraryStore = defineStore('library', () => {
         const rawTracks = await window.api.scanFolder(folder)
         localTracks.value = rawTracks.map((t: Track) => markRaw(t))
       }
+      // Also re-fetch subsonic library if connected
+      await autoLoadSubsonic()
     } finally {
       isScanning.value = false
       window.api.removeScanProgressListener()

@@ -148,14 +148,14 @@ export async function subsonicSearch(query: string): Promise<{ artists: any[]; a
 }
 
 /** Convert a Subsonic song to our Track interface */
-export function subsonicSongToTrack(song: any): any {
+export function subsonicSongToTrack(song: any, albumLevelArtist?: string): any {
   return {
     id: `subsonic-${song.id}`,
     path: `subsonic://${song.id}`,
     title: song.title || 'Unknown Title',
     artist: song.artist || 'Unknown Artist',
     album: song.album || 'Unknown Album',
-    albumArtist: song.albumArtist || song.artist || 'Unknown Artist',
+    albumArtist: albumLevelArtist || song.albumArtist || song.artist || 'Unknown Artist',
     track: song.track || 0,
     disc: song.discNumber || 1,
     duration: song.duration || 0,
@@ -169,6 +169,7 @@ export function subsonicSongToTrack(song: any): any {
 /** Get the streaming URL for a song */
 export function getStreamUrl(songId: string): string {
   const params = buildAuthParams()
+  params.delete('f') // Binary endpoint — don't request JSON format
   const base = config!.url.replace(/\/+$/, '')
   return `${base}/rest/stream?id=${songId}&${params.toString()}`
 }
@@ -176,6 +177,7 @@ export function getStreamUrl(songId: string): string {
 /** Get cover art URL */
 export function getCoverArtUrl(coverArtId: string, size: number = 512): string {
   const params = buildAuthParams()
+  params.delete('f') // Binary endpoint — don't request JSON format
   params.set('id', coverArtId)
   params.set('size', size.toString())
   const base = config!.url.replace(/\/+$/, '')
@@ -190,9 +192,10 @@ export async function subsonicGetAllSongs(): Promise<any[]> {
   for (const album of albums) {
     try {
       const detail = await subsonicGetAlbum(album.id)
+      const albumArtist = detail?.artist || album.artist || undefined
       const songs = detail?.song || []
       for (const song of Array.isArray(songs) ? songs : [songs]) {
-        tracks.push(subsonicSongToTrack(song))
+        tracks.push(subsonicSongToTrack(song, albumArtist))
       }
     } catch (err) {
       console.error(`Failed to fetch album ${album.id}:`, err)

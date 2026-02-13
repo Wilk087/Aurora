@@ -88,12 +88,22 @@
           <p class="text-sm font-medium truncate" :class="isTrackActive(track) ? 'text-accent' : 'text-white'">
             {{ track.title }}
           </p>
-          <p class="text-xs text-white/40 truncate">{{ track.artist }}</p>
+          <p class="text-xs text-white/40 truncate">
+            <span
+              class="hover:text-white/60 hover:underline underline-offset-2 cursor-pointer transition-colors"
+              @click.stop="goToTrackArtist(track)"
+            >{{ track.artist }}</span>
+          </p>
         </div>
 
         <!-- Album -->
         <div class="w-48 min-w-0 hidden lg:block">
-          <p class="text-xs text-white/40 truncate">{{ track.album }}</p>
+          <p class="text-xs text-white/40 truncate">
+            <span
+              class="hover:text-white/60 hover:underline underline-offset-2 cursor-pointer transition-colors"
+              @click.stop="goToTrackAlbum(track)"
+            >{{ track.album }}</span>
+          </p>
         </div>
 
         <!-- Duration -->
@@ -273,6 +283,18 @@ function ctxGoToAlbum() {
     a.name === ctxTrack.value!.album && a.artist === (ctxTrack.value!.albumArtist || ctxTrack.value!.artist)
   )
   ctxTrack.value = null
+  if (album) router.push(`/album/${album.id}`)
+}
+
+function goToTrackArtist(track: Track) {
+  const artist = track.albumArtist || track.artist
+  router.push(`/artist/${encodeURIComponent(artist)}`)
+}
+
+function goToTrackAlbum(track: Track) {
+  const album = library.albums.find(a =>
+    a.name === track.album && a.artist === (track.albumArtist || track.artist)
+  )
   if (album) router.push(`/album/${album.id}`)
 }
 

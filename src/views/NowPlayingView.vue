@@ -20,8 +20,19 @@
 
         <div class="mt-6 text-center">
           <h2 class="text-2xl font-bold text-white mb-1">{{ player.currentTrack.title }}</h2>
-          <p class="text-lg text-white/50">{{ player.currentTrack.artist }}</p>
-          <p class="text-sm text-white/30 mt-1">{{ player.currentTrack.album }}</p>
+          <p class="text-lg text-white/50">
+            <span
+              class="hover:text-white/70 hover:underline underline-offset-2 cursor-pointer transition-colors"
+              @click="goToArtist"
+            >{{ player.currentTrack.artist }}</span>
+          </p>
+          <p class="text-sm text-white/30 mt-1">
+            <span
+              v-if="player.currentTrack.album"
+              class="hover:text-white/50 hover:underline underline-offset-2 cursor-pointer transition-colors"
+              @click="goToAlbum"
+            >{{ player.currentTrack.album }}</span>
+          </p>
         </div>
       </div>
     </div>
@@ -48,12 +59,30 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
+import { useLibraryStore } from '@/stores/library'
 import SyncedLyrics from '@/components/SyncedLyrics.vue'
 
+const router = useRouter()
 const player = usePlayerStore()
+const library = useLibraryStore()
 
 const coverUrl = computed(() =>
   player.currentTrack?.coverArt ? window.api.getMediaUrl(player.currentTrack.coverArt) : '',
 )
+
+function goToArtist() {
+  if (!player.currentTrack) return
+  const artist = player.currentTrack.albumArtist || player.currentTrack.artist
+  router.push(`/artist/${encodeURIComponent(artist)}`)
+}
+
+function goToAlbum() {
+  if (!player.currentTrack) return
+  const album = library.albums.find(a =>
+    a.name === player.currentTrack!.album && a.artist === (player.currentTrack!.albumArtist || player.currentTrack!.artist)
+  )
+  if (album) router.push(`/album/${album.id}`)
+}
 </script>

@@ -5,6 +5,7 @@ export const usePlayerStore = defineStore('player', () => {
   // ── Internal audio element ───────────────────────────────────────────────
   const audio = new Audio()
   audio.preload = 'auto'
+  audio.crossOrigin = 'anonymous' // Required for Web Audio API with cross-origin sources (e.g. Navidrome streams)
   // ── Web Audio API chain for normalization ───────────────────────────────
   let audioCtx: AudioContext | null = null
   let sourceNode: MediaElementAudioSourceNode | null = null
@@ -408,10 +409,16 @@ export const usePlayerStore = defineStore('player', () => {
       const songId = track.path.replace('subsonic://', '')
       const streamUrl = await window.api.subsonicGetStreamUrl(songId)
       audio.src = streamUrl
+      // Wait for remote stream to become playable before returning
+      await new Promise<void>((resolve) => {
+        audio.addEventListener('canplay', () => resolve(), { once: true })
+        audio.addEventListener('error', () => resolve(), { once: true })
+        audio.load()
+      })
     } else {
       audio.src = window.api.getMediaUrl(track.path)
+      audio.load()
     }
-    audio.load()
 
     // Reset scrobble tracking for new track
     scrobbleReported = false
@@ -506,7 +513,7 @@ export const usePlayerStore = defineStore('player', () => {
         queue.value.push(track)
         currentIndex.value = queue.value.length - 1
       }
-      loadTrack(track)
+      await loadTrack(track)
     }
 
     try {
@@ -525,7 +532,7 @@ export const usePlayerStore = defineStore('player', () => {
     else play()
   }
 
-  function next() {
+  async function next() {
     if (queue.value.length === 0) return
     let nextIdx = currentIndex.value + 1
     if (nextIdx >= queue.value.length) {
@@ -533,11 +540,11 @@ export const usePlayerStore = defineStore('player', () => {
       else return
     }
     currentIndex.value = nextIdx
-    loadTrack(queue.value[nextIdx])
+    await loadTrack(queue.value[nextIdx])
     play()
   }
 
-  function previous() {
+  async function previous() {
     if (audio.currentTime > 3) {
       audio.currentTime = 0
       return
@@ -553,7 +560,7 @@ export const usePlayerStore = defineStore('player', () => {
       }
     }
     currentIndex.value = prevIdx
-    loadTrack(queue.value[prevIdx])
+    await loadTrack(queue.value[prevIdx])
     play()
   }
 
@@ -601,7 +608,7 @@ export const usePlayerStore = defineStore('player', () => {
     repeatMode.value = modes[(modes.indexOf(repeatMode.value) + 1) % 3]
   }
 
-  function playAll(tracks: Track[], startIndex = 0) {
+  async function playAll(tracks: Track[], startIndex = 0) {
     originalQueue.value = [...tracks]
     if (isShuffle.value) {
       // Keep the starting track first, shuffle the rest
@@ -613,22 +620,22 @@ export const usePlayerStore = defineStore('player', () => {
       }
       queue.value = [startTrack, ...rest]
       currentIndex.value = 0
-      loadTrack(startTrack)
+      await loadTrack(startTrack)
     } else {
       queue.value = [...tracks]
       currentIndex.value = startIndex
-      loadTrack(tracks[startIndex])
+      await loadTrack(tracks[startIndex])
     }
     play()
   }
 
-  function addToQueue(tracks: Track[]) {
+  async function addToQueue(tracks: Track[]) {
     queue.value.push(...tracks)
     originalQueue.value.push(...tracks)
     // If nothing is playing, start from the first added track
     if (!currentTrack.value && tracks.length > 0) {
       currentIndex.value = queue.value.length - tracks.length
-      loadTrack(queue.value[currentIndex.value])
+      await loadTrack(queue.value[currentIndex.value])
       play()
     }
   }

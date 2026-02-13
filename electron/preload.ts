@@ -103,6 +103,7 @@ contextBridge.exposeInMainWorld('api', {
   // App version & update checking
   getAppVersion: (): Promise<string> => ipcRenderer.invoke('app:get-version'),
   checkForUpdate: (): Promise<{ currentVersion: string; latestVersion: string; url: string } | null> => ipcRenderer.invoke('app:check-update'),
+  openExternal: (url: string): Promise<void> => ipcRenderer.invoke('app:open-external', url),
 
   // Utility – build a localfile:// URL for local file playback (pass through http(s) URLs)
   getMediaUrl: (filePath: string) => {

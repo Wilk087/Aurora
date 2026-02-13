@@ -59,12 +59,22 @@
       <p class="text-sm font-medium truncate" :class="isActive ? 'text-accent' : 'text-white'">
         {{ track.title }}
       </p>
-      <p class="text-xs text-white/40 truncate">{{ track.artist }}</p>
+      <p class="text-xs text-white/40 truncate">
+        <span
+          class="hover:text-white/60 hover:underline underline-offset-2 cursor-pointer transition-colors"
+          @click.stop="goToArtist"
+        >{{ track.artist }}</span>
+      </p>
     </div>
 
     <!-- Album -->
     <div class="w-48 min-w-0 hidden lg:block">
-      <p class="text-xs text-white/40 truncate">{{ track.album }}</p>
+      <p class="text-xs text-white/40 truncate">
+        <span
+          class="hover:text-white/60 hover:underline underline-offset-2 cursor-pointer transition-colors"
+          @click.stop="goToAlbum"
+        >{{ track.album }}</span>
+      </p>
     </div>
 
     <!-- Duration -->
@@ -258,8 +268,18 @@
               </div>
               <div class="flex-1 min-w-0">
                 <h3 class="text-lg font-bold text-white truncate">{{ track.title }}</h3>
-                <p class="text-sm text-white/50">{{ track.artist }}</p>
-                <p class="text-xs text-white/30 mt-0.5">{{ track.album }}</p>
+                <p class="text-sm text-white/50">
+                  <span
+                    class="hover:text-white/70 hover:underline underline-offset-2 cursor-pointer transition-colors"
+                    @click.stop="goToArtist"
+                  >{{ track.artist }}</span>
+                </p>
+                <p class="text-xs text-white/30 mt-0.5">
+                  <span
+                    class="hover:text-white/50 hover:underline underline-offset-2 cursor-pointer transition-colors"
+                    @click.stop="goToAlbum"
+                  >{{ track.album }}</span>
+                </p>
               </div>
               <button @click="showCreditsPanel = false" class="w-8 h-8 flex items-center justify-center rounded-lg text-white/30 hover:text-white hover:bg-white/[0.08] transition-colors shrink-0">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
