@@ -309,6 +309,23 @@
               :class="player.iosSliders ? 'translate-x-[22px]' : 'translate-x-0.5'"
             />
           </button>
+        </div>
+        <!-- Window transparency -->
+        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">Window Transparency</p>
+            <p class="text-xs text-white/30 mt-0.5">Enable glass-like transparency effect on the window background</p>
+          </div>
+          <button
+            @click="toggleTransparency"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="player.transparencyEnabled ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              :class="player.transparencyEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
         </div>      </div>
     </section>
 
@@ -684,16 +701,46 @@
       </div>
     </section>
   </div>
+
+  <!-- Restart dialog after import -->
+  <Teleport to="body">
+    <Transition name="fade">
+      <div v-if="showRestartDialog" class="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div class="bg-[#1a1a1a] border border-white/[0.08] rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+          <h3 class="text-lg font-semibold text-white mb-2">Restart to Apply</h3>
+          <p class="text-sm text-white/50 mb-6">Settings were imported successfully. Restart the app to fully apply all changes?</p>
+          <div class="flex items-center justify-end gap-3">
+            <button
+              @click="dismissRestart"
+              class="px-4 py-2 rounded-lg bg-white/[0.08] hover:bg-white/[0.12] text-sm font-medium text-white/60 hover:text-white/80 transition-colors"
+            >
+              Later
+            </button>
+            <button
+              @click="restartApp"
+              class="px-4 py-2 rounded-lg bg-accent hover:bg-accent-hover text-sm font-medium text-white transition-colors"
+            >
+              Restart Now
+            </button>
+          </div>
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
+import { usePlaylistStore } from '@/stores/playlist'
+import { useFavoritesStore } from '@/stores/favorites'
 import { useToast } from '@/composables/useToast'
 
 const library = useLibraryStore()
 const player = usePlayerStore()
+const playlistStore = usePlaylistStore()
+const favoritesStore = useFavoritesStore()
 const toast = useToast()
 
 const appVersion = __APP_VERSION__
@@ -877,6 +924,11 @@ function toggleIOSSliders() {
   toast.success(`iOS-style sliders ${player.iosSliders ? 'enabled' : 'disabled'}`)
 }
 
+function toggleTransparency() {
+  player.setTransparencyEnabled(!player.transparencyEnabled)
+  toast.success(`Window transparency ${player.transparencyEnabled ? 'enabled' : 'disabled'}`)
+}
+
 // ── Behavior ──────────────────────────────
 function toggleAutoFullscreen() {
   player.setAutoFullscreen(!player.autoFullscreen)
@@ -1007,6 +1059,8 @@ async function runExport() {
   }
 }
 
+const showRestartDialog = ref(false)
+
 async function runImport() {
   importing.value = true
   try {
@@ -1019,14 +1073,28 @@ async function runImport() {
     toast.success(`Imported: ${parts.join(', ')}`)
     // Reload everything
     await library.loadLibrary()
+    await playlistStore.loadPlaylists()
+    await favoritesStore.load()
     const settings = await window.api.getSettings()
     autoExport.value = settings.autoExport !== false
     exportPath.value = settings.exportPath || ''
+    // If settings were imported, offer a restart to fully apply
+    if (result.settings) {
+      showRestartDialog.value = true
+    }
   } catch (e: any) {
     toast.error(`Import failed: ${e.message || e}`)
   } finally {
     importing.value = false
   }
+}
+
+function restartApp() {
+  window.api.relaunchApp()
+}
+
+function dismissRestart() {
+  showRestartDialog.value = false
 }
 
 // ── Cache Management ──────────────────────

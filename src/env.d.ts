@@ -109,6 +109,11 @@ interface Window {
     close: () => void
     enterFullscreen: () => void
     exitFullscreen: () => void
+    // Window state events
+    onWindowStateChange: (callback: (state: { maximized: boolean; fullscreen: boolean }) => void) => void
+    removeWindowStateChangeListener: () => void
+    // App lifecycle
+    relaunchApp: () => void
     getSettings: () => Promise<any>
     saveSettings: (settings: any) => Promise<void>
     // Favorites

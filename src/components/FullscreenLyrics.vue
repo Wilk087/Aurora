@@ -64,7 +64,7 @@
           selectedLines.has(i) ? 'ring-1 ring-accent/40 rounded-lg !bg-accent/10' : ''
         ]"
       >
-        <p class="text-[2rem] font-extrabold leading-snug">
+        <p class="text-[2.5rem] font-extrabold leading-snug">
           {{ line.text || '♪' }}
         </p>
         <div v-if="selectedLines.has(i)" class="absolute left-2 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-accent" />
@@ -289,26 +289,26 @@ watch(() => player.currentTrack?.path, () => {
 .fs-lyric-line.is-active {
   opacity: 1;
   color: white;
-  transform: scale(1);
+  transform: scale(1.08);
   text-shadow: 0 0 40px rgba(139, 92, 246, 0.35), 0 0 80px rgba(139, 92, 246, 0.12);
 }
 
 .fs-lyric-line.is-near {
   opacity: 1;
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.30);
   transform: scale(0.97);
 }
 
 .fs-lyric-line.is-far {
   opacity: 1;
-  color: rgba(255, 255, 255, 0.18);
-  transform: scale(0.95);
+  color: rgba(255, 255, 255, 0.14);
+  transform: scale(0.93);
 }
 
 .fs-lyric-line.is-hidden {
   opacity: 1;
-  color: rgba(255, 255, 255, 0.08);
-  transform: scale(0.93);
+  color: rgba(255, 255, 255, 0.06);
+  transform: scale(0.90);
 }
 
 .fs-lyric-line:hover {

@@ -1,7 +1,7 @@
 <template>
   <div
     class="app-container h-screen flex flex-col overflow-hidden"
-    :class="isFullscreen ? 'bg-black' : 'glass-heavy rounded-xl border border-white/[0.06]'"
+    :class="appContainerClasses"
   >
     <!-- Dynamic ambient glow derived from album art -->
     <div
@@ -60,10 +60,28 @@ const library = useLibraryStore()
 const playlistStore = usePlaylistStore()
 const favoritesStore = useFavoritesStore()
 const dynamicColor = ref<string | null>(null)
+const isWindowMaximized = ref(false)
+const isWindowFullscreen = ref(false)
 
 const isFullscreen = computed(() => route.path === '/fullscreen')
 
+// Determine whether to show rounded corners & glass styling
+const appContainerClasses = computed(() => {
+  if (isFullscreen.value) return 'bg-black'
+  const noRounding = isWindowMaximized.value || isWindowFullscreen.value
+  const glass = player.transparencyEnabled ? 'glass-heavy' : 'bg-solid'
+  const border = 'border border-white/[0.06]'
+  const rounding = noRounding ? '' : 'rounded-xl'
+  return `${glass} ${rounding} ${border}`
+})
+
 onMounted(async () => {
+  // Listen for OS-level window state changes (maximize / fullscreen)
+  window.api.onWindowStateChange((state: { maximized: boolean; fullscreen: boolean }) => {
+    isWindowMaximized.value = state.maximized
+    isWindowFullscreen.value = state.fullscreen
+  })
+
   // Load saved settings
   const settings = await window.api.getSettings()
   if (settings.volume !== undefined) player.setVolume(settings.volume)
@@ -247,6 +265,7 @@ onUnmounted(() => {
   document.removeEventListener('mousedown', onMouseMove)
   document.removeEventListener('keydown', onMouseMove)
   if (idleTimer) clearTimeout(idleTimer)
+  window.api.removeWindowStateChangeListener()
 })
 
 // Re-evaluate idle timer when playback state or setting changes

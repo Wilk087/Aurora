@@ -251,6 +251,7 @@ if (process.platform === 'linux') {
 
 // ── Globals ────────────────────────────────────────────────────────────────
 let mainWindow: BrowserWindow | null = null
+let isRelaunching = false
 
 const AUDIO_EXTENSIONS = new Set([
   '.mp3', '.flac', '.ogg', '.opus', '.wav', '.m4a', '.aac', '.wma', '.alac',
@@ -833,7 +834,11 @@ async function listenbrainzSubmit(token: string, listenType: 'single' | 'playing
 }
 
 // ── Window ─────────────────────────────────────────────────────────────────
-function createWindow() {
+async function createWindow() {
+  // Load settings to check transparency preference
+  const settings = await loadSettings()
+  const isTransparent = settings.transparencyEnabled !== false // default true
+
   // Center window on the primary display (fixes Wayland multi-monitor placement)
   const primary = screen.getPrimaryDisplay()
   const { x, y, width: areaW, height: areaH } = primary.workArea
@@ -848,8 +853,8 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     frame: false,
-    transparent: true,
-    backgroundColor: '#00000000',
+    transparent: isTransparent,
+    backgroundColor: isTransparent ? '#00000000' : '#0c0c0c',
     icon: app.isPackaged
       ? join(process.resourcesPath, 'icon.png')
       : join(__dirname, '../build/icon.png'),
@@ -860,6 +865,19 @@ function createWindow() {
       webSecurity: true,
     },
   })
+
+  // Send window state changes (maximize/fullscreen) to the renderer
+  function sendWindowState() {
+    if (!mainWindow) return
+    mainWindow.webContents.send('window:state-changed', {
+      maximized: mainWindow.isMaximized(),
+      fullscreen: mainWindow.isFullScreen(),
+    })
+  }
+  mainWindow.on('maximize', sendWindowState)
+  mainWindow.on('unmaximize', sendWindowState)
+  mainWindow.on('enter-full-screen', sendWindowState)
+  mainWindow.on('leave-full-screen', sendWindowState)
 
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL)
@@ -959,7 +977,7 @@ app.whenReady().then(async () => {
     }
   })
 
-  createWindow()
+  await createWindow()
 
   // Load library into memory cache on startup
   await loadCache()
@@ -1184,6 +1202,11 @@ app.whenReady().then(async () => {
     else mainWindow?.maximize()
   })
   ipcMain.on('window:close', () => mainWindow?.close())
+  ipcMain.on('app:relaunch', () => {
+    isRelaunching = true
+    app.relaunch()
+    app.quit()
+  })
   ipcMain.on('window:enter-fullscreen', () => {
     if (!mainWindow) return
     mainWindow.setFullScreen(true)
@@ -1726,5 +1749,5 @@ app.on('window-all-closed', async () => {
   await forceFlush()
   destroyDiscordRPC()
   destroyMpris()
-  app.quit()
+  if (!isRelaunching) app.quit()
 })

@@ -110,6 +110,9 @@ export const usePlayerStore = defineStore('player', () => {
   // ── iOS-style sliders ──────────────────────────────────────────────────
   const iosSliders = ref(false)
 
+  // ── Transparency ───────────────────────────────────────────────────
+  const transparencyEnabled = ref(true) // default on
+
   // ── Auto-fullscreen on idle ─────────────────────────────────────────
   const autoFullscreen = ref(false)
   const autoFullscreenDelay = ref(30) // seconds
@@ -233,6 +236,7 @@ export const usePlayerStore = defineStore('player', () => {
     if (s.waveformEnabled === true) waveformEnabled.value = true
     if (s.adaptiveAccent === true) adaptiveAccent.value = true
     if (s.iosSliders === true) iosSliders.value = true
+    if (s.transparencyEnabled === false) transparencyEnabled.value = false
     if (s.autoFullscreen === true) autoFullscreen.value = true
     if (s.autoFullscreenDelay !== undefined) autoFullscreenDelay.value = s.autoFullscreenDelay
     if (s.normalization === true) {
@@ -760,6 +764,14 @@ export const usePlayerStore = defineStore('player', () => {
     })
   }
 
+  function setTransparencyEnabled(enabled: boolean) {
+    transparencyEnabled.value = enabled
+    window.api.getSettings().then((s: any) => {
+      s.transparencyEnabled = enabled
+      window.api.saveSettings(s)
+    })
+  }
+
   function setAutoFullscreen(enabled: boolean) {
     autoFullscreen.value = enabled
     window.api.getSettings().then((s: any) => {
@@ -850,6 +862,9 @@ export const usePlayerStore = defineStore('player', () => {
     // iOS sliders
     iosSliders,
     setIOSSliders,
+    // Transparency
+    transparencyEnabled,
+    setTransparencyEnabled,
     // Auto-fullscreen
     autoFullscreen,
     autoFullscreenDelay,

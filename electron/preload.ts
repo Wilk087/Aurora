@@ -20,6 +20,17 @@ contextBridge.exposeInMainWorld('api', {
   enterFullscreen: () => ipcRenderer.send('window:enter-fullscreen'),
   exitFullscreen: () => ipcRenderer.send('window:exit-fullscreen'),
 
+  // Window state events (OS-level maximize/fullscreen)
+  onWindowStateChange: (callback: (state: { maximized: boolean; fullscreen: boolean }) => void) => {
+    ipcRenderer.on('window:state-changed', (_, state) => callback(state))
+  },
+  removeWindowStateChangeListener: () => {
+    ipcRenderer.removeAllListeners('window:state-changed')
+  },
+
+  // App lifecycle
+  relaunchApp: () => ipcRenderer.send('app:relaunch'),
+
   // Settings
   getSettings: () => ipcRenderer.invoke('settings:get'),
   saveSettings: (settings: any) => ipcRenderer.invoke('settings:set', settings),

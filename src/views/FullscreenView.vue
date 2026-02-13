@@ -2,229 +2,237 @@
   <div
     v-if="player.currentTrack"
     class="fullscreen-view fixed inset-0 z-[100] select-none"
+    @mousemove="onMouseActivity"
+    @mousedown="onMouseActivity"
     @dblclick.self="exitFullscreen"
   >
     <!-- ── Fluid gradient background from cover colors ─────────── -->
     <div class="absolute inset-0 bg-black transition-colors duration-1000">
-      <!-- Color blobs extracted from album art -->
       <div
         class="absolute inset-0 transition-all duration-[2s] ease-out"
         :style="bgStyle"
       />
-      <!-- Noise / grain overlay for texture -->
       <div class="absolute inset-0 opacity-[0.03]" style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 /%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22 /%3E%3C/svg%3E')" />
     </div>
 
-    <!-- ── Layout ──────────────────────────────────────────────── -->
-    <div class="relative z-10 h-full flex">
-
-      <!-- Left side: cover art + track info -->
-      <div class="w-[45%] h-full flex flex-col items-center justify-center p-12 shrink-0">
-        <!-- Album cover with shadow -->
-        <div class="relative max-w-[420px] w-full">
-          <div class="aspect-square rounded-2xl overflow-hidden shadow-2xl shadow-black/60">
-            <img
-              v-if="player.currentTrack.coverArt"
-              :src="coverUrl"
-              class="w-full h-full object-cover"
-            />
-            <div v-else class="w-full h-full bg-white/[0.06] flex items-center justify-center">
-              <svg class="w-32 h-32 text-white/10" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        <!-- Track info below cover -->
-        <div class="mt-8 text-center max-w-[420px] w-full">
-          <h1 class="text-3xl font-extrabold text-white leading-tight line-clamp-2">
-            {{ player.currentTrack.title }}
-          </h1>
-          <p class="text-xl text-white/60 mt-2 font-medium">
-            {{ player.currentTrack.artist }}
-          </p>
-          <p class="text-base text-white/30 mt-1">
-            {{ player.currentTrack.album }}
-          </p>
-        </div>
+    <!-- ── Two-column layout ──────────────────────────────────── -->
+    <div class="relative z-10 h-full flex flex-col">
+      <!-- Top bar: window controls (fade with idle) -->
+      <div
+        class="absolute top-0 right-0 flex items-center gap-2 p-6 z-20 fs-fade"
+        :class="idle ? 'fs-idle' : ''"
+      >
+        <button
+          @click="showQueue = !showQueue"
+          class="w-10 h-10 flex items-center justify-center rounded-full transition-colors"
+          :class="showQueue ? 'bg-white/20 text-accent' : 'bg-white/10 hover:bg-white/20 text-white/60 hover:text-white'"
+          title="Queue"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
+          </svg>
+        </button>
+        <button
+          @click="exitFullscreen"
+          class="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white/60 hover:text-white transition-colors"
+          title="Exit fullscreen"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
+          </svg>
+        </button>
       </div>
 
-      <!-- Right side: lyrics -->
-      <div class="flex-1 h-full flex flex-col min-w-0">
-        <!-- Close / Queue buttons -->
-        <div class="flex items-center justify-end gap-2 p-6 shrink-0">
-          <button
-            @click="showQueue = !showQueue"
-            class="w-10 h-10 flex items-center justify-center rounded-full transition-colors"
-            :class="showQueue ? 'bg-white/20 text-accent' : 'bg-white/10 hover:bg-white/20 text-white/60 hover:text-white'"
-            title="Queue"
-          >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
-            </svg>
-          </button>
-          <button
-            @click="exitFullscreen"
-            class="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white/60 hover:text-white transition-colors"
-            title="Exit fullscreen"
-          >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
-            </svg>
-          </button>
-        </div>
-
-        <!-- Synced lyrics -->
-        <div class="flex-1 overflow-hidden flex items-center justify-center">
-          <FullscreenLyrics />
-        </div>
-
-        <!-- Playback controls -->
-        <div class="p-8 shrink-0">
-          <!-- Progress bar -->
-          <div class="flex items-center gap-4 mb-6">
-            <span class="text-sm text-white/50 w-14 text-right tabular-nums font-mono">
-              {{ formatTime(player.currentTime) }}
-            </span>
-
-            <!-- Waveform mode (fullscreen only) -->
-            <div v-if="player.waveformEnabled && player.waveformData.length > 0" class="flex-1">
-              <WaveformBar
-                :data="player.waveformData"
-                :progress="player.progress"
-                :duration="player.duration"
-                @seek="(p) => player.seekPercent(p)"
+      <!-- Main content area -->
+      <div class="flex-1 flex min-h-0">
+        <!-- Left side: cover art + track info + waveform (always visible) -->
+        <div class="w-[45%] h-full flex flex-col items-center justify-center px-14 py-10 shrink-0">
+          <!-- Album cover -->
+          <div class="relative max-w-[380px] w-full">
+            <div class="aspect-square rounded-2xl overflow-hidden shadow-2xl shadow-black/50 ring-1 ring-white/[0.06]">
+              <img
+                v-if="player.currentTrack.coverArt"
+                :src="coverUrl"
+                class="w-full h-full object-cover"
               />
-            </div>
-
-            <!-- Standard progress bar -->
-            <div v-else-if="!player.iosSliders" class="flex-1 relative group h-2">
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="0.1"
-                :value="player.progress"
-                @input="onProgressInput"
-                class="fs-progress w-full h-2 rounded-full cursor-pointer relative z-10 opacity-0"
-              />
-              <div class="absolute inset-y-0 left-0 right-0 flex items-center pointer-events-none">
-                <div class="w-full h-1.5 group-hover:h-2 rounded-full bg-white/15 transition-all overflow-hidden">
-                  <div
-                    class="h-full rounded-full bg-white/80"
-                    :style="{ width: player.progress + '%' }"
-                  />
-                </div>
+              <div v-else class="w-full h-full bg-white/[0.06] flex items-center justify-center">
+                <svg class="w-32 h-32 text-white/10" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                </svg>
               </div>
             </div>
-
-            <!-- iOS-style progress bar -->
-            <IOSSlider
-              v-else
-              :value="player.progress"
-              :min="0"
-              :max="100"
-              :step="0.1"
-              size="lg"
-              fill-color="bg-white/80"
-              class="flex-1"
-              @update="(v: number) => player.seekPercent(v)"
-            />
-
-            <span class="text-sm text-white/50 w-14 tabular-nums font-mono">
-              {{ formatTime(player.duration) }}
-            </span>
           </div>
 
-          <!-- Transport + Volume controls -->
-          <div class="flex items-center justify-center gap-6">
-            <button
-              @click="player.toggleShuffle()"
-              class="w-10 h-10 flex items-center justify-center rounded-full transition-colors"
-              :class="player.isShuffle ? 'text-accent' : 'text-white/30 hover:text-white/60'"
-            >
-              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" />
-              </svg>
-            </button>
+          <!-- Track info (always visible) -->
+          <div class="mt-5 max-w-[380px] w-full">
+            <h1 class="text-2xl font-extrabold text-white leading-tight line-clamp-2">
+              {{ player.currentTrack.title }}
+            </h1>
+            <p class="text-base text-white/50 mt-1.5 font-medium">
+              <span
+                class="hover:text-white/80 hover:underline underline-offset-2 cursor-pointer transition-colors"
+                @click="goToArtist"
+              >{{ player.currentTrack.artist }}</span>
+              <span v-if="player.currentTrack.album" class="text-white/25"> · </span>
+              <span
+                v-if="player.currentTrack.album"
+                class="text-white/25 hover:text-white/60 hover:underline underline-offset-2 cursor-pointer transition-colors"
+                @click="goToAlbum"
+              >{{ player.currentTrack.album }}</span>
+            </p>
+          </div>
 
-            <button
-              @click="player.previous()"
-              class="w-12 h-12 flex items-center justify-center rounded-full text-white/60 hover:text-white transition-colors"
-            >
-              <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
-              </svg>
-            </button>
+          <!-- Progress / Waveform (always visible) -->
+          <div class="mt-5 max-w-[380px] w-full">
+            <div class="flex items-center gap-3">
+              <span class="text-sm text-white/50 w-12 text-right tabular-nums font-mono">
+                {{ formatTime(player.currentTime) }}
+              </span>
 
-            <button
-              @click="player.togglePlay()"
-              class="w-16 h-16 flex items-center justify-center rounded-full bg-white text-black hover:scale-105 active:scale-95 transition-transform shadow-xl"
-            >
-              <svg v-if="player.isPlaying" class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-              </svg>
-              <svg v-else class="w-7 h-7 ml-1" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            </button>
-
-            <button
-              @click="player.next()"
-              class="w-12 h-12 flex items-center justify-center rounded-full text-white/60 hover:text-white transition-colors"
-            >
-              <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
-              </svg>
-            </button>
-
-            <button
-              @click="player.cycleRepeat()"
-              class="w-10 h-10 flex items-center justify-center rounded-full transition-colors relative"
-              :class="player.repeatMode !== 'off' ? 'text-accent' : 'text-white/30 hover:text-white/60'"
-            >
-              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" />
-              </svg>
-              <span v-if="player.repeatMode === 'one'" class="absolute -top-0.5 -right-0.5 text-[9px] font-bold text-accent">1</span>
-            </button>
-
-            <!-- Volume -->
-            <div class="flex items-center gap-2 ml-2">
-              <button
-                @click="player.toggleMute()"
-                class="w-8 h-8 flex items-center justify-center rounded-full text-white/40 hover:text-white/70 transition-colors"
-              >
-                <svg v-if="player.isMuted || player.volume === 0" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
-                </svg>
-                <svg v-else-if="player.volume < 0.5" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z" />
-                </svg>
-                <svg v-else class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
-                </svg>
-              </button>
-
-              <div class="w-24 relative group" v-if="!player.iosSliders">
-                <input
-                  type="range" min="0" max="1" step="0.01"
-                  :value="player.volume" @input="onVolumeInput"
-                  class="fs-volume w-full cursor-pointer relative z-10"
+              <!-- Waveform -->
+              <div v-if="player.waveformEnabled && player.waveformData.length > 0" class="flex-1">
+                <WaveformBar
+                  :data="player.waveformData"
+                  :progress="player.progress"
+                  :duration="player.duration"
+                  @seek="(p) => player.seekPercent(p)"
                 />
-                <div class="absolute top-1/2 left-0 -translate-y-1/2 h-[3px] rounded-full bg-white/15 w-full pointer-events-none" />
-                <div class="absolute top-1/2 left-0 -translate-y-1/2 h-[3px] rounded-full bg-white/70 pointer-events-none" :style="{ width: player.volume * 100 + '%' }" />
               </div>
-              <IOSSlider v-else :value="player.volume" :min="0" :max="1" :step="0.01" class="w-24" @update="(v: number) => player.setVolume(v)" />
+
+              <!-- Standard progress bar -->
+              <div v-else-if="!player.iosSliders" class="flex-1 relative group h-2">
+                <input
+                  type="range" min="0" max="100" step="0.1"
+                  :value="player.progress" @input="onProgressInput"
+                  class="fs-progress w-full h-2 rounded-full cursor-pointer relative z-10 opacity-0"
+                />
+                <div class="absolute inset-y-0 left-0 right-0 flex items-center pointer-events-none">
+                  <div class="w-full h-1.5 group-hover:h-2 rounded-full bg-white/15 transition-all overflow-hidden">
+                    <div class="h-full rounded-full bg-white/80" :style="{ width: player.progress + '%' }" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- iOS-style progress bar -->
+              <IOSSlider
+                v-else
+                :value="player.progress" :min="0" :max="100" :step="0.1"
+                size="lg" fill-color="bg-white/80" class="flex-1"
+                @update="(v: number) => player.seekPercent(v)"
+              />
+
+              <span class="text-sm text-white/50 w-12 tabular-nums font-mono">
+                {{ formatTime(player.duration) }}
+              </span>
             </div>
+
+            <!-- Transport controls (fade with idle) -->
+            <div class="fs-fade mt-4" :class="idle ? 'fs-idle' : ''">
+              <div class="flex items-center justify-center gap-5">
+                <button
+                  @click="player.toggleShuffle()"
+                  class="w-9 h-9 flex items-center justify-center rounded-full transition-colors"
+                  :class="player.isShuffle ? 'text-accent' : 'text-white/30 hover:text-white/60'"
+                >
+                  <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" />
+                  </svg>
+                </button>
+
+                <button
+                  @click="player.previous()"
+                  class="w-11 h-11 flex items-center justify-center rounded-full text-white/60 hover:text-white transition-colors"
+                >
+                  <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+                  </svg>
+                </button>
+
+                <button
+                  @click="player.togglePlay()"
+                  class="w-14 h-14 flex items-center justify-center rounded-full bg-white text-black hover:scale-105 active:scale-95 transition-transform shadow-xl"
+                >
+                  <svg v-if="player.isPlaying" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                  </svg>
+                  <svg v-else class="w-6 h-6 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </button>
+
+                <button
+                  @click="player.next()"
+                  class="w-11 h-11 flex items-center justify-center rounded-full text-white/60 hover:text-white transition-colors"
+                >
+                  <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+                  </svg>
+                </button>
+
+                <button
+                  @click="player.cycleRepeat()"
+                  class="w-9 h-9 flex items-center justify-center rounded-full transition-colors relative"
+                  :class="player.repeatMode !== 'off' ? 'text-accent' : 'text-white/30 hover:text-white/60'"
+                >
+                  <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" />
+                  </svg>
+                  <span v-if="player.repeatMode === 'one'" class="absolute -top-0.5 -right-0.5 text-[9px] font-bold text-accent">1</span>
+                </button>
+              </div>
+
+              <!-- Volume slider (centered, slightly narrower than progress) -->
+              <div class="flex items-center justify-center mt-3 px-8">
+                <button
+                  @click="player.toggleMute()"
+                  class="w-5 h-5 mr-3 flex items-center justify-center text-white/40 hover:text-white/70 transition-colors shrink-0"
+                >
+                  <svg v-if="player.isMuted || player.volume === 0" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
+                  </svg>
+                  <svg v-else-if="player.volume < 0.5" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z" />
+                  </svg>
+                  <svg v-else class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+                  </svg>
+                </button>
+
+                <div class="flex-1 relative group" v-if="!player.iosSliders">
+                  <input
+                    type="range" min="0" max="1" step="0.01"
+                    :value="player.volume" @input="onVolumeInput"
+                    class="fs-volume w-full cursor-pointer relative z-10"
+                  />
+                  <div class="absolute top-1/2 left-0 -translate-y-1/2 h-[3px] rounded-full bg-white/15 w-full pointer-events-none" />
+                  <div class="absolute top-1/2 left-0 -translate-y-1/2 h-[3px] rounded-full bg-white/70 pointer-events-none transition-all" :style="{ width: player.volume * 100 + '%' }" />
+                </div>
+                <IOSSlider v-else :value="player.volume" :min="0" :max="1" :step="0.01" class="flex-1" @update="(v: number) => player.setVolume(v)" />
+
+                <button
+                  @click="player.toggleMute()"
+                  class="w-5 h-5 ml-3 flex items-center justify-center text-white/40 hover:text-white/70 transition-colors shrink-0"
+                >
+                  <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right side: lyrics (always visible) -->
+        <div class="flex-1 h-full flex flex-col min-w-0">
+          <div class="flex-1 overflow-hidden flex items-center justify-center">
+            <FullscreenLyrics />
           </div>
         </div>
       </div>
     </div>
 
     <!-- Keyboard hint -->
-    <div class="absolute top-6 left-6 text-white/20 text-xs font-mono opacity-0 hover:opacity-100 transition-opacity">
+    <div class="absolute top-6 left-6 text-white/20 text-xs font-mono opacity-0 hover:opacity-100 transition-opacity z-20">
       ESC or F11 to exit
     </div>
 
@@ -237,6 +245,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
+import { useLibraryStore } from '@/stores/library'
 import { formatTime } from '@/utils/formatTime'
 import FullscreenLyrics from '@/components/FullscreenLyrics.vue'
 import QueuePanel from '@/components/QueuePanel.vue'
@@ -245,7 +254,38 @@ import IOSSlider from '@/components/IOSSlider.vue'
 
 const router = useRouter()
 const player = usePlayerStore()
+const library = useLibraryStore()
 const showQueue = ref(false)
+
+// ── Idle / Active state ──────────────────────────────────────────────
+const idle = ref(false)
+let idleTimer: ReturnType<typeof setTimeout> | null = null
+const IDLE_DELAY = 3000 // ms of no mouse activity
+
+function onMouseActivity() {
+  idle.value = false
+  if (idleTimer) clearTimeout(idleTimer)
+  idleTimer = setTimeout(() => { idle.value = true }, IDLE_DELAY)
+}
+
+// ── Navigation helpers ───────────────────────────────────────────────
+function goToArtist() {
+  if (!player.currentTrack) return
+  const artistName = player.currentTrack.albumArtist || player.currentTrack.artist
+  window.api.exitFullscreen()
+  router.replace(`/artist/${encodeURIComponent(artistName)}`)
+}
+
+function goToAlbum() {
+  if (!player.currentTrack) return
+  const album = library.albums.find(a =>
+    a.name === player.currentTrack!.album && a.artist === (player.currentTrack!.albumArtist || player.currentTrack!.artist)
+  )
+  if (album) {
+    window.api.exitFullscreen()
+    router.replace(`/album/${album.id}`)
+  }
+}
 
 const coverUrl = computed(() =>
   player.currentTrack?.coverArt ? window.api.getMediaUrl(player.currentTrack.coverArt) : '',
@@ -347,14 +387,30 @@ function onKeydown(e: KeyboardEvent) {
 onMounted(() => {
   window.api.enterFullscreen()
   document.addEventListener('keydown', onKeydown)
+  // Start idle timer immediately
+  idleTimer = setTimeout(() => { idle.value = true }, IDLE_DELAY)
 })
 
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
+  if (idleTimer) clearTimeout(idleTimer)
 })
 </script>
 
 <style scoped>
+/* ── Idle/Active fade ─────────────────────────────────────────── */
+.fs-fade {
+  transition: opacity 0.5s ease, transform 0.5s ease;
+  opacity: 1;
+  transform: translateY(0);
+}
+.fs-fade.fs-idle {
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+}
+
+/* ── Progress slider ──────────────────────────────────────────── */
 .fs-progress {
   -webkit-appearance: none;
   appearance: none;
@@ -374,6 +430,7 @@ onUnmounted(() => {
   opacity: 1;
 }
 
+/* ── Volume slider ────────────────────────────────────────────── */
 .fs-volume {
   -webkit-appearance: none;
   appearance: none;
@@ -382,8 +439,8 @@ onUnmounted(() => {
 }
 .fs-volume::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: white;
   cursor: pointer;
