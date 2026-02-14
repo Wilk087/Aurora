@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, shallowRef, computed, markRaw } from 'vue'
+import { splitArtists } from '@/utils/splitArtists'
 
 export type SortOrder = 'title' | 'artist' | 'album' | 'year' | 'duration'
 export type AlbumSortOrder = 'name' | 'artist' | 'year' | 'tracks'
@@ -86,14 +87,37 @@ export const useLibraryStore = defineStore('library', () => {
 
   const artists = computed<Artist[]>(() => {
     const map = new Map<string, Artist>()
-    for (const album of albums.value) {
-      if (!map.has(album.artist)) {
-        map.set(album.artist, { name: album.artist, albums: [], trackCount: 0 })
+
+    function ensureArtist(name: string): Artist {
+      if (!map.has(name)) {
+        map.set(name, { name, albums: [], trackCount: 0 })
       }
-      const artist = map.get(album.artist)!
-      artist.albums.push(album)
-      artist.trackCount += album.tracks.length
+      return map.get(name)!
     }
+
+    // Add albums to each individual artist from the album artist field
+    for (const album of albums.value) {
+      const names = splitArtists(album.artist)
+      const added = new Set<string>()
+      for (const name of names) {
+        const artist = ensureArtist(name)
+        if (!added.has(name)) {
+          artist.albums.push(album)
+          artist.trackCount += album.tracks.length
+          added.add(name)
+        }
+      }
+    }
+
+    // Also scan track-level artists for featured appearances
+    for (const track of tracks.value) {
+      const trackArtists = splitArtists(track.artist)
+      for (const name of trackArtists) {
+        // Just ensure the artist exists so featured-only artists have a page
+        ensureArtist(name)
+      }
+    }
+
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
   })
 
@@ -221,6 +245,11 @@ export const useLibraryStore = defineStore('library', () => {
     subsonicTracks.value = rawTracks.map((t: Track) => markRaw({ ...t, source: 'subsonic' as const }))
   }
 
+  /** Remove all subsonic tracks from the library */
+  function clearSubsonicTracks() {
+    subsonicTracks.value = []
+  }
+
   /** Auto-load subsonic library if previously connected */
   async function autoLoadSubsonic() {
     try {
@@ -266,5 +295,6 @@ export const useLibraryStore = defineStore('library', () => {
     setSortOrder,
     setAlbumSortOrder,
     mergeSubsonicTracks,
+    clearSubsonicTracks,
   }
 })

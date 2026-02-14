@@ -20,7 +20,7 @@
         <div class="flex items-center gap-3 text-sm text-white/40 mb-3">
           <span>{{ artist.albums.length }} {{ artist.albums.length === 1 ? 'album' : 'albums' }}</span>
           <span>&bull;</span>
-          <span>{{ artist.trackCount }} {{ artist.trackCount === 1 ? 'song' : 'songs' }}</span>
+          <span>{{ artist.trackCount + featuredTracks.length }} {{ (artist.trackCount + featuredTracks.length) === 1 ? 'song' : 'songs' }}</span>
           <template v-if="artistInfo?.country">
             <span>&bull;</span>
             <span>{{ artistInfo.country }}</span>
@@ -53,7 +53,7 @@
             Play All
           </button>
           <button
-            @click="player.addToQueue(allTracks)"
+            @click="player.addToQueue(allPlayableTracks)"
             class="px-6 py-2.5 bg-white/[0.08] hover:bg-white/[0.12] rounded-full text-sm font-medium text-white/80 transition-all"
           >
             Add to Queue
@@ -136,6 +136,20 @@
       </div>
     </section>
 
+    <!-- Appears On (featured tracks not in this artist's own albums) -->
+    <section v-if="featuredTracks.length > 0" class="mb-8">
+      <h2 class="text-lg font-semibold text-white mb-4">Appears On</h2>
+      <div class="space-y-0.5">
+        <SongRow
+          v-for="(track, i) in featuredTracks"
+          :key="track.id"
+          :track="track"
+          :index="i"
+          @play="player.playAll(featuredTracks, i)"
+        />
+      </div>
+    </section>
+
     <!-- Loading info state -->
     <div v-if="loadingInfo" class="flex items-center gap-2 text-xs text-white/30 mt-4">
       <div class="w-3 h-3 border border-accent/30 border-t-accent rounded-full animate-spin" />
@@ -155,6 +169,7 @@ import { useRoute } from 'vue-router'
 import { useLibraryStore, type Album } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import SongRow from '@/components/SongRow.vue'
+import { splitArtists } from '@/utils/splitArtists'
 
 const route = useRoute()
 const library = useLibraryStore()
@@ -172,7 +187,6 @@ const artist = computed(() => {
 
 const albums = computed<Album[]>(() => {
   if (!artist.value) return []
-  // Only albums with more than 1 track, sorted by year
   return [...artist.value.albums]
     .filter(a => a.tracks.length > 1)
     .sort((a, b) => (b.year || 0) - (a.year || 0))
@@ -180,9 +194,19 @@ const albums = computed<Album[]>(() => {
 
 const looseTracks = computed(() => {
   if (!artist.value) return []
-  // Tracks from albums with only 1 track (treated as singles)
   const singleAlbums = artist.value.albums.filter(a => a.tracks.length === 1)
   return singleAlbums.flatMap(a => a.tracks)
+})
+
+// Tracks where this artist appears as a featured/track-level artist but isn't the album artist
+const featuredTracks = computed(() => {
+  const name = artistName.value
+  if (!name) return []
+  const albumTrackIds = new Set(allTracks.value.map(t => t.id))
+  return library.tracks.filter(t => {
+    if (albumTrackIds.has(t.id)) return false
+    return splitArtists(t.artist).some(a => a === name)
+  })
 })
 
 const allTracks = computed(() => {
@@ -190,13 +214,15 @@ const allTracks = computed(() => {
   return artist.value.albums.flatMap(a => a.tracks)
 })
 
+const allPlayableTracks = computed(() => [...allTracks.value, ...featuredTracks.value])
+
 function getCoverUrl(path: string) {
   return window.api.getMediaUrl(path)
 }
 
 function playAll() {
-  if (allTracks.value.length > 0) {
-    player.playAll(allTracks.value)
+  if (allPlayableTracks.value.length > 0) {
+    player.playAll(allPlayableTracks.value)
   }
 }
 

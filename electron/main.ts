@@ -463,6 +463,7 @@ async function performExport(exportDir: string, isAuto = false): Promise<string>
     exportedAt: new Date().toISOString(),
     settings,
     favorites,
+    favoriteMeta: { ...favoriteMeta },
     playlists: playlistData,
   }
 
@@ -493,7 +494,10 @@ async function performImport(importPath: string): Promise<{ settings: boolean; f
 
   if (Array.isArray(bundle.favorites)) {
     favoriteIds = bundle.favorites
-    await writeFile(favoritesPath, JSON.stringify(favoriteIds, null, 2))
+    favoriteMeta = (bundle.favoriteMeta && typeof bundle.favoriteMeta === 'object')
+      ? bundle.favoriteMeta
+      : {}
+    await writeFile(favoritesPath, JSON.stringify({ ids: favoriteIds, meta: favoriteMeta }, null, 2))
     result.favorites = favoriteIds.length
   }
 
@@ -509,26 +513,43 @@ async function performImport(importPath: string): Promise<{ settings: boolean; f
 // ── Favorites persistence ──────────────────────────────────────────────────
 const favoritesPath = join(userDataPath, 'favorites.json')
 let favoriteIds: string[] = []
+let favoriteMeta: Record<string, TrackMetaSnapshot> = {}
 
-async function loadFavorites(): Promise<string[]> {
+async function loadFavorites(): Promise<{ ids: string[]; meta: Record<string, TrackMetaSnapshot> }> {
   try {
     if (existsSync(favoritesPath)) {
-      favoriteIds = JSON.parse(await readFile(favoritesPath, 'utf-8'))
+      const raw = JSON.parse(await readFile(favoritesPath, 'utf-8'))
+      if (Array.isArray(raw)) {
+        // Old format: plain string array — no metadata stored yet
+        favoriteIds = raw
+        favoriteMeta = {}
+      } else {
+        // New format: { ids, meta }
+        favoriteIds = raw.ids || []
+        favoriteMeta = raw.meta || {}
+      }
     }
-  } catch { favoriteIds = [] }
-  return favoriteIds
+  } catch { favoriteIds = []; favoriteMeta = {} }
+  return { ids: favoriteIds, meta: favoriteMeta }
 }
 
 async function saveFavorites(): Promise<void> {
-  await writeFile(favoritesPath, JSON.stringify(favoriteIds, null, 2))
+  await writeFile(favoritesPath, JSON.stringify({ ids: favoriteIds, meta: favoriteMeta }, null, 2))
   scheduleAutoExport()
 }
 
 // ── Playlist persistence ───────────────────────────────────────────────────
+interface TrackMetaSnapshot {
+  title: string
+  artist: string
+  album: string
+}
+
 interface Playlist {
   id: string
   name: string
   trackIds: string[]
+  trackMeta?: Record<string, TrackMetaSnapshot>
   createdAt: number
   updatedAt: number
   smart?: boolean
@@ -1112,20 +1133,23 @@ app.whenReady().then(async () => {
 
   // ── IPC: Favorites ──
   ipcMain.handle('favorites:get', async () => await loadFavorites())
-  ipcMain.handle('favorites:toggle', async (_, trackId: string) => {
+  ipcMain.handle('favorites:toggle', async (_, trackId: string, meta?: TrackMetaSnapshot) => {
     const idx = favoriteIds.indexOf(trackId)
     if (idx >= 0) {
       favoriteIds.splice(idx, 1)
+      delete favoriteMeta[trackId]
     } else {
       favoriteIds.push(trackId)
+      if (meta) favoriteMeta[trackId] = meta
     }
     await saveFavorites()
-    return favoriteIds
+    return { ids: favoriteIds, meta: favoriteMeta }
   })
-  ipcMain.handle('favorites:set', async (_, ids: string[]) => {
+  ipcMain.handle('favorites:set', async (_, ids: string[], meta?: Record<string, TrackMetaSnapshot>) => {
     favoriteIds = ids
+    if (meta) favoriteMeta = meta
     await saveFavorites()
-    return favoriteIds
+    return { ids: favoriteIds, meta: favoriteMeta }
   })
 
   // ── IPC: Discord RPC ──
@@ -1183,11 +1207,16 @@ app.whenReady().then(async () => {
     return pl || null
   })
 
-  ipcMain.handle('playlists:add-tracks', async (_, id: string, trackIds: string[]) => {
+  ipcMain.handle('playlists:add-tracks', async (_, id: string, trackIds: string[], trackMeta?: Record<string, TrackMetaSnapshot>) => {
     const pl = playlists.find(p => p.id === id)
     if (pl) {
       for (const tid of trackIds) {
         if (!pl.trackIds.includes(tid)) pl.trackIds.push(tid)
+      }
+      // Merge metadata snapshots
+      if (trackMeta) {
+        if (!pl.trackMeta) pl.trackMeta = {}
+        Object.assign(pl.trackMeta, trackMeta)
       }
       pl.updatedAt = Date.now()
       await savePlaylists()
@@ -1199,6 +1228,7 @@ app.whenReady().then(async () => {
     const pl = playlists.find(p => p.id === id)
     if (pl) {
       pl.trackIds = pl.trackIds.filter(t => t !== trackId)
+      if (pl.trackMeta) delete pl.trackMeta[trackId]
       pl.updatedAt = Date.now()
       await savePlaylists()
     }

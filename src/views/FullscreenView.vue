@@ -69,10 +69,11 @@
               {{ player.currentTrack.title }}
             </h1>
             <p class="text-base text-white/50 mt-1.5 font-medium">
-              <span
-                class="hover:text-white/80 hover:underline underline-offset-2 cursor-pointer transition-colors"
-                @click="goToArtist"
-              >{{ player.currentTrack.artist }}</span>
+              <ArtistLinks
+                :artist="player.currentTrack.artist"
+                :album-artist="player.currentTrack.albumArtist"
+                hover-class="hover:text-white/80"
+              />
               <span v-if="player.currentTrack.album" class="text-white/25"> · </span>
               <span
                 v-if="player.currentTrack.album"
@@ -251,6 +252,7 @@ import FullscreenLyrics from '@/components/FullscreenLyrics.vue'
 import QueuePanel from '@/components/QueuePanel.vue'
 import WaveformBar from '@/components/WaveformBar.vue'
 import IOSSlider from '@/components/IOSSlider.vue'
+import ArtistLinks from '@/components/ArtistLinks.vue'
 
 const router = useRouter()
 const player = usePlayerStore()

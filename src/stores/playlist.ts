@@ -40,7 +40,17 @@ export const usePlaylistStore = defineStore('playlist', () => {
   }
 
   async function addTracks(playlistId: string, trackIds: string[]) {
-    const updated = await window.api.addTracksToPlaylist(playlistId, trackIds)
+    const library = useLibraryStore()
+    // Build metadata snapshot for the tracks being added
+    const trackMeta: Record<string, TrackMetaSnapshot> = {}
+    const trackMap = new Map(library.tracks.map(t => [t.id, t]))
+    for (const tid of trackIds) {
+      const track = trackMap.get(tid)
+      if (track) {
+        trackMeta[tid] = { title: track.title, artist: track.artist, album: track.album }
+      }
+    }
+    const updated = await window.api.addTracksToPlaylist(playlistId, trackIds, trackMeta)
     if (updated) {
       const idx = playlists.value.findIndex(p => p.id === playlistId)
       if (idx >= 0) {
@@ -77,8 +87,25 @@ export const usePlaylistStore = defineStore('playlist', () => {
     const pl = getPlaylistById(id)
     if (!pl) return []
     const trackMap = new Map(library.tracks.map(t => [t.id, t]))
+    // Build metadata index for fallback lookups (title+artist+album → Track)
+    const byMeta = new Map<string, Track>()
+    for (const t of library.tracks) {
+      const key = `${t.title}\0${t.artist}\0${t.album}`.toLowerCase()
+      if (!byMeta.has(key)) byMeta.set(key, t)
+    }
     return pl.trackIds
-      .map(tid => trackMap.get(tid))
+      .map(tid => {
+        // 1. Direct ID lookup
+        const direct = trackMap.get(tid)
+        if (direct) return direct
+        // 2. Metadata fallback: use stored snapshot to find a cross-source match
+        const meta = pl.trackMeta?.[tid]
+        if (meta) {
+          const key = `${meta.title}\0${meta.artist}\0${meta.album}`.toLowerCase()
+          return byMeta.get(key)
+        }
+        return undefined
+      })
       .filter((t): t is Track => !!t)
   }
 

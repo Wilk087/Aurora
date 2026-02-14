@@ -76,10 +76,17 @@ interface SmartPlaylistRule {
   value2?: string // for 'between'
 }
 
+interface TrackMetaSnapshot {
+  title: string
+  artist: string
+  album: string
+}
+
 interface Playlist {
   id: string
   name: string
   trackIds: string[]
+  trackMeta?: Record<string, TrackMetaSnapshot>
   createdAt: number
   updatedAt: number
   smart?: boolean
@@ -117,9 +124,9 @@ interface Window {
     getSettings: () => Promise<any>
     saveSettings: (settings: any) => Promise<void>
     // Favorites
-    getFavorites: () => Promise<string[]>
-    toggleFavorite: (trackId: string) => Promise<string[]>
-    setFavorites: (ids: string[]) => Promise<string[]>
+    getFavorites: () => Promise<{ ids: string[]; meta: Record<string, TrackMetaSnapshot> }>
+    toggleFavorite: (trackId: string, meta?: TrackMetaSnapshot) => Promise<{ ids: string[]; meta: Record<string, TrackMetaSnapshot> }>
+    setFavorites: (ids: string[], meta?: Record<string, TrackMetaSnapshot>) => Promise<{ ids: string[]; meta: Record<string, TrackMetaSnapshot> }>
     updateDiscordPresence: (data: any) => Promise<void>
     toggleDiscordRPC: (enabled: boolean, clientId?: string) => Promise<void>
     getPlaylists: () => Promise<Playlist[]>
@@ -127,7 +134,7 @@ interface Window {
     createPlaylist: (name: string) => Promise<Playlist>
     deletePlaylist: (id: string) => Promise<Playlist[]>
     renamePlaylist: (id: string, name: string) => Promise<Playlist | null>
-    addTracksToPlaylist: (id: string, trackIds: string[]) => Promise<Playlist | null>
+    addTracksToPlaylist: (id: string, trackIds: string[], trackMeta?: Record<string, TrackMetaSnapshot>) => Promise<Playlist | null>
     removeTrackFromPlaylist: (id: string, trackId: string) => Promise<Playlist | null>
     getMediaUrl: (filePath: string) => string
     onScanProgress: (callback: (data: { current: number; total: number }) => void) => void

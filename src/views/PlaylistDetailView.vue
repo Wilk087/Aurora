@@ -89,10 +89,11 @@
             {{ track.title }}
           </p>
           <p class="text-xs text-white/40 truncate">
-            <span
-              class="hover:text-white/60 hover:underline underline-offset-2 cursor-pointer transition-colors"
-              @click.stop="goToTrackArtist(track)"
-            >{{ track.artist }}</span>
+            <ArtistLinks
+              :artist="track.artist"
+              :album-artist="track.albumArtist"
+              hover-class="hover:text-white/60"
+            />
           </p>
         </div>
 
@@ -191,6 +192,7 @@ import { useFavoritesStore } from '@/stores/favorites'
 import { useToast } from '@/composables/useToast'
 import { formatTime } from '@/utils/formatTime'
 import PlaylistCover from '@/components/PlaylistCover.vue'
+import ArtistLinks from '@/components/ArtistLinks.vue'
 
 const route = useRoute()
 const router = useRouter()

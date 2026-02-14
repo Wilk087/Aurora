@@ -34,10 +34,12 @@
       <div class="min-w-0">
         <p class="text-sm font-medium truncate text-white">{{ player.currentTrack?.title }}</p>
         <p class="text-xs text-white/50 truncate">
-          <span
-            class="hover:text-white/80 hover:underline underline-offset-2 cursor-pointer transition-colors"
-            @click.stop="goToArtist"
-          >{{ player.currentTrack?.artist }}</span>
+          <ArtistLinks
+            v-if="player.currentTrack?.artist"
+            :artist="player.currentTrack.artist"
+            :album-artist="player.currentTrack.albumArtist"
+            hover-class="hover:text-white/80"
+          />
         </p>
       </div>
     </div>
@@ -185,6 +187,9 @@
         </svg>
       </button>
 
+      <!-- Sleep timer -->
+      <SleepTimerMenu />
+
       <button
         @click="player.toggleMute()"
         class="w-8 h-8 flex items-center justify-center rounded-full text-white/40 hover:text-white/70 transition-colors"
@@ -262,17 +267,13 @@ import { useLibraryStore } from '@/stores/library'
 import { formatTime } from '@/utils/formatTime'
 import QueuePanel from '@/components/QueuePanel.vue'
 import IOSSlider from '@/components/IOSSlider.vue'
+import ArtistLinks from '@/components/ArtistLinks.vue'
+import SleepTimerMenu from '@/components/SleepTimerMenu.vue'
 
 const router = useRouter()
 const player = usePlayerStore()
 const library = useLibraryStore()
 const showQueue = ref(false)
-
-function goToArtist() {
-  if (!player.currentTrack) return
-  const artist = player.currentTrack.albumArtist || player.currentTrack.artist
-  router.push(`/artist/${encodeURIComponent(artist)}`)
-}
 
 const coverUrl = computed(() =>
   player.currentTrack?.coverArt ? window.api.getMediaUrl(player.currentTrack.coverArt) : '',

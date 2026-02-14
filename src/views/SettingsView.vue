@@ -520,6 +520,13 @@
           >
             {{ subsonicSyncing ? 'Syncing...' : 'Sync Library' }}
           </button>
+          <button
+            v-if="subsonicConnected"
+            @click="disconnectSubsonic"
+            class="px-4 py-2 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-sm font-medium text-red-400 hover:text-red-300 transition-all"
+          >
+            Disconnect
+          </button>
         </div>
 
         <!-- Connection status -->
@@ -1011,6 +1018,25 @@ async function syncSubsonicLibrary() {
   } finally {
     subsonicSyncing.value = false
   }
+}
+
+async function disconnectSubsonic() {
+  const settings = await window.api.getSettings()
+  settings.subsonicUrl = ''
+  settings.subsonicUsername = ''
+  settings.subsonicPassword = ''
+  settings.subsonicLegacyAuth = false
+  settings.subsonicConnected = false
+  await window.api.saveSettings(settings)
+
+  subsonicUrl.value = ''
+  subsonicUsername.value = ''
+  subsonicPassword.value = ''
+  subsonicLegacyAuth.value = false
+  subsonicConnected.value = false
+
+  library.clearSubsonicTracks()
+  toast.success('Disconnected from server')
 }
 
 // ── Export / Import ───────────────────────

@@ -3,6 +3,7 @@
     <div
       v-if="visible"
       class="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md"
+      data-lrc-syncer-active
       @keydown="onKeyDown"
     >
       <div class="w-full max-w-xl mx-4 bg-[#1a1a1e] rounded-2xl border border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">

@@ -36,9 +36,9 @@ contextBridge.exposeInMainWorld('api', {
   saveSettings: (settings: any) => ipcRenderer.invoke('settings:set', settings),
 
   // Favorites
-  getFavorites: (): Promise<string[]> => ipcRenderer.invoke('favorites:get'),
-  toggleFavorite: (trackId: string): Promise<string[]> => ipcRenderer.invoke('favorites:toggle', trackId),
-  setFavorites: (ids: string[]): Promise<string[]> => ipcRenderer.invoke('favorites:set', ids),
+  getFavorites: (): Promise<{ ids: string[]; meta: Record<string, { title: string; artist: string; album: string }> }> => ipcRenderer.invoke('favorites:get'),
+  toggleFavorite: (trackId: string, meta?: { title: string; artist: string; album: string }): Promise<{ ids: string[]; meta: Record<string, { title: string; artist: string; album: string }> }> => ipcRenderer.invoke('favorites:toggle', trackId, meta),
+  setFavorites: (ids: string[], meta?: Record<string, { title: string; artist: string; album: string }>): Promise<{ ids: string[]; meta: Record<string, { title: string; artist: string; album: string }> }> => ipcRenderer.invoke('favorites:set', ids, meta),
 
   // Discord RPC
   updateDiscordPresence: (data: any) => ipcRenderer.invoke('discord:update-presence', data),
@@ -50,7 +50,7 @@ contextBridge.exposeInMainWorld('api', {
   createPlaylist: (name: string) => ipcRenderer.invoke('playlists:create', name),
   deletePlaylist: (id: string) => ipcRenderer.invoke('playlists:delete', id),
   renamePlaylist: (id: string, name: string) => ipcRenderer.invoke('playlists:rename', id, name),
-  addTracksToPlaylist: (id: string, trackIds: string[]) => ipcRenderer.invoke('playlists:add-tracks', id, trackIds),
+  addTracksToPlaylist: (id: string, trackIds: string[], trackMeta?: Record<string, { title: string; artist: string; album: string }>) => ipcRenderer.invoke('playlists:add-tracks', id, trackIds, trackMeta),
   removeTrackFromPlaylist: (id: string, trackId: string) => ipcRenderer.invoke('playlists:remove-track', id, trackId),
 
   // Credits / extended metadata

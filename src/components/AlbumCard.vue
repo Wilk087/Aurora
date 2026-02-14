@@ -34,10 +34,10 @@
 
     <p class="text-sm font-medium text-white truncate">{{ album.name }}</p>
     <p class="text-xs text-white/40 truncate">
-      <span
-        class="hover:text-white/60 hover:underline underline-offset-2 cursor-pointer transition-colors"
-        @click.stop="goToArtist"
-      >{{ album.artist }}</span>{{ album.year ? ` • ${album.year}` : '' }}
+      <ArtistLinks
+        :artist="album.artist"
+        hover-class="hover:text-white/60"
+      />{{ album.year ? ` • ${album.year}` : '' }}
     </p>
 
     <!-- Context menu -->
@@ -94,6 +94,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
+import ArtistLinks from '@/components/ArtistLinks.vue'
 import type { Album } from '@/stores/library'
 
 const props = defineProps<{ album: Album }>()

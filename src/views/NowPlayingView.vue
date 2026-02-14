@@ -21,10 +21,11 @@
         <div class="mt-6 text-center">
           <h2 class="text-2xl font-bold text-white mb-1">{{ player.currentTrack.title }}</h2>
           <p class="text-lg text-white/50">
-            <span
-              class="hover:text-white/70 hover:underline underline-offset-2 cursor-pointer transition-colors"
-              @click="goToArtist"
-            >{{ player.currentTrack.artist }}</span>
+            <ArtistLinks
+              :artist="player.currentTrack.artist"
+              :album-artist="player.currentTrack.albumArtist"
+              hover-class="hover:text-white/70"
+            />
           </p>
           <p class="text-sm text-white/30 mt-1">
             <span
@@ -63,6 +64,7 @@ import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import SyncedLyrics from '@/components/SyncedLyrics.vue'
+import ArtistLinks from '@/components/ArtistLinks.vue'
 
 const router = useRouter()
 const player = usePlayerStore()
@@ -71,12 +73,6 @@ const library = useLibraryStore()
 const coverUrl = computed(() =>
   player.currentTrack?.coverArt ? window.api.getMediaUrl(player.currentTrack.coverArt) : '',
 )
-
-function goToArtist() {
-  if (!player.currentTrack) return
-  const artist = player.currentTrack.albumArtist || player.currentTrack.artist
-  router.push(`/artist/${encodeURIComponent(artist)}`)
-}
 
 function goToAlbum() {
   if (!player.currentTrack) return

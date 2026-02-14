@@ -254,16 +254,70 @@ function onMouseMove() {
   resetIdleTimer()
 }
 
+// ── Global keyboard shortcuts ──────────────────────────────────────────
+function onGlobalKeydown(e: KeyboardEvent) {
+  // Don't intercept when typing in inputs
+  const tag = (e.target as HTMLElement)?.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
+
+  // Don't intercept when LrcSyncer overlay is visible
+  if (document.querySelector('[data-lrc-syncer-active]')) return
+
+  // Don't intercept in fullscreen view (it has its own handler)
+  if (route.path === '/fullscreen') return
+
+  switch (e.key) {
+    case ' ':
+      e.preventDefault()
+      player.togglePlay()
+      break
+    case 'ArrowRight':
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault()
+        player.next()
+      } else {
+        e.preventDefault()
+        player.seek(Math.min(player.duration, player.currentTime + 5))
+      }
+      break
+    case 'ArrowLeft':
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault()
+        player.previous()
+      } else {
+        e.preventDefault()
+        player.seek(Math.max(0, player.currentTime - 5))
+      }
+      break
+    case 'ArrowUp':
+      e.preventDefault()
+      player.setVolume(Math.min(1, player.volume + 0.05))
+      break
+    case 'ArrowDown':
+      e.preventDefault()
+      player.setVolume(Math.max(0, player.volume - 0.05))
+      break
+    case 'm':
+    case 'M':
+      if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        player.toggleMute()
+      }
+      break
+  }
+}
+
 onMounted(() => {
   document.addEventListener('mousemove', onMouseMove)
   document.addEventListener('mousedown', onMouseMove)
   document.addEventListener('keydown', onMouseMove)
+  document.addEventListener('keydown', onGlobalKeydown)
 })
 
 onUnmounted(() => {
   document.removeEventListener('mousemove', onMouseMove)
   document.removeEventListener('mousedown', onMouseMove)
   document.removeEventListener('keydown', onMouseMove)
+  document.removeEventListener('keydown', onGlobalKeydown)
   if (idleTimer) clearTimeout(idleTimer)
   window.api.removeWindowStateChangeListener()
 })

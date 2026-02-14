@@ -60,10 +60,11 @@
         {{ track.title }}
       </p>
       <p class="text-xs text-white/40 truncate">
-        <span
-          class="hover:text-white/60 hover:underline underline-offset-2 cursor-pointer transition-colors"
-          @click.stop="goToArtist"
-        >{{ track.artist }}</span>
+        <ArtistLinks
+          :artist="track.artist"
+          :album-artist="track.albumArtist"
+          hover-class="hover:text-white/60"
+        />
       </p>
     </div>
 
@@ -269,10 +270,11 @@
               <div class="flex-1 min-w-0">
                 <h3 class="text-lg font-bold text-white truncate">{{ track.title }}</h3>
                 <p class="text-sm text-white/50">
-                  <span
-                    class="hover:text-white/70 hover:underline underline-offset-2 cursor-pointer transition-colors"
-                    @click.stop="goToArtist"
-                  >{{ track.artist }}</span>
+                  <ArtistLinks
+                    :artist="track.artist"
+                    :album-artist="track.albumArtist"
+                    hover-class="hover:text-white/70"
+                  />
                 </p>
                 <p class="text-xs text-white/30 mt-0.5">
                   <span
@@ -382,6 +384,7 @@ import { useLibraryStore } from '@/stores/library'
 import { useToast } from '@/composables/useToast'
 import { useFavoritesStore } from '@/stores/favorites'
 import { formatTime } from '@/utils/formatTime'
+import ArtistLinks from '@/components/ArtistLinks.vue'
 
 const props = defineProps<{
   track: Track

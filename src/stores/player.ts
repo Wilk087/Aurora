@@ -121,6 +121,37 @@ export const usePlayerStore = defineStore('player', () => {
   // ── Audio normalization ───────────────────────────────────────────────
   const normalization = ref(false)
 
+  // ── Sleep timer ─────────────────────────────────────────────────────────
+  const sleepTimerMode = ref<null | 'song' | 'album' | 'time'>(null)
+  const sleepTimerEndTime = ref<number | null>(null) // ms timestamp for 'time' mode
+  const sleepTimerRemaining = ref(0) // seconds remaining (updated by interval)
+  let sleepTimerInterval: ReturnType<typeof setInterval> | null = null
+
+  function startSleepTimer(mode: 'song' | 'album' | 'time', minutes?: number) {
+    cancelSleepTimer()
+    sleepTimerMode.value = mode
+    if (mode === 'time' && minutes && minutes > 0) {
+      sleepTimerEndTime.value = Date.now() + minutes * 60 * 1000
+      sleepTimerRemaining.value = minutes * 60
+      sleepTimerInterval = setInterval(() => {
+        if (!sleepTimerEndTime.value) { cancelSleepTimer(); return }
+        const left = Math.max(0, Math.round((sleepTimerEndTime.value - Date.now()) / 1000))
+        sleepTimerRemaining.value = left
+        if (left <= 0) {
+          pause()
+          cancelSleepTimer()
+        }
+      }, 1000)
+    }
+  }
+
+  function cancelSleepTimer() {
+    sleepTimerMode.value = null
+    sleepTimerEndTime.value = null
+    sleepTimerRemaining.value = 0
+    if (sleepTimerInterval) { clearInterval(sleepTimerInterval); sleepTimerInterval = null }
+  }
+
   // ── Scrobbling ──────────────────────────────────────────────────────────
   let scrobblingEnabled = false
   let scrobbleTimer: ReturnType<typeof setTimeout> | null = null
@@ -495,6 +526,23 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   function handleTrackEnd() {
+    // Sleep timer: "after this song" — pause immediately
+    if (sleepTimerMode.value === 'song') {
+      cancelSleepTimer()
+      return // don't advance, just stop
+    }
+
+    // Sleep timer: "after this album" — pause if next track is a different album
+    if (sleepTimerMode.value === 'album') {
+      const currentAlbum = currentTrack.value?.album
+      const nextIdx = currentIndex.value + 1
+      const nextTrack = nextIdx < queue.value.length ? queue.value[nextIdx] : null
+      if (!nextTrack || nextTrack.album !== currentAlbum) {
+        cancelSleepTimer()
+        return // album finished, stop
+      }
+    }
+
     if (repeatMode.value === 'one') {
       audio.currentTime = 0
       audio.play()
@@ -884,5 +932,10 @@ export const usePlayerStore = defineStore('player', () => {
     setScrobblingEnabled,
     // Playback error
     playbackError,
+    // Sleep timer
+    sleepTimerMode,
+    sleepTimerRemaining,
+    startSleepTimer,
+    cancelSleepTimer,
   }
 })
