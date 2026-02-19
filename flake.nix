@@ -26,7 +26,7 @@
           ];
 
           buildInputs = with pkgs; [
-            electron_28
+            electron_39
             glib
             nss
             nspr
