@@ -163,7 +163,7 @@
     </div>
 
     <!-- ── Volume & fullscreen (right) ───────────────────────────────────── -->
-    <div class="flex items-center gap-2 w-60 justify-end">
+    <div class="flex items-center gap-2 w-60 justify-end" @wheel.prevent="onVolumeWheel">
       <!-- Queue toggle -->
       <button
         @click="showQueue = !showQueue"
@@ -285,5 +285,10 @@ function onProgressInput(e: Event) {
 
 function onVolumeInput(e: Event) {
   player.setVolume(parseFloat((e.target as HTMLInputElement).value))
+}
+
+function onVolumeWheel(e: WheelEvent) {
+  const delta = e.deltaY < 0 ? 0.05 : -0.05
+  player.setVolume(Math.min(1, Math.max(0, player.volume + delta)))
 }
 </script>

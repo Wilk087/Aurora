@@ -113,6 +113,7 @@
             ? 'bg-white/[0.1] text-white'
             : 'text-white/50 hover:text-white/70 hover:bg-white/[0.05]'
         "
+        @contextmenu.prevent="openPlaylistCtx($event, pl)"
       >
         <svg class="w-4 h-4 shrink-0 opacity-40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
@@ -120,6 +121,55 @@
         <span class="truncate">{{ pl.name }}</span>
       </router-link>
     </div>
+
+    <!-- Playlist context menu -->
+    <Teleport to="body">
+      <div v-if="plCtx.show" class="fixed inset-0 z-[90]" @click="plCtx.show = false" @contextmenu.prevent="plCtx.show = false" />
+      <div
+        v-if="plCtx.show"
+        class="fixed z-[100] w-48 rounded-xl bg-[#1a1a2e]/95 backdrop-blur-lg border border-white/10 py-1.5 shadow-2xl"
+        :style="{ top: plCtx.y + 'px', left: plCtx.x + 'px' }"
+      >
+        <button
+          @click.stop="playPlaylist(false)"
+          class="w-full px-3.5 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2.5"
+        >
+          <svg class="w-4 h-4 shrink-0 text-white/40" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+          Play
+        </button>
+        <button
+          @click.stop="playPlaylist(true)"
+          class="w-full px-3.5 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2.5"
+        >
+          <svg class="w-4 h-4 shrink-0 text-white/40" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" />
+          </svg>
+          Shuffle
+        </button>
+        <div class="border-t border-white/[0.06] my-1" />
+        <button
+          @click.stop="renamePlaylistPrompt"
+          class="w-full px-3.5 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2.5"
+        >
+          <svg class="w-4 h-4 shrink-0 text-white/40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" />
+          </svg>
+          Rename
+        </button>
+        <div class="border-t border-white/[0.06] my-1" />
+        <button
+          @click.stop="deletePlaylistConfirm"
+          class="w-full px-3.5 py-2 text-left text-sm text-red-400 hover:text-red-300 hover:bg-white/[0.06] transition-colors flex items-center gap-2.5"
+        >
+          <svg class="w-4 h-4 shrink-0 text-red-400/60" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+          </svg>
+          Delete
+        </button>
+      </div>
+    </Teleport>
 
     <!-- Spacer -->
     <div class="flex-1" />
@@ -146,17 +196,58 @@
 </template>
 
 <script setup lang="ts">
-import { watch, computed } from 'vue'
+import { ref, reactive, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { usePlaylistStore, type PlaylistSortOrder } from '@/stores/playlist'
-
 const router = useRouter()
 const route = useRoute()
 const player = usePlayerStore()
 const library = useLibraryStore()
 const playlistStore = usePlaylistStore()
+
+// ── Playlist context menu ──────────────────────────────────────────────
+const plCtx = reactive({ show: false, x: 0, y: 0, playlist: null as Playlist | null })
+
+function openPlaylistCtx(e: MouseEvent, pl: Playlist) {
+  plCtx.x = Math.min(e.clientX, window.innerWidth - 200)
+  plCtx.y = Math.min(e.clientY, window.innerHeight - 120)
+  plCtx.playlist = pl
+  plCtx.show = true
+}
+
+function renamePlaylistPrompt() {
+  plCtx.show = false
+  if (!plCtx.playlist) return
+  const newName = window.prompt('Rename playlist:', plCtx.playlist.name)
+  if (newName && newName.trim() && newName.trim() !== plCtx.playlist.name) {
+    playlistStore.renamePlaylist(plCtx.playlist.id, newName.trim())
+  }
+}
+
+function deletePlaylistConfirm() {
+  plCtx.show = false
+  if (!plCtx.playlist) return
+  if (window.confirm(`Delete "${plCtx.playlist.name}"?`)) {
+    playlistStore.deletePlaylist(plCtx.playlist.id)
+    // Navigate away if currently viewing the deleted playlist
+    if (route.path === `/playlist/${plCtx.playlist.id}`) {
+      router.replace('/playlists')
+    }
+  }
+}
+
+function playPlaylist(shuffle: boolean) {
+  plCtx.show = false
+  if (!plCtx.playlist) return
+  const tracks = playlistStore.getPlaylistTracks(plCtx.playlist.id)
+  if (tracks.length === 0) return
+  if (shuffle) {
+    player.isShuffle = true
+  }
+  player.playAll(tracks)
+}
 
 function getCoverUrl(path: string) {
   return window.api.getMediaUrl(path)

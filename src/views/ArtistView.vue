@@ -1,5 +1,5 @@
 <template>
-  <div v-if="artist" class="artist-view p-6 max-w-5xl">
+  <div v-if="artist" class="artist-view p-6 max-w-5xl mx-auto">
     <!-- Artist header -->
     <div class="flex items-start gap-6 mb-8">
       <!-- Artist image -->

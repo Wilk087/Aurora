@@ -17,15 +17,18 @@
         </svg>
       </div>
 
-      <!-- Play overlay -->
+      <!-- Play / Pause overlay -->
       <div
         class="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center"
       >
         <button
-          @click.stop="$emit('play')"
+          @click.stop="togglePlayAlbum"
           class="w-12 h-12 rounded-full bg-accent flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all accent-glow"
         >
-          <svg class="w-6 h-6 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+          <svg v-if="isThisAlbumPlaying" class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+          </svg>
+          <svg v-else class="w-6 h-6 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
             <path d="M8 5v14l11-7z" />
           </svg>
         </button>
@@ -85,6 +88,43 @@
           </svg>
           Show in File Explorer
         </button>
+        <div class="border-t border-white/[0.06] my-1" />
+        <!-- Add to Playlist submenu -->
+        <div class="relative" ref="playlistSubmenuRef">
+          <button
+            @click.stop="showPlaylistSub = !showPlaylistSub"
+            class="w-full px-3.5 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2.5"
+          >
+            <svg class="w-4 h-4 shrink-0 text-white/40" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Add to Playlist…
+          </button>
+          <div
+            v-if="showPlaylistSub"
+            class="absolute left-full top-0 ml-1 w-48 rounded-xl bg-[#1a1a2e]/95 backdrop-blur-lg border border-white/10 py-1.5 shadow-2xl max-h-64 overflow-y-auto z-[110]"
+          >
+            <p class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/30">Add to playlist</p>
+            <button
+              @click.stop="createAndAddPlaylist"
+              class="w-full px-3.5 py-2 text-left text-sm text-accent hover:bg-white/[0.06] transition-colors flex items-center gap-2"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              New Playlist
+            </button>
+            <div v-if="playlistStore.playlists.length > 0" class="border-t border-white/[0.06] my-1" />
+            <button
+              v-for="pl in playlistStore.sortedPlaylists"
+              :key="pl.id"
+              @click.stop="addToPlaylist(pl.id)"
+              class="w-full px-3.5 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors truncate"
+            >
+              {{ pl.name }}
+            </button>
+          </div>
+        </div>
       </div>
     </Teleport>
   </div>
@@ -94,6 +134,8 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
+import { usePlaylistStore } from '@/stores/playlist'
+import { useToast } from '@/composables/useToast'
 import ArtistLinks from '@/components/ArtistLinks.vue'
 import type { Album } from '@/stores/library'
 
@@ -103,6 +145,25 @@ defineEmits(['click', 'play'])
 
 const router = useRouter()
 const player = usePlayerStore()
+const playlistStore = usePlaylistStore()
+const toast = useToast()
+
+const showPlaylistSub = ref(false)
+const playlistSubmenuRef = ref<HTMLElement>()
+
+/** True when this album's tracks are currently playing */
+const isThisAlbumPlaying = computed(() => {
+  if (!player.isPlaying || !player.currentTrack) return false
+  return props.album.tracks.some(t => t.id === player.currentTrack?.id)
+})
+
+function togglePlayAlbum() {
+  if (isThisAlbumPlaying.value) {
+    player.togglePlay()
+  } else {
+    player.playAll(props.album.tracks)
+  }
+}
 
 const coverUrl = computed(() =>
   props.album.coverArt ? window.api.getMediaUrl(props.album.coverArt) : '',
@@ -143,5 +204,23 @@ function openInExplorer() {
   if (props.album.tracks.length > 0) {
     window.api.showInExplorer(props.album.tracks[0].path)
   }
+}
+
+async function createAndAddPlaylist() {
+  const name = props.album.name || 'Untitled'
+  const pl = await playlistStore.createPlaylist(name)
+  await playlistStore.addTracks(pl.id, props.album.tracks.map(t => t.id))
+  toast.success(`Created "${name}" with ${props.album.tracks.length} tracks`)
+  showPlaylistSub.value = false
+  showCtx.value = false
+}
+
+async function addToPlaylist(playlistId: string) {
+  const pl = playlistStore.getPlaylistById(playlistId)
+  const trackIds = props.album.tracks.map(t => t.id)
+  await playlistStore.addTracks(playlistId, trackIds)
+  toast.success(`Added ${trackIds.length} tracks to ${pl?.name || 'playlist'}`)
+  showPlaylistSub.value = false
+  showCtx.value = false
 }
 </script>

@@ -65,7 +65,12 @@
         ]"
       >
         <p class="text-[2.5rem] font-extrabold leading-snug">
-          {{ line.text || '♪' }}
+          <template v-if="line.text">{{ line.text }}</template>
+          <span v-else class="inline-flex items-center gap-2 opacity-50">
+            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>
+            <span class="text-xl tracking-[0.3em]">···</span>
+            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>
+          </span>
         </p>
         <div v-if="selectedLines.has(i)" class="absolute left-2 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-accent" />
       </div>

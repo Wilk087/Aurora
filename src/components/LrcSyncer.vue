@@ -12,7 +12,7 @@
           <div>
             <h3 class="text-lg font-semibold text-white">Sync Lyrics</h3>
             <p class="text-xs text-white/40 mt-0.5">
-              Play the song and press <kbd class="px-1.5 py-0.5 rounded bg-white/10 text-white/60 font-mono text-[10px]">Space</kbd> to stamp each line
+              <kbd class="px-1.5 py-0.5 rounded bg-white/10 text-white/60 font-mono text-[10px]">Space</kbd> stamp line · <kbd class="px-1.5 py-0.5 rounded bg-white/10 text-white/60 font-mono text-[10px]">Tab</kbd> add instrumental
             </p>
           </div>
           <button
@@ -76,6 +76,13 @@
 
           <div class="ml-4 flex items-center gap-2">
             <button
+              @click="addInstrumentalLine"
+              class="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/[0.08] hover:bg-white/[0.12] text-white/60 hover:text-white/80 transition-all"
+              title="Add instrumental/empty line (Tab)"
+            >
+              ♪ Instrumental
+            </button>
+            <button
               @click="undoLast"
               :disabled="stampedCount === 0"
               class="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/[0.08] hover:bg-white/[0.12] text-white/60 hover:text-white/80 disabled:opacity-30 transition-all"
@@ -116,8 +123,11 @@
                 {{ line.time !== null ? formatTime(line.time) : '--:--' }}
               </span>
               <!-- Line text -->
-              <p class="text-sm leading-relaxed" :class="getTextClass(i)">
+              <p v-if="line.text" class="text-sm leading-relaxed" :class="getTextClass(i)">
                 {{ line.text }}
+              </p>
+              <p v-else class="text-sm leading-relaxed italic" :class="getTextClass(i)">
+                <span class="opacity-50">♪ instrumental</span>
               </p>
             </div>
           </div>
@@ -243,6 +253,24 @@ function stampNext() {
   }
 }
 
+function addInstrumentalLine() {
+  // Insert an empty (instrumental) line at the current stamp position and stamp it immediately
+  const idx = currentStampIndex.value
+  lines.value.splice(idx, 0, { text: '', time: currentTime.value })
+  // Re-index element refs
+  lineElRefs.value = {}
+  // Advance to next unstamped
+  let next = idx + 1
+  while (next < lines.value.length && lines.value[next].time !== null) {
+    next++
+  }
+  currentStampIndex.value = Math.min(next, lines.value.length - 1)
+  nextTick(() => {
+    const nextEl = lineElRefs.value[currentStampIndex.value]
+    if (nextEl) nextEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  })
+}
+
 function undoLast() {
   // Find last stamped line
   for (let i = lines.value.length - 1; i >= 0; i--) {
@@ -288,6 +316,10 @@ function onKeyDown(e: KeyboardEvent) {
     e.preventDefault()
     e.stopPropagation()
     stampNext()
+  } else if (e.code === 'Tab') {
+    e.preventDefault()
+    e.stopPropagation()
+    addInstrumentalLine()
   } else if (e.code === 'ArrowLeft') {
     e.preventDefault()
     seekBack()
@@ -333,7 +365,8 @@ function buildLrc(): string {
     const m = Math.floor(t / 60)
     const s = Math.floor(t % 60)
     const ms = Math.floor((t % 1) * 100)
-    return `[${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}] ${line.text}`
+    const ts = `[${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}]`
+    return line.text ? `${ts} ${line.text}` : ts
   }).join('\n')
 }
 

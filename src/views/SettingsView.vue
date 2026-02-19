@@ -1,5 +1,5 @@
 <template>
-  <div class="settings-view p-6 max-w-2xl">
+  <div class="settings-view p-6 max-w-2xl mx-auto">
     <h1 class="text-3xl font-bold text-white mb-8">Settings</h1>
 
     <!-- ── Music Folders ──────────────────────────────────────────── -->

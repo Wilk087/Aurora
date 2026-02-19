@@ -48,8 +48,8 @@
         <!-- Left side: cover art + track info + waveform (always visible) -->
         <div class="w-[45%] h-full flex flex-col items-center justify-center px-14 py-10 shrink-0">
           <!-- Album cover -->
-          <div class="relative max-w-[380px] w-full">
-            <div class="aspect-square rounded-2xl overflow-hidden shadow-2xl shadow-black/50 ring-1 ring-white/[0.06]">
+          <div class="relative w-full transition-all duration-700 ease-out" :class="player.isPlaying ? 'max-w-[380px]' : 'max-w-[360px]'">
+            <div class="aspect-square rounded-2xl overflow-hidden shadow-2xl shadow-black/50 ring-1 ring-white/[0.06] transition-all duration-700 ease-out" :class="player.isPlaying ? 'scale-100' : 'scale-[0.97] opacity-90'">
               <img
                 v-if="player.currentTrack.coverArt"
                 :src="coverUrl"
@@ -183,7 +183,7 @@
               </div>
 
               <!-- Volume slider (centered, slightly narrower than progress) -->
-              <div class="flex items-center justify-center mt-3 px-8">
+              <div class="flex items-center justify-center mt-3 px-8" @wheel.prevent="onVolumeWheel">
                 <button
                   @click="player.toggleMute()"
                   class="w-5 h-5 mr-3 flex items-center justify-center text-white/40 hover:text-white/70 transition-colors shrink-0"
@@ -361,12 +361,20 @@ function onVolumeInput(e: Event) {
   player.setVolume(parseFloat((e.target as HTMLInputElement).value))
 }
 
+function onVolumeWheel(e: WheelEvent) {
+  const delta = e.deltaY < 0 ? 0.05 : -0.05
+  player.setVolume(Math.min(1, Math.max(0, player.volume + delta)))
+}
+
 function exitFullscreen() {
   window.api.exitFullscreen()
   router.back()
 }
 
 function onKeydown(e: KeyboardEvent) {
+  // Don't intercept when LrcSyncer overlay is active
+  if (document.querySelector('[data-lrc-syncer-active]')) return
+
   if (e.key === 'Escape' || e.key === 'F11') {
     e.preventDefault()
     exitFullscreen()

@@ -65,7 +65,12 @@
         :class="[getLyricClass(i), selectedLines.has(i) ? 'ring-1 ring-accent/40 rounded-lg bg-accent/10' : '']"
       >
         <p class="text-center leading-relaxed" :class="getLyricTextClass(i)">
-          {{ line.text || '\u266A' }}
+          <template v-if="line.text">{{ line.text }}</template>
+          <span v-else class="inline-flex items-center gap-1.5 opacity-60">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>
+            <span class="text-sm tracking-widest">···</span>
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>
+          </span>
         </p>
         <!-- Selection indicator -->
         <div v-if="selectedLines.has(i)" class="absolute left-1 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-accent" />
