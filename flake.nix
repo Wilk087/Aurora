@@ -18,6 +18,9 @@
 
           src = ./.;
 
+          VITE_APP_VERSION = version;
+          APP_VERSION = version;
+
           npmDepsHash = "sha256-y/vSUR/8sZ7ItHeeeHfig9BHz6CSCstIx3F5KG4ZlFo="; 
 
           forceGitDeps = true;
