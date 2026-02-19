@@ -12,16 +12,18 @@
         pkgs = import nixpkgs { inherit system; };
       in
       {
-        packages.default = pkgs.stdenv.mkDerivation rec {
+        packages.default = pkgs.buildNpmPackage rec {
           pname = "aurora-player";
-          # NOTE: Update version to match the version in package.json
           version = "2.4.0";
 
           src = ./.;
 
+          npmDepsHash = ""; 
+
+          ELECTRON_SKIP_BINARY_DOWNLOAD = "1";
+
           nativeBuildInputs = with pkgs; [
             nodejs_20
-            nodePackages.npm
             makeWrapper
           ];
 
@@ -37,33 +39,24 @@
             gtk3
             pango
             cairo
-            xorg.libX11
-            xorg.libXcomposite
-            xorg.libXdamage
-            xorg.libXext
-            xorg.libXfixes
-            xorg.libXrandr
-            xorg.libxcb
+            libx11
+            libxcomposite
+            libxdamage
+            libxext
+            libxfixes
+            libxrandr
+            libxcb
             mesa
             expat
             alsa-lib
           ];
-
-          configurePhase = ''
-            export HOME=$TMPDIR
-            npm ci --ignore-scripts
-          '';
-
-          buildPhase = ''
-            npm run build
-          '';
 
           installPhase = ''
             mkdir -p $out/lib/aurora-player
             cp -r dist dist-electron node_modules package.json $out/lib/aurora-player/
 
             mkdir -p $out/bin
-            makeWrapper ${pkgs.electron}/bin/electron $out/bin/aurora-player \
+            makeWrapper ${pkgs.electron_30}/bin/electron $out/bin/aurora-player \
               --add-flags "$out/lib/aurora-player/dist-electron/main.js" \
               --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath buildInputs}"
 
