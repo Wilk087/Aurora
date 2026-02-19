@@ -63,7 +63,7 @@
             cp -r dist dist-electron node_modules package.json $out/lib/aurora-player/
 
             mkdir -p $out/bin
-            makeWrapper ${pkgs.electron_28}/bin/electron $out/bin/aurora-player \
+            makeWrapper ${pkgs.electron}/bin/electron $out/bin/aurora-player \
               --add-flags "$out/lib/aurora-player/dist-electron/main.js" \
               --prefix LD_LIBRARY_PATH : "${pkgs.lib.makeLibraryPath buildInputs}"
 
@@ -95,7 +95,7 @@
           buildInputs = with pkgs; [
             nodejs_20
             nodePackages.npm
-            electron_28
+            electron
           ];
         };
       });
