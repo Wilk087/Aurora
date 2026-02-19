@@ -18,7 +18,7 @@
 
           src = ./.;
 
-          npmDepsHash = ""; 
+          npmDepsHash = "sha256-y/vSUR/8sZ7ItHeeeHfig9BHz6CSCsTiX3F5KG4ZlFo="; 
 
           forceGitDeps = true;
 
