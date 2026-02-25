@@ -103,7 +103,7 @@
           @click="$router.push(`/album/${album.id}`)"
           class="group cursor-pointer"
         >
-          <div class="aspect-square rounded-xl overflow-hidden bg-white/[0.06] mb-2 transition-transform group-hover:scale-[1.03]">
+          <div class="relative aspect-square rounded-xl overflow-hidden bg-white/[0.06] mb-2 transition-transform group-hover:scale-[1.03]">
             <img
               v-if="album.coverArt"
               :src="getCoverUrl(album.coverArt)"
@@ -114,6 +114,23 @@
               <svg class="w-12 h-12 text-white/10" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
               </svg>
+            </div>
+
+            <!-- Play / Stop overlay -->
+            <div
+              class="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center"
+            >
+              <button
+                @click.stop="togglePlayAlbum(album)"
+                class="w-12 h-12 rounded-full bg-accent flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all accent-glow"
+              >
+                <svg v-if="isAlbumPlaying(album)" class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M6 6h12v12H6z" />
+                </svg>
+                <svg v-else class="w-6 h-6 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </button>
             </div>
           </div>
           <p class="text-sm font-medium text-white truncate">{{ album.name }}</p>
@@ -218,6 +235,19 @@ const allPlayableTracks = computed(() => [...allTracks.value, ...featuredTracks.
 
 function getCoverUrl(path: string) {
   return window.api.getMediaUrl(path)
+}
+
+function isAlbumPlaying(album: Album): boolean {
+  if (!player.isPlaying || !player.currentTrack) return false
+  return album.tracks.some(t => t.id === player.currentTrack?.id)
+}
+
+function togglePlayAlbum(album: Album) {
+  if (isAlbumPlaying(album)) {
+    player.clearQueue()
+  } else {
+    player.playAll(album.tracks)
+  }
 }
 
 function playAll() {
