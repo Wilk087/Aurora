@@ -121,6 +121,9 @@ export const usePlayerStore = defineStore('player', () => {
   // ── Audio normalization ───────────────────────────────────────────────
   const normalization = ref(false)
 
+  // ── LRC sync mode (pause at end of track instead of advancing) ────────
+  const lrcSyncMode = ref(false)
+
   // ── Sleep timer ─────────────────────────────────────────────────────────
   const sleepTimerMode = ref<null | 'song' | 'album' | 'time'>(null)
   const sleepTimerEndTime = ref<number | null>(null) // ms timestamp for 'time' mode
@@ -528,6 +531,13 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   function handleTrackEnd() {
+    // LRC sync mode: pause at end so user can save their work
+    if (lrcSyncMode.value) {
+      audio.currentTime = 0
+      pause()
+      return
+    }
+
     // Sleep timer: "after this song" — pause immediately
     if (sleepTimerMode.value === 'song') {
       cancelSleepTimer()
@@ -934,6 +944,8 @@ export const usePlayerStore = defineStore('player', () => {
     setScrobblingEnabled,
     // Playback error
     playbackError,
+    // LRC sync mode
+    lrcSyncMode,
     // Sleep timer
     sleepTimerMode,
     sleepTimerRemaining,

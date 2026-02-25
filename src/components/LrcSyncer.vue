@@ -198,6 +198,13 @@ const isPlaying = computed(() => player.isPlaying)
 const stampedCount = computed(() => lines.value.filter(l => l.time !== null).length)
 const allStamped = computed(() => lines.value.length > 0 && lines.value.every(l => l.time !== null))
 
+// Toggle lrcSyncMode on the player so the track pauses at the end
+watch(
+  () => props.visible,
+  (vis) => { player.lrcSyncMode = vis },
+  { immediate: true },
+)
+
 // Parse plain lyrics into lines when visible/lyrics change
 watch(
   () => [props.visible, props.plainLyrics],
