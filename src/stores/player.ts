@@ -214,6 +214,8 @@ export const usePlayerStore = defineStore('player', () => {
   let errorSkipTimeout: ReturnType<typeof setTimeout> | null = null
 
   audio.addEventListener('error', () => {
+    // Ignore errors from intentional queue clearing (audio.src = '')
+    if (!currentTrack.value) return
     isLoading.value = false
     isPlaying.value = false
     const err = audio.error

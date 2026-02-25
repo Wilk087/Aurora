@@ -25,8 +25,8 @@
           @click.stop="togglePlayAlbum"
           class="w-12 h-12 rounded-full bg-accent flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all accent-glow"
         >
-          <svg v-if="isThisAlbumPlaying" class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+          <svg v-if="isThisAlbumPlaying" class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M6 6h12v12H6z" />
           </svg>
           <svg v-else class="w-6 h-6 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
             <path d="M8 5v14l11-7z" />
@@ -159,7 +159,7 @@ const isThisAlbumPlaying = computed(() => {
 
 function togglePlayAlbum() {
   if (isThisAlbumPlaying.value) {
-    player.togglePlay()
+    player.clearQueue()
   } else {
     player.playAll(props.album.tracks)
   }
