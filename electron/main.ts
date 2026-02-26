@@ -13,6 +13,7 @@ import {
   setSubsonicConfig, subsonicPing, subsonicGetAllSongs,
   getStreamUrl, getCoverArtUrl,
 } from './subsonic'
+import { startRemoteServer, stopRemoteServer, registerRemoteIPC, isRemoteEnabled } from './remote'
 
 // ── Discord Rich Presence ──────────────────────────────────────────────────
 // Uses discord-rpc to show what's currently playing
@@ -1000,6 +1001,20 @@ app.whenReady().then(async () => {
 
   await createWindow()
 
+  // ── Remote control server ──────────────────────────────────────────────
+  registerRemoteIPC(() => app.getPath('userData'))
+  if (isRemoteEnabled(app.getPath('userData'))) {
+    startRemoteServer(mainWindow!, () => app.getPath('userData'))
+  }
+
+  ipcMain.handle('remote:start-server', () => {
+    startRemoteServer(mainWindow!, () => app.getPath('userData'))
+  })
+
+  ipcMain.handle('remote:stop-server', () => {
+    stopRemoteServer()
+  })
+
   // Load library into memory cache on startup
   await loadCache()
   await loadArtistCache()
@@ -1788,6 +1803,7 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', async () => {
   await forceFlush()
+  stopRemoteServer()
   destroyDiscordRPC()
   destroyMpris()
   if (!isRelaunching) app.quit()

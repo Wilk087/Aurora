@@ -1,6 +1,17 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 
+// Lazy accessor for library store to avoid circular dependency
+// Must not use require() — Vite doesn't resolve @/ aliases in require() calls
+let _libStore: any = null
+function getLibStore() {
+  if (!_libStore) {
+    // Dynamic import resolved at module level by Vite, called lazily
+    _libStore = (window as any).__auroraLibStore
+  }
+  return _libStore
+}
+
 export const usePlayerStore = defineStore('player', () => {
   // ── Internal audio element ───────────────────────────────────────────────
   const audio = new Audio()
@@ -872,6 +883,108 @@ export const usePlayerStore = defineStore('player', () => {
       window.api.saveSettings(s)
     })
   }
+
+  // ── Remote control integration ──────────────────────────────────────────
+  function sendRemoteState() {
+    const trackForRemote = currentTrack.value ? {
+      id: currentTrack.value.id,
+      title: currentTrack.value.title,
+      artist: currentTrack.value.artist,
+      album: currentTrack.value.album,
+      coverArt: currentTrack.value.coverArt,
+      duration: currentTrack.value.duration,
+    } : null
+
+    window.api.sendRemoteState({
+      currentTrack: trackForRemote,
+      isPlaying: isPlaying.value,
+      currentTime: currentTime.value,
+      duration: duration.value,
+      volume: volume.value,
+      isMuted: isMuted.value,
+      isShuffle: isShuffle.value,
+      repeatMode: repeatMode.value,
+      currentIndex: currentIndex.value,
+      queue: queue.value.slice(0, 50).map(t => ({
+        id: t.id, title: t.title, artist: t.artist,
+        album: t.album, coverArt: t.coverArt,
+      })),
+    })
+  }
+
+  // Throttled time updates (don't flood WS)
+  let remoteTimeThrottle = 0
+  audio.addEventListener('timeupdate', () => {
+    const now = Date.now()
+    if (now - remoteTimeThrottle > 1000) {
+      remoteTimeThrottle = now
+      sendRemoteState()
+    }
+  })
+
+  // Send on meaningful state changes
+  watch(currentTrack, sendRemoteState)
+  watch(isPlaying, sendRemoteState)
+  watch(volume, sendRemoteState)
+  watch(isMuted, sendRemoteState)
+  watch(isShuffle, sendRemoteState)
+  watch(repeatMode, sendRemoteState)
+
+  // Handle commands from remote clients
+  window.api.onRemoteCommand((command: string, data?: any) => {
+    switch (command) {
+      case 'play': play(); break
+      case 'pause': pause(); break
+      case 'togglePlay': togglePlay(); break
+      case 'next': next(); break
+      case 'previous': previous(); break
+      case 'seek': seek(typeof data === 'number' ? data : 0); break
+      case 'volume': setVolume(typeof data === 'number' ? data : 0); break
+      case 'toggleMute': toggleMute(); break
+      case 'toggleShuffle': toggleShuffle(); break
+      case 'cycleRepeat': cycleRepeat(); break
+      case 'playFromQueue': {
+        if (data && typeof data.index === 'number') {
+          playFromQueue(data.index)
+        }
+        break
+      }
+      case 'playTrack': {
+        const lib = getLibStore()
+        const track = lib.tracks.find((t: Track) => t.id === data?.trackId)
+        if (track) {
+          const albumTracks = lib.tracks.filter((t: Track) => t.album === track.album && t.albumArtist === track.albumArtist)
+          const idx = albumTracks.findIndex((t: Track) => t.id === track.id)
+          playAll(albumTracks, Math.max(0, idx))
+        }
+        break
+      }
+      case 'playAlbum': {
+        const lib = getLibStore()
+        const albumTracks = lib.tracks.filter((t: Track) => {
+          const key = `${t.album}---${t.albumArtist}`
+          return key === data?.albumKey
+        })
+        if (albumTracks.length > 0) {
+          if (data?.shuffle) isShuffle.value = true
+          playAll(albumTracks, data?.startIndex || 0)
+        }
+        break
+      }
+      case 'playNext': {
+        const lib = getLibStore()
+        const track = lib.tracks.find((t: Track) => t.id === data?.trackId)
+        if (track) playNext(track)
+        break
+      }
+      case 'playLater': {
+        const lib = getLibStore()
+        const track = lib.tracks.find((t: Track) => t.id === data?.trackId)
+        if (track) playLater(track)
+        break
+      }
+    }
+  })
 
   return {
     currentTrack,

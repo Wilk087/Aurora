@@ -537,6 +537,96 @@
       </div>
     </section>
 
+    <!-- ── Remote Control ───────────────────────────────────────── -->
+    <section class="mb-8">
+      <h2 class="text-lg font-semibold text-white mb-4">Remote Control</h2>
+
+      <div class="px-4 py-4 rounded-xl bg-white/[0.05] space-y-4">
+        <p class="text-xs text-white/40">Control Aurora from your phone on the same network. Open the URL below in your mobile browser and enter the PIN to connect.</p>
+
+        <!-- Enable toggle -->
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm text-white/80">Enable Remote Control</p>
+            <p class="text-xs text-white/30 mt-0.5">Start a local server for mobile remote access</p>
+          </div>
+          <button
+            @click="toggleRemote"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="remoteEnabled ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              :class="remoteEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
+
+        <template v-if="remoteEnabled">
+          <!-- Connection info -->
+          <div class="p-3 rounded-xl bg-white/[0.04] border border-white/[0.06]">
+            <p class="text-[10px] font-semibold uppercase tracking-wider text-white/30 mb-2">Connection</p>
+            <div class="flex items-center gap-3">
+              <div class="flex-1">
+                <p class="text-sm text-white/70 font-mono select-all">http://{{ remoteLanIp }}:{{ remotePort }}</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] font-semibold uppercase tracking-wider text-white/30">PIN</span>
+                <span class="text-lg font-bold font-mono text-accent tracking-widest select-all">{{ remotePin }}</span>
+                <button
+                  @click="regeneratePin"
+                  class="p-1.5 rounded-lg hover:bg-white/[0.08] text-white/30 hover:text-white/60 transition-all"
+                  title="Generate new PIN"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Trusted devices -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-white/30">Trusted Devices ({{ remoteTrustedDevices.length }})</p>
+              <button
+                v-if="remoteTrustedDevices.length > 0"
+                @click="removeAllDevices"
+                class="text-[10px] text-red-400/70 hover:text-red-400 transition-colors"
+              >
+                Revoke All
+              </button>
+            </div>
+            <div v-if="remoteTrustedDevices.length === 0" class="text-xs text-white/20 py-2">
+              No devices paired yet. Enter the PIN on your phone to connect.
+            </div>
+            <div v-else class="space-y-1.5">
+              <div
+                v-for="(device, i) in remoteTrustedDevices"
+                :key="i"
+                class="flex items-center justify-between px-3 py-2 rounded-lg bg-white/[0.03]"
+              >
+                <div class="min-w-0 flex-1">
+                  <p class="text-xs text-white/60 truncate">{{ device.name }}</p>
+                  <p class="text-[10px] text-white/25">{{ device.ip }} · Last seen {{ formatDeviceTime(device.lastSeen) }}</p>
+                </div>
+                <button
+                  @click="removeDevice(i)"
+                  class="p-1 rounded hover:bg-white/[0.08] text-white/20 hover:text-red-400 transition-all shrink-0 ml-2"
+                  title="Revoke access"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </section>
+
     <!-- ── Cache Management ─────────────────────────────────────── -->
     <section class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Cache</h2>
@@ -783,6 +873,13 @@ const exportDefaultPath = ref('')
 const exporting = ref(false)
 const importing = ref(false)
 
+// Remote Control
+const remoteEnabled = ref(false)
+const remoteLanIp = ref('')
+const remotePort = ref(19876)
+const remotePin = ref('')
+const remoteTrustedDevices = ref<{ name: string; ip: string; createdAt: number; lastSeen: number }[]>([])
+
 // Lyrics offset display
 const lyricsOffsetDisplay = computed(() => {
   const v = player.lyricsOffset
@@ -846,7 +943,73 @@ onMounted(async () => {
 
   // Enumerate audio devices
   player.enumerateOutputDevices()
+
+  // Load remote control config
+  try {
+    const rc = await window.api.getRemoteConfig()
+    remoteEnabled.value = rc.enabled
+    remoteLanIp.value = rc.lanIp
+    remotePort.value = rc.port
+    remotePin.value = rc.pin
+    remoteTrustedDevices.value = rc.trustedDevices
+  } catch (_) { /* remote not available */ }
+
+  // Listen for new trusted devices
+  window.api.onRemoteDeviceAdded((device: any) => {
+    remoteTrustedDevices.value = [...remoteTrustedDevices.value.filter(d => d.name !== device.name || d.ip !== device.ip), device]
+  })
 })
+
+/* ---------- Remote Control ---------- */
+async function toggleRemote() {
+  remoteEnabled.value = !remoteEnabled.value
+  await window.api.setRemoteEnabled(remoteEnabled.value)
+  if (remoteEnabled.value) {
+    await window.api.remoteStartServer()
+    const rc = await window.api.getRemoteConfig()
+    remoteLanIp.value = rc.lanIp
+    remotePort.value = rc.port
+    remotePin.value = rc.pin
+    remoteTrustedDevices.value = rc.trustedDevices
+    toast.success('Remote control server started')
+  } else {
+    await window.api.remoteStopServer()
+    toast.success('Remote control server stopped')
+  }
+}
+
+async function regeneratePin() {
+  const rc = await window.api.remoteRegeneratePin()
+  remotePin.value = rc.pin
+  toast.success('PIN regenerated — new devices need the new PIN')
+}
+
+async function removeDevice(index: number) {
+  const device = remoteTrustedDevices.value[index]
+  if (!device) return
+  await window.api.remoteRemoveDevice(index)
+  remoteTrustedDevices.value.splice(index, 1)
+  toast.success(`Revoked ${device.name}`)
+}
+
+async function removeAllDevices() {
+  if (remoteTrustedDevices.value.length === 0) return
+  await window.api.remoteRemoveAllDevices()
+  remoteTrustedDevices.value = []
+  toast.success('All devices revoked')
+}
+
+function formatDeviceTime(timestamp: number): string {
+  const diff = Date.now() - timestamp
+  const sec = Math.floor(diff / 1000)
+  if (sec < 60) return 'just now'
+  const min = Math.floor(sec / 60)
+  if (min < 60) return `${min}m ago`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr}h ago`
+  const d = Math.floor(hr / 24)
+  return `${d}d ago`
+}
 
 async function toggleDiscord() {
   discordEnabled.value = !discordEnabled.value

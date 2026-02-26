@@ -186,5 +186,21 @@ interface Window {
     getAppVersion: () => Promise<string>
     checkForUpdate: () => Promise<{ currentVersion: string; latestVersion: string; url: string } | null>
     openExternal: (url: string) => Promise<void>
+    // Remote control
+    onRemoteCommand: (callback: (command: string, data?: any) => void) => void
+    removeRemoteCommandListener: () => void
+    onRemoteRequest: (callback: (requestType: string) => void) => void
+    removeRemoteRequestListener: () => void
+    sendRemoteResponse: (requestType: string, data: any) => void
+    sendRemoteState: (state: any) => void
+    onRemoteDeviceAdded: (callback: (device: { name: string; ip: string }) => void) => void
+    removeRemoteDeviceAddedListener: () => void
+    getRemoteConfig: () => Promise<{ enabled: boolean; pin: string; trustedDevices: { name: string; ip: string; createdAt: number; lastSeen: number }[]; lanIp: string; port: number }>
+    setRemoteEnabled: (enabled: boolean) => Promise<{ enabled: boolean }>
+    remoteRegeneratePin: () => Promise<{ pin: string }>
+    remoteRemoveDevice: (index: number) => Promise<{ name: string; ip: string; createdAt: number; lastSeen: number }[]>
+    remoteRemoveAllDevices: () => Promise<[]>
+    remoteStartServer: () => Promise<void>
+    remoteStopServer: () => Promise<void>
   }
 }

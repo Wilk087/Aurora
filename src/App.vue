@@ -59,6 +59,11 @@ const player = usePlayerStore()
 const library = useLibraryStore()
 const playlistStore = usePlaylistStore()
 const favoritesStore = useFavoritesStore()
+
+// Expose stores globally for cross-store lazy access (avoids circular require issues)
+;(window as any).__auroraLibStore = library
+;(window as any).__auroraPlaylistStore = playlistStore
+
 const dynamicColor = ref<string | null>(null)
 const isWindowMaximized = ref(false)
 const isWindowFullscreen = ref(false)

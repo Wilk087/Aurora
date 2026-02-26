@@ -23,7 +23,7 @@ export default defineConfig({
         vite: {
           build: {
             rollupOptions: {
-              external: ['bufferutil', 'utf-8-validate', 'dbus-next'],
+              external: ['bufferutil', 'utf-8-validate', 'dbus-next', 'express', 'ws', 'bonjour-service'],
             },
           },
         },

@@ -158,4 +158,33 @@ contextBridge.exposeInMainWorld('api', {
   removeMprisCommandListener: () => {
     ipcRenderer.removeAllListeners('mpris:command')
   },
+
+  // Remote control
+  onRemoteCommand: (callback: (command: string, data?: any) => void) => {
+    ipcRenderer.on('remote:command', (_, command, data) => callback(command, data))
+  },
+  removeRemoteCommandListener: () => {
+    ipcRenderer.removeAllListeners('remote:command')
+  },
+  onRemoteRequest: (callback: (requestType: string) => void) => {
+    ipcRenderer.on('remote:request', (_, requestType) => callback(requestType))
+  },
+  removeRemoteRequestListener: () => {
+    ipcRenderer.removeAllListeners('remote:request')
+  },
+  sendRemoteResponse: (requestType: string, data: any) => ipcRenderer.send(`remote:response:${requestType}`, data),
+  sendRemoteState: (state: any) => ipcRenderer.send('remote:state-update', state),
+  onRemoteDeviceAdded: (callback: (device: { name: string; ip: string }) => void) => {
+    ipcRenderer.on('remote:device-added', (_, device) => callback(device))
+  },
+  removeRemoteDeviceAddedListener: () => {
+    ipcRenderer.removeAllListeners('remote:device-added')
+  },
+  getRemoteConfig: () => ipcRenderer.invoke('remote:get-config'),
+  setRemoteEnabled: (enabled: boolean) => ipcRenderer.invoke('remote:set-enabled', enabled),
+  remoteRegeneratePin: () => ipcRenderer.invoke('remote:regenerate-pin'),
+  remoteRemoveDevice: (index: number) => ipcRenderer.invoke('remote:remove-device', index),
+  remoteRemoveAllDevices: () => ipcRenderer.invoke('remote:remove-all-devices'),
+  remoteStartServer: () => ipcRenderer.invoke('remote:start-server'),
+  remoteStopServer: () => ipcRenderer.invoke('remote:stop-server'),
 })

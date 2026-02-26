@@ -272,6 +272,46 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
+  // ── Remote control: respond to library data requests ────────────────
+  window.api.onRemoteRequest((requestType: string) => {
+    if (requestType === 'getTracks') {
+      const trackData = tracks.value.map(t => ({
+        id: t.id,
+        title: t.title,
+        artist: t.artist,
+        album: t.album,
+        albumArtist: t.albumArtist,
+        coverArt: t.coverArt,
+        duration: t.duration,
+        trackNumber: t.track,
+      }))
+      window.api.sendRemoteResponse('getTracks', trackData)
+    }
+
+    if (requestType === 'getAlbums') {
+      const albumData = albums.value.map(a => ({
+        key: `${a.name}---${a.artist}`,
+        name: a.name,
+        artist: a.artist,
+        coverArt: a.coverArt,
+        trackCount: a.tracks.length,
+        year: a.year,
+      }))
+      window.api.sendRemoteResponse('getAlbums', albumData)
+    }
+
+    if (requestType === 'getPlaylists') {
+      // Forward to playlist store — access via global to avoid require('@/') in Vite bundle
+      const playlistStore = (window as any).__auroraPlaylistStore
+      const playlistData = playlistStore.sortedPlaylists.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        trackCount: p.trackIds.length,
+      }))
+      window.api.sendRemoteResponse('getPlaylists', playlistData)
+    }
+  })
+
   return {
     tracks,
     folders,
