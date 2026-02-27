@@ -93,6 +93,42 @@ function generateToken(): string {
   return randomBytes(32).toString('hex')
 }
 
+/** Parse a User-Agent string into a human-readable "OS · Browser" label */
+function parseDeviceName(ua?: string): string {
+  if (!ua) return 'Unknown Device'
+
+  // ── OS ──
+  let os = 'Unknown OS'
+  if (/Android/.test(ua)) {
+    const m = ua.match(/Android\s+([\d.]+)/)
+    os = m ? `Android ${m[1]}` : 'Android'
+  } else if (/iPhone/.test(ua)) {
+    os = 'iPhone'
+  } else if (/iPad/.test(ua)) {
+    os = 'iPad'
+  } else if (/CrOS/.test(ua)) {
+    os = 'ChromeOS'
+  } else if (/Mac OS X/.test(ua)) {
+    os = 'macOS'
+  } else if (/Windows/.test(ua)) {
+    os = 'Windows'
+  } else if (/Linux/.test(ua)) {
+    os = 'Linux'
+  }
+
+  // ── Browser ──
+  let browser = ''
+  if (/Edg\//.test(ua)) browser = 'Edge'
+  else if (/OPR\/|Opera/.test(ua)) browser = 'Opera'
+  else if (/Firefox\//.test(ua)) browser = 'Firefox'
+  else if (/SamsungBrowser/.test(ua)) browser = 'Samsung Browser'
+  else if (/Chrome\//.test(ua) && !/Chromium/.test(ua)) browser = 'Chrome'
+  else if (/Safari\//.test(ua) && !/Chrome/.test(ua)) browser = 'Safari'
+
+  return browser ? `${os} · ${browser}` : os
+}
+
+let pinRefreshInterval: ReturnType<typeof setInterval> | null = null
 let config: RemoteConfig = { enabled: false, pin: '0000', trustedDevices: [] }
 
 export function isRemoteEnabled(dataPath: string): boolean {
@@ -203,7 +239,7 @@ export function startRemoteServer(win: BrowserWindow, getDataPath: () => string)
     const token = generateToken()
     const device: TrustedDevice = {
       token,
-      name: deviceName || req.headers['user-agent'] || 'Unknown Device',
+      name: deviceName || parseDeviceName(req.headers['user-agent'] as string),
       ip: getClientIp(req),
       createdAt: Date.now(),
       lastSeen: Date.now(),
@@ -316,7 +352,7 @@ export function startRemoteServer(win: BrowserWindow, getDataPath: () => string)
               const token = generateToken()
               const device: TrustedDevice = {
                 token,
-                name: msg.deviceName || req.headers['user-agent'] || 'Unknown',
+                name: msg.deviceName || parseDeviceName(req.headers['user-agent'] as string),
                 ip: req.socket.remoteAddress || 'unknown',
                 createdAt: Date.now(),
                 lastSeen: Date.now(),
@@ -367,6 +403,16 @@ export function startRemoteServer(win: BrowserWindow, getDataPath: () => string)
     console.error('mDNS publish failed (non-fatal):', err)
   }
 
+  // ── PIN auto-refresh every 5 minutes ────────────────────────────────
+  if (pinRefreshInterval) clearInterval(pinRefreshInterval)
+  pinRefreshInterval = setInterval(() => {
+    config.pin = generatePin()
+    saveConfig(config)
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('remote:pin-changed', config.pin)
+    }
+  }, 5 * 60 * 1000)
+
   // ── IPC: receive state updates from renderer ─────────────────────────
   ipcMain.on('remote:state-update', (_: any, state: Partial<RemoteState>) => {
     Object.assign(currentState, state)
@@ -378,6 +424,7 @@ export function startRemoteServer(win: BrowserWindow, getDataPath: () => string)
 
 // ── Stop ────────────────────────────────────────────────────────────────────
 export function stopRemoteServer() {
+  if (pinRefreshInterval) { clearInterval(pinRefreshInterval); pinRefreshInterval = null }
   authenticatedSockets.clear()
   if (httpServer) { httpServer.close(); httpServer = null }
   if (wss) { wss.close(); wss = null }
@@ -736,7 +783,7 @@ async function submitPin(){
   const pin=document.getElementById('pinInput').value;
   document.getElementById('authError').textContent='';
   try{
-    const r=await fetch(API+'/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin,deviceName:navigator.userAgent.split('(')[0].trim()})});
+    const r=await fetch(API+'/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin})});
     const d=await r.json();
     if(!r.ok){document.getElementById('authError').textContent=d.error||'Failed';return}
     token=d.token;localStorage.setItem('aurora_token',token);

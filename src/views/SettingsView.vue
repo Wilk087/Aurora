@@ -958,6 +958,11 @@ onMounted(async () => {
   window.api.onRemoteDeviceAdded((device: any) => {
     remoteTrustedDevices.value = [...remoteTrustedDevices.value.filter(d => d.name !== device.name || d.ip !== device.ip), device]
   })
+
+  // Listen for auto-refreshed PIN
+  window.api.onRemotePinChanged((pin: string) => {
+    remotePin.value = pin
+  })
 })
 
 /* ---------- Remote Control ---------- */

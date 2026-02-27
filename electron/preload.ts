@@ -180,6 +180,12 @@ contextBridge.exposeInMainWorld('api', {
   removeRemoteDeviceAddedListener: () => {
     ipcRenderer.removeAllListeners('remote:device-added')
   },
+  onRemotePinChanged: (callback: (pin: string) => void) => {
+    ipcRenderer.on('remote:pin-changed', (_, pin) => callback(pin))
+  },
+  removeRemotePinChangedListener: () => {
+    ipcRenderer.removeAllListeners('remote:pin-changed')
+  },
   getRemoteConfig: () => ipcRenderer.invoke('remote:get-config'),
   setRemoteEnabled: (enabled: boolean) => ipcRenderer.invoke('remote:set-enabled', enabled),
   remoteRegeneratePin: () => ipcRenderer.invoke('remote:regenerate-pin'),
