@@ -1041,7 +1041,7 @@ onUnmounted(() => {
   max-width: 90vw;
   padding: 16px 20px;
   border-radius: 20px;
-  background: rgba(14, 14, 28, 0.75);
+  background: rgba(14, 14, 28, 0.55);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.08);
