@@ -288,24 +288,38 @@
           @mouseenter="modernControlsHover = true"
           @mouseleave="modernControlsHover = false"
         >
-          <!-- Track info (hidden when collapsed) -->
-          <div class="modern-controls-full">
-            <h2 class="text-lg font-bold text-white leading-tight line-clamp-1">
-              {{ player.currentTrack?.title }}
-            </h2>
-            <p class="text-sm text-white/50 mt-0.5 font-medium line-clamp-1">
-              <ArtistLinks
-                :artist="player.currentTrack?.artist ?? ''"
-                :album-artist="player.currentTrack?.albumArtist"
-                hover-class="hover:text-white/80"
-              />
-              <span v-if="player.currentTrack?.album" class="text-white/25"> · </span>
-              <span
-                v-if="player.currentTrack?.album"
-                class="text-white/25 hover:text-white/60 hover:underline underline-offset-2 cursor-pointer transition-colors"
-                @click="goToAlbum"
-              >{{ player.currentTrack?.album }}</span>
-            </p>
+          <!-- Header zone: overlaid mini/full info -->
+          <div class="modern-header-zone">
+            <!-- Full track info -->
+            <div class="modern-header-full">
+              <h2 class="text-lg font-bold text-white leading-tight line-clamp-1">
+                {{ player.currentTrack?.title }}
+              </h2>
+              <p class="text-sm text-white/50 mt-0.5 font-medium line-clamp-1">
+                <ArtistLinks
+                  :artist="player.currentTrack?.artist ?? ''"
+                  :album-artist="player.currentTrack?.albumArtist"
+                  hover-class="hover:text-white/80"
+                />
+                <span v-if="player.currentTrack?.album" class="text-white/25"> · </span>
+                <span
+                  v-if="player.currentTrack?.album"
+                  class="text-white/25 hover:text-white/60 hover:underline underline-offset-2 cursor-pointer transition-colors"
+                  @click="goToAlbum"
+                >{{ player.currentTrack?.album }}</span>
+              </p>
+            </div>
+            <!-- Mini info -->
+            <div class="modern-header-mini">
+              <h2 class="text-base font-semibold text-white leading-tight line-clamp-1">
+                {{ player.currentTrack?.title }}
+              </h2>
+              <p class="text-sm text-white/40 mt-0.5 font-medium line-clamp-1">
+                {{ player.currentTrack?.artist }}
+                <span v-if="player.currentTrack?.album" class="text-white/20"> · </span>
+                <span v-if="player.currentTrack?.album" class="text-white/20">{{ player.currentTrack?.album }}</span>
+              </p>
+            </div>
           </div>
 
           <!-- Progress / Waveform (always visible) -->
@@ -977,10 +991,10 @@ onUnmounted(() => {
 
 /* ── Modern mode: multi-layer ambient fade ─────────────────── */
 
-/* Layer 1: Alpha gradient mask on the sharp cover ─ dissolves the right edge */
+/* Layer 1: Alpha gradient mask on the sharp cover ─ curved ")" dissolve */
 .modern-cover-masked {
-  mask-image: linear-gradient(to right, black 0%, black 55%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to right, black 0%, black 55%, transparent 100%);
+  mask-image: radial-gradient(ellipse 70% 100% at 35% 50%, black 0%, black 50%, transparent 85%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 100% at 35% 50%, black 0%, black 50%, transparent 85%);
 }
 
 /* Layer 2: Blurred ambient backdrop ─ smears cover hues into the transition */
@@ -1010,7 +1024,7 @@ onUnmounted(() => {
   position: absolute;
   left: 25%;
   transform: translateX(-50%);
-  bottom: 40px;
+  bottom: 60px;
   z-index: 30;
   width: 420px;
   max-width: 90vw;
@@ -1025,19 +1039,44 @@ onUnmounted(() => {
   overflow: hidden;
 }
 .modern-controls-box.modern-controls-collapsed {
-  padding: 10px 20px;
-  border-radius: 14px;
-  bottom: 28px;
+  padding: 14px 24px 10px;
+  border-radius: 16px;
+  bottom: 52px;
 }
 .modern-controls-full {
-  max-height: 200px;
+  display: grid;
+  grid-template-rows: 1fr;
   opacity: 1;
-  transition: max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease, margin 0.4s ease;
+  transition: grid-template-rows 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+  overflow: hidden;
+}
+.modern-controls-full > * {
   overflow: hidden;
 }
 .modern-controls-collapsed .modern-controls-full {
-  max-height: 0;
+  grid-template-rows: 0fr;
   opacity: 0;
-  margin: 0;
+}
+
+/* Header zone: overlays mini and full info at the same position */
+.modern-header-zone {
+  display: grid;
+}
+.modern-header-zone > * {
+  grid-area: 1 / 1;
+}
+.modern-header-full {
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+.modern-header-mini {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.modern-controls-collapsed .modern-header-full {
+  opacity: 0;
+}
+.modern-controls-collapsed .modern-header-mini {
+  opacity: 1;
 }
 </style>
