@@ -186,6 +186,10 @@ interface Window {
     getAppVersion: () => Promise<string>
     checkForUpdate: () => Promise<{ currentVersion: string; latestVersion: string; url: string } | null>
     openExternal: (url: string) => Promise<void>
+    // Animated covers
+    getAnimatedCover: (album: string, artist: string) => Promise<string | null>
+    getAnimatedCoverCacheStats: () => Promise<{ count: number }>
+    clearAnimatedCoverCache: () => Promise<{ ok: boolean }>
     // Remote control
     onRemoteCommand: (callback: (command: string, data?: any) => void) => void
     removeRemoteCommandListener: () => void

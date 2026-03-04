@@ -50,6 +50,13 @@
           <!-- Album cover -->
           <div class="relative w-full transition-all duration-700 ease-out" :class="player.isPlaying ? 'max-w-[380px]' : 'max-w-[360px]'">
             <div class="aspect-square rounded-2xl overflow-hidden shadow-2xl shadow-black/50 ring-1 ring-white/[0.06] transition-all duration-700 ease-out" :class="player.isPlaying ? 'scale-100' : 'scale-[0.97] opacity-90'">
+              <!-- Animated cover video (HLS stream via hls.js) -->
+              <video
+                v-show="animatedCoverActive"
+                ref="animatedVideoEl"
+                class="w-full h-full object-cover absolute inset-0 z-10"
+                autoplay loop muted playsinline
+              />
               <img
                 v-if="player.currentTrack.coverArt"
                 :src="coverUrl"
@@ -243,7 +250,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
@@ -253,6 +260,7 @@ import QueuePanel from '@/components/QueuePanel.vue'
 import WaveformBar from '@/components/WaveformBar.vue'
 import IOSSlider from '@/components/IOSSlider.vue'
 import ArtistLinks from '@/components/ArtistLinks.vue'
+import Hls from 'hls.js'
 
 const router = useRouter()
 const player = usePlayerStore()
@@ -291,6 +299,98 @@ function goToAlbum() {
 
 const coverUrl = computed(() =>
   player.currentTrack?.coverArt ? window.api.getMediaUrl(player.currentTrack.coverArt) : '',
+)
+
+// ── Animated cover (HLS stream) ─────────────────────────────────────────
+const animatedVideoEl = ref<HTMLVideoElement | null>(null)
+const animatedCoverActive = ref(false)
+let hlsInstance: Hls | null = null
+let animatedCoverAbort = '' // track key to skip stale responses
+
+function destroyHls() {
+  if (hlsInstance) {
+    hlsInstance.destroy()
+    hlsInstance = null
+  }
+  animatedCoverActive.value = false
+}
+
+function attachHls(url: string) {
+  destroyHls()
+  const videoEl = animatedVideoEl.value
+  if (!videoEl) return
+
+  if (Hls.isSupported()) {
+    const hls = new Hls({
+      enableWorker: false,
+      maxBufferLength: 10,
+      maxMaxBufferLength: 30,
+    })
+    hls.loadSource(url)
+    hls.attachMedia(videoEl)
+    hls.on(Hls.Events.MANIFEST_PARSED, (_e, data) => {
+      // Prefer H.264 (avc1) levels — HEVC can have color rendering issues in Chromium
+      const avcLevels = data.levels
+        .map((l: any, i: number) => ({ idx: i, codec: l.codecSet || '' }))
+        .filter((l: any) => !l.codec.includes('hvc') && !l.codec.includes('hev'))
+      if (avcLevels.length > 0) {
+        // Restrict to only H.264 levels
+        hls.currentLevel = avcLevels[avcLevels.length - 1].idx // pick highest quality avc
+      }
+      videoEl.play().catch(() => {})
+      animatedCoverActive.value = true
+    })
+    hls.on(Hls.Events.ERROR, (_e, data) => {
+      if (data.fatal) {
+        destroyHls()
+      }
+    })
+    hlsInstance = hls
+  } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+    // Safari native HLS
+    videoEl.src = url
+    videoEl.addEventListener('loadedmetadata', () => {
+      videoEl.play().catch(() => {})
+      animatedCoverActive.value = true
+    }, { once: true })
+  }
+}
+
+async function fetchAnimatedCover(track: { album: string; artist: string }) {
+  const key = `${track.album}---${track.artist}`
+  animatedCoverAbort = key
+  try {
+    const hlsUrl = await window.api.getAnimatedCover(track.album || '', track.artist || '')
+    if (animatedCoverAbort !== key) return // track changed
+    if (hlsUrl) {
+      await nextTick() // ensure video element is in DOM
+      attachHls(hlsUrl)
+    }
+  } catch {
+    // silently ignore
+  }
+}
+
+watch(
+  () => player.currentTrack,
+  (track) => {
+    destroyHls()
+    if (!track || !player.animatedCoversEnabled) return
+    fetchAnimatedCover(track)
+  },
+  { immediate: true },
+)
+
+// React to animated covers toggle
+watch(
+  () => player.animatedCoversEnabled,
+  (enabled) => {
+    if (!enabled) {
+      destroyHls()
+    } else if (player.currentTrack) {
+      fetchAnimatedCover(player.currentTrack)
+    }
+  },
 )
 
 // ── Extract dominant colors from cover art for fluid background ──────────
@@ -404,6 +504,7 @@ onMounted(() => {
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
   if (idleTimer) clearTimeout(idleTimer)
+  destroyHls()
 })
 </script>
 

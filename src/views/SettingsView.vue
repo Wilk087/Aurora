@@ -329,6 +329,30 @@
         </div>      </div>
     </section>
 
+    <!-- ── Animated Covers ────────────────────────────────────────── -->
+    <section class="mb-8">
+      <h2 class="text-lg font-semibold text-white mb-4">Animated Covers</h2>
+      <div class="space-y-4">
+        <!-- Toggle -->
+        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">Motion Album Artwork</p>
+            <p class="text-xs text-white/30 mt-0.5">Show animated album covers in fullscreen and album pages (fetched from Apple Music)</p>
+          </div>
+          <button
+            @click="toggleAnimatedCovers"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="player.animatedCoversEnabled ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              :class="player.animatedCoversEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
+      </div>
+    </section>
+
     <!-- ── Behavior ───────────────────────────────────────────────── -->
     <section class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Behavior</h2>
@@ -687,6 +711,20 @@
             class="px-3 py-1.5 text-xs font-medium rounded-lg bg-white/[0.08] hover:bg-white/[0.12] text-white/60 hover:text-white/80 transition-all disabled:opacity-40"
           >
             {{ cacheClearing.library ? 'Clearing...' : 'Clear' }}
+          </button>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <div>
+            <span class="text-sm text-white/70">Animated Covers</span>
+            <p class="text-xs text-white/30">Cached motion artwork URLs from Apple Music</p>
+          </div>
+          <button
+            @click="clearAnimatedCoverCache"
+            :disabled="cacheClearing.animated"
+            class="px-3 py-1.5 text-xs font-medium rounded-lg bg-white/[0.08] hover:bg-white/[0.12] text-white/60 hover:text-white/80 transition-all disabled:opacity-40"
+          >
+            {{ cacheClearing.animated ? 'Clearing...' : 'Clear' }}
           </button>
         </div>
 
@@ -1104,6 +1142,24 @@ function toggleTransparency() {
   toast.success(`Window transparency ${player.transparencyEnabled ? 'enabled' : 'disabled'}`)
 }
 
+// ── Animated Covers ───────────────────────
+function toggleAnimatedCovers() {
+  player.setAnimatedCoversEnabled(!player.animatedCoversEnabled)
+  toast.success(`Animated covers ${player.animatedCoversEnabled ? 'enabled' : 'disabled'}`)
+}
+
+async function clearAnimatedCoverCache() {
+  cacheClearing.value.animated = true
+  try {
+    await window.api.clearAnimatedCoverCache()
+    toast.success('Animated cover cache cleared')
+  } catch {
+    toast.error('Failed to clear animated cover cache')
+  } finally {
+    cacheClearing.value.animated = false
+  }
+}
+
 // ── Behavior ──────────────────────────────
 function toggleAutoFullscreen() {
   player.setAutoFullscreen(!player.autoFullscreen)
@@ -1297,6 +1353,7 @@ const cacheClearing = ref<Record<string, boolean>>({
   covers: false,
   artist: false,
   waveform: false,
+  animated: false,
 })
 
 const cacheLabels: Record<string, string> = {
@@ -1324,14 +1381,19 @@ async function clearCache(target: string) {
 async function clearAllCaches() {
   const targets = ['library', 'covers', 'artist', 'waveform']
   for (const t of targets) cacheClearing.value[t] = true
+  cacheClearing.value.animated = true
   try {
-    await window.api.resetCache(targets)
+    await Promise.all([
+      window.api.resetCache(targets),
+      window.api.clearAnimatedCoverCache(),
+    ])
     await library.loadLibrary()
     toast.success('All caches cleared')
   } catch {
     toast.error('Failed to clear caches')
   } finally {
     for (const t of targets) cacheClearing.value[t] = false
+    cacheClearing.value.animated = false
   }
 }
 </script>

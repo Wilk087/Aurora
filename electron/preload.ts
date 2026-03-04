@@ -159,6 +159,14 @@ contextBridge.exposeInMainWorld('api', {
     ipcRenderer.removeAllListeners('mpris:command')
   },
 
+  // Animated covers
+  getAnimatedCover: (album: string, artist: string): Promise<string | null> =>
+    ipcRenderer.invoke('animated-cover:get', album, artist),
+  getAnimatedCoverCacheStats: (): Promise<{ count: number }> =>
+    ipcRenderer.invoke('animated-cover:cache-stats'),
+  clearAnimatedCoverCache: (): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('animated-cover:clear-cache'),
+
   // Remote control
   onRemoteCommand: (callback: (command: string, data?: any) => void) => {
     ipcRenderer.on('remote:command', (_, command, data) => callback(command, data))

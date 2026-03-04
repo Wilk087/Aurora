@@ -14,6 +14,7 @@ import {
   getStreamUrl, getCoverArtUrl,
 } from './subsonic'
 import { startRemoteServer, stopRemoteServer, registerRemoteIPC, isRemoteEnabled } from './remote'
+import { registerAnimatedCoverIPC } from './animated-covers'
 
 // ── Discord Rich Presence ──────────────────────────────────────────────────
 // Uses discord-rpc to show what's currently playing
@@ -1000,6 +1001,9 @@ app.whenReady().then(async () => {
   })
 
   await createWindow()
+
+  // ── Animated covers ────────────────────────────────────────────────────
+  registerAnimatedCoverIPC()
 
   // ── Remote control server ──────────────────────────────────────────────
   registerRemoteIPC(() => app.getPath('userData'))

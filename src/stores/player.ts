@@ -97,6 +97,9 @@ export const usePlayerStore = defineStore('player', () => {
   const waveformEnabled = ref(false)
   const waveformCache = new Map<string, number[]>()
 
+  // ── Animated covers ────────────────────────────────────────────────────
+  const animatedCoversEnabled = ref(false)
+
   async function generateWaveform(trackPath: string) {
     if (waveformCache.has(trackPath)) {
       waveformData.value = waveformCache.get(trackPath)!
@@ -282,6 +285,7 @@ export const usePlayerStore = defineStore('player', () => {
     if (s.muted === true) { isMuted.value = true; audio.muted = true }
     if (s.lyricsOffset !== undefined) lyricsOffset.value = s.lyricsOffset
     if (s.waveformEnabled === true) waveformEnabled.value = true
+    if (s.animatedCoversEnabled === true) animatedCoversEnabled.value = true
     if (s.adaptiveAccent === true) adaptiveAccent.value = true
     if (s.iosSliders === true) iosSliders.value = true
     if (s.transparencyEnabled === false) transparencyEnabled.value = false
@@ -821,6 +825,14 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
+  function setAnimatedCoversEnabled(enabled: boolean) {
+    animatedCoversEnabled.value = enabled
+    window.api.getSettings().then((s: any) => {
+      s.animatedCoversEnabled = enabled
+      window.api.saveSettings(s)
+    })
+  }
+
   function setAdaptiveAccent(enabled: boolean) {
     adaptiveAccent.value = enabled
     window.api.getSettings().then((s: any) => {
@@ -1035,6 +1047,9 @@ export const usePlayerStore = defineStore('player', () => {
     waveformEnabled,
     setWaveformEnabled,
     generateWaveform,
+    // Animated covers
+    animatedCoversEnabled,
+    setAnimatedCoversEnabled,
     // Adaptive accent
     adaptiveAccent,
     currentAccentColor,

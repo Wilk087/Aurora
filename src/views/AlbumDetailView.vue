@@ -2,7 +2,13 @@
   <div v-if="album" class="album-detail p-6">
     <!-- Album header -->
     <div class="flex items-end gap-6 mb-8">
-      <div class="w-56 h-56 rounded-2xl overflow-hidden bg-white/[0.06] shrink-0 cover-shadow">
+      <div class="w-56 h-56 rounded-2xl overflow-hidden bg-white/[0.06] shrink-0 cover-shadow relative">
+        <video
+          v-show="animatedCoverActive"
+          ref="animatedVideoEl"
+          class="w-full h-full object-cover absolute inset-0 z-10"
+          autoplay loop muted playsinline
+        />
         <img v-if="album.coverArt" :src="coverUrl" class="w-full h-full object-cover" />
         <div v-else class="w-full h-full flex items-center justify-center">
           <svg class="w-20 h-20 text-white/10" fill="currentColor" viewBox="0 0 24 24">
@@ -85,13 +91,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { useSelection } from '@/composables/useSelection'
 import SongRow from '@/components/SongRow.vue'
 import SelectionBar from '@/components/SelectionBar.vue'
+import Hls from 'hls.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -103,6 +110,87 @@ const selection = useSelection(() => album.value?.tracks ?? [])
 
 const coverUrl = computed(() =>
   album.value?.coverArt ? window.api.getMediaUrl(album.value.coverArt) : '',
+)
+
+// ── Animated cover (HLS stream) ─────────────────────────────────────────
+const animatedVideoEl = ref<HTMLVideoElement | null>(null)
+const animatedCoverActive = ref(false)
+let hlsInstance: Hls | null = null
+
+function destroyHls() {
+  if (hlsInstance) {
+    hlsInstance.destroy()
+    hlsInstance = null
+  }
+  animatedCoverActive.value = false
+}
+
+function attachHls(url: string) {
+  destroyHls()
+  const videoEl = animatedVideoEl.value
+  if (!videoEl) return
+
+  if (Hls.isSupported()) {
+    const hls = new Hls({
+      enableWorker: false,
+      maxBufferLength: 10,
+      maxMaxBufferLength: 30,
+    })
+    hls.loadSource(url)
+    hls.attachMedia(videoEl)
+    hls.on(Hls.Events.MANIFEST_PARSED, (_e, data) => {
+      const avcLevels = data.levels
+        .map((l: any, i: number) => ({ idx: i, codec: l.codecSet || '' }))
+        .filter((l: any) => !l.codec.includes('hvc') && !l.codec.includes('hev'))
+      if (avcLevels.length > 0) {
+        hls.currentLevel = avcLevels[avcLevels.length - 1].idx
+      }
+      videoEl.play().catch(() => {})
+      animatedCoverActive.value = true
+    })
+    hls.on(Hls.Events.ERROR, (_e, data) => {
+      if (data.fatal) destroyHls()
+    })
+    hlsInstance = hls
+  } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+    videoEl.src = url
+    videoEl.addEventListener('loadedmetadata', () => {
+      videoEl.play().catch(() => {})
+      animatedCoverActive.value = true
+    }, { once: true })
+  }
+}
+
+watch(
+  () => album.value,
+  async (a) => {
+    destroyHls()
+    if (!a || !player.animatedCoversEnabled) return
+    try {
+      const hlsUrl = await window.api.getAnimatedCover(a.name || '', a.artist || '')
+      if (hlsUrl && album.value?.id === a.id) {
+        await nextTick()
+        attachHls(hlsUrl)
+      }
+    } catch {}
+  },
+  { immediate: true },
+)
+
+watch(
+  () => player.animatedCoversEnabled,
+  (enabled) => {
+    if (!enabled) {
+      destroyHls()
+    } else if (album.value) {
+      const a = album.value
+      window.api.getAnimatedCover(a.name || '', a.artist || '').then((hlsUrl) => {
+        if (hlsUrl && album.value?.id === a.id) {
+          nextTick().then(() => attachHls(hlsUrl))
+        }
+      }).catch(() => {})
+    }
+  },
 )
 
 const totalDuration = computed(() => {
@@ -148,5 +236,8 @@ function onKeyDown(e: KeyboardEvent) {
 }
 
 onMounted(() => document.addEventListener('keydown', onKeyDown))
-onUnmounted(() => document.removeEventListener('keydown', onKeyDown))
+onUnmounted(() => {
+  document.removeEventListener('keydown', onKeyDown)
+  destroyHls()
+})
 </script>
