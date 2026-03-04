@@ -62,6 +62,13 @@
                     :album-artist="currentTrack.albumArtist"
                     hover-class="hover:text-white/60"
                   />
+                  <template v-if="currentTrack.album">
+                    <span class="text-white/20"> · </span>
+                    <span
+                      class="text-white/20 hover:text-white/50 hover:underline underline-offset-2 cursor-pointer transition-colors"
+                      @click.stop="goToAlbum(currentTrack)"
+                    >{{ currentTrack.album }}</span>
+                  </template>
                 </p>
               </div>
               <div class="flex items-center justify-center gap-[2px] shrink-0 w-5">
@@ -124,6 +131,13 @@
                       :album-artist="item.track.albumArtist"
                       hover-class="hover:text-white/50"
                     />
+                    <template v-if="item.track.album">
+                      <span class="text-white/15"> · </span>
+                      <span
+                        class="text-white/15 hover:text-white/40 hover:underline underline-offset-2 cursor-pointer transition-colors"
+                        @click.stop="goToAlbum(item.track)"
+                      >{{ item.track.album }}</span>
+                    </template>
                   </p>
                 </div>
                 <span class="text-[10px] text-white/20 tabular-nums shrink-0 font-mono">{{ formatTime(item.track.duration) }}</span>
@@ -173,6 +187,13 @@
                       :album-artist="item.track.albumArtist"
                       hover-class="hover:text-white/50"
                     />
+                    <template v-if="item.track.album">
+                      <span class="text-white/15"> · </span>
+                      <span
+                        class="text-white/15 hover:text-white/40 hover:underline underline-offset-2 cursor-pointer transition-colors"
+                        @click.stop="goToAlbum(item.track)"
+                      >{{ item.track.album }}</span>
+                    </template>
                   </p>
                 </div>
                 <span class="text-[10px] text-white/20 tabular-nums shrink-0 font-mono">{{ formatTime(item.track.duration) }}</span>
@@ -198,6 +219,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
+import { useLibraryStore } from '@/stores/library'
 import { formatTime } from '@/utils/formatTime'
 import ArtistLinks from '@/components/ArtistLinks.vue'
 
@@ -206,6 +228,7 @@ defineEmits(['close'])
 
 const router = useRouter()
 const player = usePlayerStore()
+const library = useLibraryStore()
 const showPrevious = ref(false)
 
 // ── Drag & drop state ──────────────────────────────────────
@@ -271,6 +294,15 @@ const previousTracks = computed(() => {
 
 function getCoverUrl(path: string) {
   return window.api.getMediaUrl(path)
+}
+
+function goToAlbum(track: Track) {
+  const album = library.albums.find(a =>
+    a.name === track.album && a.artist === (track.albumArtist || track.artist)
+  )
+  if (album) {
+    router.push(`/album/${album.id}`)
+  }
 }
 </script>
 

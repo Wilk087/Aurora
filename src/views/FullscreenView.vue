@@ -315,9 +315,17 @@
                 {{ player.currentTrack?.title }}
               </h2>
               <p class="text-sm text-white/40 mt-0.5 font-medium line-clamp-1">
-                {{ player.currentTrack?.artist }}
+                <ArtistLinks
+                  :artist="player.currentTrack?.artist ?? ''"
+                  :album-artist="player.currentTrack?.albumArtist"
+                  hover-class="hover:text-white/60"
+                />
                 <span v-if="player.currentTrack?.album" class="text-white/20"> · </span>
-                <span v-if="player.currentTrack?.album" class="text-white/20">{{ player.currentTrack?.album }}</span>
+                <span
+                  v-if="player.currentTrack?.album"
+                  class="text-white/20 hover:text-white/50 hover:underline underline-offset-2 cursor-pointer transition-colors"
+                  @click="goToAlbum"
+                >{{ player.currentTrack?.album }}</span>
               </p>
             </div>
           </div>
@@ -366,7 +374,8 @@
 
           <!-- Transport + Volume (hidden when collapsed) -->
           <div class="modern-controls-full">
-            <div class="flex items-center justify-center gap-5 mt-3">
+            <div class="pt-1 pb-2">
+            <div class="flex items-center justify-center gap-5 mt-2">
               <button
                 @click="player.toggleShuffle()"
                 class="w-10 h-10 flex items-center justify-center rounded-full transition-colors"
@@ -455,6 +464,7 @@
                   <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
                 </svg>
               </button>
+            </div>
             </div>
           </div>
         </div>
@@ -727,11 +737,12 @@ function attachHls(url: string) {
   }
 }
 
-async function fetchAnimatedCover(track: { album: string; artist: string }) {
-  const key = `${track.album}---${track.artist}`
+async function fetchAnimatedCover(track: { album: string; artist: string; albumArtist?: string }) {
+  const lookupArtist = track.albumArtist || track.artist
+  const key = `${track.album}---${lookupArtist}`
   animatedCoverAbort = key
   try {
-    const hlsUrl = await window.api.getAnimatedCover(track.album || '', track.artist || '')
+    const hlsUrl = await window.api.getAnimatedCover(track.album || '', lookupArtist || '')
     if (animatedCoverAbort !== key) return // track changed
     if (hlsUrl) {
       await nextTick() // ensure video element is in DOM
@@ -1036,22 +1047,21 @@ onUnmounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-  overflow: hidden;
 }
 .modern-controls-box.modern-controls-collapsed {
-  padding: 14px 24px 10px;
+  padding: 12px 24px;
   border-radius: 16px;
-  bottom: 52px;
+  bottom: 60px;
 }
 .modern-controls-full {
   display: grid;
   grid-template-rows: 1fr;
   opacity: 1;
   transition: grid-template-rows 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
-  overflow: hidden;
 }
 .modern-controls-full > * {
   overflow: hidden;
+  min-height: 0;
 }
 .modern-controls-collapsed .modern-controls-full {
   grid-template-rows: 0fr;
@@ -1061,6 +1071,7 @@ onUnmounted(() => {
 /* Header zone: overlays mini and full info at the same position */
 .modern-header-zone {
   display: grid;
+  position: relative;
 }
 .modern-header-zone > * {
   grid-area: 1 / 1;
@@ -1072,11 +1083,14 @@ onUnmounted(() => {
 .modern-header-mini {
   opacity: 0;
   transition: opacity 0.3s ease;
+  pointer-events: none;
 }
 .modern-controls-collapsed .modern-header-full {
   opacity: 0;
+  pointer-events: none;
 }
 .modern-controls-collapsed .modern-header-mini {
   opacity: 1;
+  pointer-events: auto;
 }
 </style>

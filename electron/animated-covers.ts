@@ -169,7 +169,7 @@ interface AppleMusicAlbum {
 async function searchAnimatedCover(album: string, artist: string): Promise<string | null> {
   const token = await getAppleMusicToken()
   const term = encodeURIComponent(`${album} ${artist}`)
-  const url = `https://amp-api.music.apple.com/v1/catalog/${STOREFRONT}/search?types=albums&term=${term}&limit=5&extend=editorialVideo`
+  const url = `https://amp-api.music.apple.com/v1/catalog/${STOREFRONT}/search?types=albums&term=${term}&limit=10&extend=editorialVideo`
 
   const raw = await fetchText(url, {
     Authorization: `Bearer ${token}`,
@@ -182,6 +182,8 @@ async function searchAnimatedCover(album: string, artist: string): Promise<strin
   // Find best match
   const normalizedAlbum = album.trim().toLowerCase()
   const normalizedArtist = artist.trim().toLowerCase()
+  // Split multi-artist strings for partial matching (e.g. "Metro Boomin" in "Metro Boomin, Swae Lee")
+  const artistParts = normalizedArtist.split(/[,;&]|\bfeat\.?\b|\bft\.?\b|\bwith\b/i).map(s => s.trim()).filter(Boolean)
 
   for (const a of albums) {
     const aName = a.attributes.name.trim().toLowerCase()
@@ -192,9 +194,11 @@ async function searchAnimatedCover(album: string, artist: string): Promise<strin
       aName.includes(normalizedAlbum) ||
       normalizedAlbum.includes(aName)
 
+    // Check artist match: full string match, contains, or any part matches
     const artistMatch = aArtist === normalizedArtist ||
       aArtist.includes(normalizedArtist) ||
-      normalizedArtist.includes(aArtist)
+      normalizedArtist.includes(aArtist) ||
+      artistParts.some(part => part.length > 2 && (aArtist.includes(part) || part.includes(aArtist)))
 
     if (nameMatch && artistMatch) {
       const ev = a.attributes.editorialVideo
