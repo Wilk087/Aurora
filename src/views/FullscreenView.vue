@@ -44,9 +44,9 @@
         </button>
       </div>
 
-      <!-- Main content area -->
-      <div class="flex-1 flex min-h-0">
-        <!-- Left side: cover art + track info + waveform (always visible) -->
+      <!-- Main content area: Default / Minimal mode -->
+      <div v-if="immersiveStyle !== 'artwork'" class="flex-1 flex min-h-0">
+        <!-- Left side: cover art + track info + waveform -->
         <div class="w-[45%] h-full flex flex-col items-center justify-center px-14 py-10 shrink-0">
           <!-- Album cover -->
           <div class="relative w-full transition-all duration-700 ease-out" :class="player.isPlaying ? 'max-w-[380px]' : 'max-w-[360px]'">
@@ -231,10 +231,40 @@
           </div>
         </div>
 
-        <!-- Right side: lyrics (always visible) -->
+        <!-- Right side: lyrics -->
         <div class="flex-1 h-full flex flex-col min-w-0">
           <div class="flex-1 overflow-hidden flex items-center justify-center">
             <FullscreenLyrics />
+          </div>
+        </div>
+      </div>
+
+      <!-- Main content area: Artwork mode (centered large cover) -->
+      <div v-else class="flex-1 flex items-center justify-center min-h-0">
+        <div
+          class="relative transition-all duration-700 ease-out"
+          :style="{ width: 'min(70vh, 70vw)' }"
+        >
+          <div
+            class="aspect-square rounded-3xl overflow-hidden shadow-2xl shadow-black/60 ring-1 ring-white/[0.06] transition-all duration-700 ease-out"
+            :class="player.isPlaying ? 'scale-100' : 'scale-[0.97] opacity-90'"
+          >
+            <video
+              v-show="animatedCoverActive"
+              ref="animatedVideoEl"
+              class="w-full h-full object-cover absolute inset-0 z-10"
+              autoplay loop muted playsinline
+            />
+            <img
+              v-if="player.currentTrack?.coverArt"
+              :src="coverUrl"
+              class="w-full h-full object-cover"
+            />
+            <div v-else class="w-full h-full bg-white/[0.06] flex items-center justify-center">
+              <svg class="w-40 h-40 text-white/10" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+              </svg>
+            </div>
           </div>
         </div>
       </div>
@@ -490,6 +520,14 @@ watch(
     }
   },
 )
+
+// Re-attach HLS when immersive style changes (video element is recreated)
+watch(immersiveStyle, () => {
+  destroyHls()
+  if (player.currentTrack && player.animatedCoversEnabled) {
+    nextTick(() => fetchAnimatedCover(player.currentTrack!))
+  }
+})
 
 // ── Extract dominant colors from cover art for fluid background ──────────
 const colors = ref<{ c1: string; c2: string; c3: string; c4: string }>({
