@@ -13,7 +13,7 @@
         class="absolute inset-0 transition-all duration-[2s] ease-out"
         :style="bgStyle"
       />
-      <div class="absolute inset-0 opacity-[0.03]" style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 /%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22 /%3E%3C/svg%3E')" />
+      <div v-if="immersiveStyle !== 'modern'" class="absolute inset-0 opacity-[0.03]" style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 /%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22 /%3E%3C/svg%3E')" />
     </div>
 
     <!-- ── Two-column layout ──────────────────────────────────── -->
@@ -44,8 +44,8 @@
         </button>
       </div>
 
-      <!-- Main content area: Default / Minimal mode -->
-      <div v-if="immersiveStyle !== 'artwork'" class="flex-1 flex min-h-0">
+      <!-- Main content area: Default mode -->
+      <div v-if="immersiveStyle === 'default'" class="flex-1 flex min-h-0">
         <!-- Left side: cover art + track info + waveform -->
         <div class="w-[45%] h-full flex flex-col items-center justify-center px-14 py-10 shrink-0">
           <!-- Album cover -->
@@ -239,8 +239,215 @@
         </div>
       </div>
 
+      <!-- Main content area: Modern mode (full-height cover + ambient fade + lyrics) -->
+      <div v-else-if="immersiveStyle === 'modern'" class="flex-1 flex min-h-0">
+        <!-- Blurred ambient backdrop (extends cover's colors into the transition zone) -->
+        <div class="absolute inset-0 z-[1] overflow-hidden pointer-events-none">
+          <img
+            v-if="player.currentTrack?.coverArt"
+            :src="coverUrl"
+            class="absolute top-0 left-0 w-[65%] h-full object-cover modern-ambient-blur"
+          />
+        </div>
+
+        <!-- Left: full-height cover with alpha mask -->
+        <div class="relative w-[50%] h-full shrink-0 z-[2]">
+          <div class="absolute inset-0 modern-cover-masked">
+            <video
+              v-show="animatedCoverActive"
+              ref="animatedVideoEl"
+              class="w-full h-full object-cover absolute inset-0 z-10"
+              autoplay loop muted playsinline
+            />
+            <img
+              v-if="player.currentTrack?.coverArt"
+              :src="coverUrl"
+              class="w-full h-full object-cover"
+            />
+            <div v-else class="w-full h-full bg-white/[0.06] flex items-center justify-center">
+              <svg class="w-40 h-40 text-white/10" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+              </svg>
+            </div>
+          </div>
+          <!-- Darkening vignette at transition zone -->
+          <div class="modern-vignette" />
+        </div>
+
+        <!-- Right: lyrics -->
+        <div class="flex-1 h-full flex flex-col min-w-0 z-[3]">
+          <div class="flex-1 overflow-hidden flex items-center justify-center">
+            <FullscreenLyrics />
+          </div>
+        </div>
+
+        <!-- Floating controls box -->
+        <div
+          class="modern-controls-box"
+          :class="{ 'modern-controls-collapsed': idle && !modernControlsHover }"
+          @mouseenter="modernControlsHover = true"
+          @mouseleave="modernControlsHover = false"
+        >
+          <!-- Track info (hidden when collapsed) -->
+          <div class="modern-controls-full">
+            <h2 class="text-lg font-bold text-white leading-tight line-clamp-1">
+              {{ player.currentTrack?.title }}
+            </h2>
+            <p class="text-sm text-white/50 mt-0.5 font-medium line-clamp-1">
+              <ArtistLinks
+                :artist="player.currentTrack?.artist ?? ''"
+                :album-artist="player.currentTrack?.albumArtist"
+                hover-class="hover:text-white/80"
+              />
+              <span v-if="player.currentTrack?.album" class="text-white/25"> · </span>
+              <span
+                v-if="player.currentTrack?.album"
+                class="text-white/25 hover:text-white/60 hover:underline underline-offset-2 cursor-pointer transition-colors"
+                @click="goToAlbum"
+              >{{ player.currentTrack?.album }}</span>
+            </p>
+          </div>
+
+          <!-- Progress / Waveform (always visible) -->
+          <div class="mt-2 w-full">
+            <div class="flex items-center gap-3">
+              <span class="text-xs text-white/50 w-10 text-right tabular-nums font-mono">
+                {{ formatTime(player.currentTime) }}
+              </span>
+
+              <div v-if="player.waveformEnabled && player.waveformData.length > 0" class="flex-1">
+                <WaveformBar
+                  :data="player.waveformData"
+                  :progress="player.progress"
+                  :duration="player.duration"
+                  @seek="(p) => player.seekPercent(p)"
+                />
+              </div>
+
+              <div v-else-if="!player.iosSliders" class="flex-1 relative group h-2">
+                <input
+                  type="range" min="0" max="100" step="0.1"
+                  :value="player.progress" @input="onProgressInput"
+                  class="fs-progress w-full h-2 rounded-full cursor-pointer relative z-10 opacity-0"
+                />
+                <div class="absolute inset-y-0 left-0 right-0 flex items-center pointer-events-none">
+                  <div class="w-full h-1.5 group-hover:h-2 rounded-full bg-white/15 transition-all overflow-hidden">
+                    <div class="h-full rounded-full bg-white/80" :style="{ width: player.progress + '%' }" />
+                  </div>
+                </div>
+              </div>
+
+              <IOSSlider
+                v-else
+                :value="player.progress" :min="0" :max="100" :step="0.1"
+                size="lg" fill-color="bg-white/80" class="flex-1"
+                @update="(v: number) => player.seekPercent(v)"
+              />
+
+              <span class="text-xs text-white/50 w-10 tabular-nums font-mono">
+                {{ formatTime(player.duration) }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Transport + Volume (hidden when collapsed) -->
+          <div class="modern-controls-full">
+            <div class="flex items-center justify-center gap-5 mt-3">
+              <button
+                @click="player.toggleShuffle()"
+                class="w-10 h-10 flex items-center justify-center rounded-full transition-colors"
+                :class="player.isShuffle ? 'text-accent' : 'text-white/30 hover:text-white/60'"
+              >
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" />
+                </svg>
+              </button>
+
+              <button
+                @click="player.previous()"
+                class="w-10 h-10 flex items-center justify-center rounded-full text-white/60 hover:text-white transition-colors"
+              >
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+                </svg>
+              </button>
+
+              <button
+                @click="player.togglePlay()"
+                class="w-12 h-12 flex items-center justify-center rounded-full bg-white text-black hover:scale-105 active:scale-95 transition-transform shadow-xl"
+              >
+                <svg v-if="player.isPlaying" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                </svg>
+                <svg v-else class="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </button>
+
+              <button
+                @click="player.next()"
+                class="w-10 h-10 flex items-center justify-center rounded-full text-white/60 hover:text-white transition-colors"
+              >
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+                </svg>
+              </button>
+
+              <button
+                @click="player.cycleRepeat()"
+                class="w-10 h-10 flex items-center justify-center rounded-full transition-colors relative"
+                :class="player.repeatMode !== 'off' ? 'text-accent' : 'text-white/30 hover:text-white/60'"
+              >
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" />
+                </svg>
+                <span v-if="player.repeatMode === 'one'" class="absolute -top-0.5 -right-0.5 text-[9px] font-bold text-accent">1</span>
+              </button>
+            </div>
+
+            <!-- Volume -->
+            <div class="flex items-center justify-center mt-2 px-6" @wheel.prevent="onVolumeWheel">
+              <button
+                @click="player.toggleMute()"
+                class="w-4 h-4 mr-2.5 flex items-center justify-center text-white/40 hover:text-white/70 transition-colors shrink-0"
+              >
+                <svg v-if="player.isMuted || player.volume === 0" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
+                </svg>
+                <svg v-else-if="player.volume < 0.5" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z" />
+                </svg>
+                <svg v-else class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+                </svg>
+              </button>
+
+              <div class="flex-1 relative group" v-if="!player.iosSliders">
+                <input
+                  type="range" min="0" max="1" step="0.01"
+                  :value="player.volume" @input="onVolumeInput"
+                  class="fs-volume w-full cursor-pointer relative z-10"
+                />
+                <div class="absolute top-1/2 left-0 -translate-y-1/2 h-[3px] rounded-full bg-white/15 w-full pointer-events-none" />
+                <div class="absolute top-1/2 left-0 -translate-y-1/2 h-[3px] rounded-full bg-white/70 pointer-events-none transition-all" :style="{ width: player.volume * 100 + '%' }" />
+              </div>
+              <IOSSlider v-else :value="player.volume" :min="0" :max="1" :step="0.01" class="flex-1" @update="(v: number) => player.setVolume(v)" />
+
+              <button
+                @click="player.toggleMute()"
+                class="w-4 h-4 ml-2.5 flex items-center justify-center text-white/40 hover:text-white/70 transition-colors shrink-0"
+              >
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Main content area: Artwork mode (centered large cover) -->
-      <div v-else class="flex-1 flex items-center justify-center min-h-0">
+      <div v-else-if="immersiveStyle === 'artwork'" class="flex-1 flex items-center justify-center min-h-0">
         <div
           class="relative transition-all duration-700 ease-out"
           :style="{ width: 'min(70vh, 70vw)' }"
@@ -400,13 +607,15 @@ const showQueue = ref(false)
 const showImmersiveMenu = ref(false)
 const showStyleDropdown = ref(false)
 const styleDropdownRef = ref<HTMLElement | null>(null)
+const modernControlsHover = ref(false)
 
 // ── Immersive settings ───────────────────────────────────────────────
 const IMMERSIVE_STYLE_KEY = 'aurora:immersive-style'
-const immersiveStyle = ref(localStorage.getItem(IMMERSIVE_STYLE_KEY) || 'default')
+const _storedStyle = localStorage.getItem(IMMERSIVE_STYLE_KEY) || 'default'
+const immersiveStyle = ref(['default', 'modern', 'artwork'].includes(_storedStyle) ? _storedStyle : 'default')
 const immersiveStyles = [
   { id: 'default', label: 'Default' },
-  { id: 'minimal', label: 'Minimal' },
+  { id: 'modern', label: 'Modern' },
   { id: 'artwork', label: 'Artwork' },
 ]
 const currentStyleLabel = computed(() =>
@@ -556,15 +765,33 @@ const colors = ref<{ c1: string; c2: string; c3: string; c4: string }>({
   c3: 'rgba(40,15,50,1)',
   c4: 'rgba(10,5,20,1)',
 })
+const brightColors = ref<{ c1: string; c2: string; c3: string; c4: string }>({
+  c1: 'rgba(50,20,70,0.95)',
+  c2: 'rgba(30,15,55,0.95)',
+  c3: 'rgba(60,25,75,0.95)',
+  c4: 'rgba(20,10,40,0.95)',
+})
 
-const bgStyle = computed(() => ({
-  background: `
-    radial-gradient(ellipse 80% 70% at 15% 60%, ${colors.value.c1} 0%, transparent 70%),
-    radial-gradient(ellipse 70% 80% at 85% 30%, ${colors.value.c2} 0%, transparent 65%),
-    radial-gradient(ellipse 60% 50% at 50% 90%, ${colors.value.c3} 0%, transparent 60%),
-    radial-gradient(ellipse 90% 60% at 30% 10%, ${colors.value.c4} 0%, transparent 70%)
-  `,
-}))
+const bgStyle = computed(() => {
+  const c = immersiveStyle.value === 'modern' ? brightColors.value : colors.value
+  return {
+    background: `
+      radial-gradient(ellipse 80% 70% at 15% 60%, ${c.c1} 0%, transparent 70%),
+      radial-gradient(ellipse 70% 80% at 85% 30%, ${c.c2} 0%, transparent 65%),
+      radial-gradient(ellipse 60% 50% at 50% 90%, ${c.c3} 0%, transparent 60%),
+      radial-gradient(ellipse 90% 60% at 30% 10%, ${c.c4} 0%, transparent 70%)
+    `,
+  }
+})
+
+// Fade style for modern cover (uses bright background colors)
+const modernFadeStyle = computed(() => {
+  const c = brightColors.value
+  // Average the extracted colors for a smooth single-tone fade
+  return {
+    background: `linear-gradient(to right, transparent 0%, ${c.c2} 70%, ${c.c1} 100%)`,
+  }
+})
 
 function extractColors(src: string) {
   const img = new Image()
@@ -604,6 +831,23 @@ function extractColors(src: string) {
     })
 
     colors.value = { c1: extracted[0], c2: extracted[1], c3: extracted[2], c4: extracted[3] }
+
+    // Brighter variant for Modern mode
+    const bright = quadrants.map((q) => {
+      let r = 0, g = 0, b = 0, count = 0
+      for (let y = q.sy; y < q.ey; y++) {
+        for (let x = q.sx; x < q.ex; x++) {
+          const i = (y * 16 + x) * 4
+          r += data[i]; g += data[i + 1]; b += data[i + 2]; count++
+        }
+      }
+      if (count === 0) return 'rgba(40,20,60,0.95)'
+      const br = Math.min(255, Math.round((r / count) * 0.7))
+      const bg = Math.min(255, Math.round((g / count) * 0.6))
+      const bb = Math.min(255, Math.round((b / count) * 0.75))
+      return `rgba(${br},${bg},${bb},0.95)`
+    })
+    brightColors.value = { c1: bright[0], c2: bright[1], c3: bright[2], c4: bright[3] }
   }
 }
 
@@ -730,4 +974,70 @@ onUnmounted(() => {
 .dropdown-leave-active { transition: all 0.1s ease-in; }
 .dropdown-enter-from, .dropdown-leave-to { opacity: 0; transform: translateY(-4px); }
 .dropdown-enter-to, .dropdown-leave-from { opacity: 1; transform: translateY(0); }
+
+/* ── Modern mode: multi-layer ambient fade ─────────────────── */
+
+/* Layer 1: Alpha gradient mask on the sharp cover ─ dissolves the right edge */
+.modern-cover-masked {
+  mask-image: linear-gradient(to right, black 0%, black 55%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black 0%, black 55%, transparent 100%);
+}
+
+/* Layer 2: Blurred ambient backdrop ─ smears cover hues into the transition */
+.modern-ambient-blur {
+  filter: blur(60px) saturate(1.4) brightness(0.7);
+  transform: scale(1.1); /* prevent blur edge artifacts */
+}
+
+/* Layer 3: Darkening vignette at the transition midpoint */
+.modern-vignette {
+  position: absolute;
+  top: 0;
+  right: -20%;
+  width: 40%;
+  height: 100%;
+  z-index: 25;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 50% 70% at 50% 50%,
+    rgba(0, 0, 0, 0.3) 0%,
+    transparent 100%
+  );
+}
+
+/* ── Modern mode: floating controls box ─────────────────────── */
+.modern-controls-box {
+  position: absolute;
+  left: 25%;
+  transform: translateX(-50%);
+  bottom: 40px;
+  z-index: 30;
+  width: 420px;
+  max-width: 90vw;
+  padding: 16px 20px;
+  border-radius: 20px;
+  background: rgba(14, 14, 28, 0.75);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+.modern-controls-box.modern-controls-collapsed {
+  padding: 10px 20px;
+  border-radius: 14px;
+  bottom: 28px;
+}
+.modern-controls-full {
+  max-height: 200px;
+  opacity: 1;
+  transition: max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease, margin 0.4s ease;
+  overflow: hidden;
+}
+.modern-controls-collapsed .modern-controls-full {
+  max-height: 0;
+  opacity: 0;
+  margin: 0;
+}
 </style>
