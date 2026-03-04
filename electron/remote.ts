@@ -182,17 +182,23 @@ function sendCommand(command: string, data?: any) {
   mainWindow.webContents.send('remote:command', command, data)
 }
 
-// ── Get LAN IP ──────────────────────────────────────────────────────────────
+// ── Get LAN IPs ─────────────────────────────────────────────────────────────
 export function getLanIp(): string {
+  const ips = getAllLanIps()
+  return ips.length > 0 ? ips[0] : '127.0.0.1'
+}
+
+export function getAllLanIps(): string[] {
+  const ips: string[] = []
   const nets = networkInterfaces()
   for (const name of Object.keys(nets)) {
     for (const net of nets[name] || []) {
       if (net.family === 'IPv4' && !net.internal) {
-        return net.address
+        ips.push(net.address)
       }
     }
   }
-  return '127.0.0.1'
+  return ips
 }
 
 // ── IPC request/response with timeout ───────────────────────────────────────
@@ -447,6 +453,7 @@ export function registerRemoteIPC(getDataPath: () => string) {
         lastSeen: d.lastSeen,
       })),
       lanIp: getLanIp(),
+      lanIps: getAllLanIps(),
       port: PORT,
     }
   })

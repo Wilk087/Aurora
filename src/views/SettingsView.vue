@@ -591,8 +591,12 @@
           <div class="p-3 rounded-xl bg-white/[0.04] border border-white/[0.06]">
             <p class="text-[10px] font-semibold uppercase tracking-wider text-white/30 mb-2">Connection</p>
             <div class="flex items-center gap-3">
-              <div class="flex-1">
-                <p class="text-sm text-white/70 font-mono select-all">http://{{ remoteLanIp }}:{{ remotePort }}</p>
+              <div class="flex-1 space-y-0.5">
+                <p
+                  v-for="ip in remoteLanIps"
+                  :key="ip"
+                  class="text-sm text-white/70 font-mono select-all"
+                >http://{{ ip }}:{{ remotePort }}</p>
               </div>
               <div class="flex items-center gap-2">
                 <span class="text-[10px] font-semibold uppercase tracking-wider text-white/30">PIN</span>
@@ -914,6 +918,7 @@ const importing = ref(false)
 // Remote Control
 const remoteEnabled = ref(false)
 const remoteLanIp = ref('')
+const remoteLanIps = ref<string[]>([])
 const remotePort = ref(19876)
 const remotePin = ref('')
 const remoteTrustedDevices = ref<{ name: string; ip: string; createdAt: number; lastSeen: number }[]>([])
@@ -987,6 +992,7 @@ onMounted(async () => {
     const rc = await window.api.getRemoteConfig()
     remoteEnabled.value = rc.enabled
     remoteLanIp.value = rc.lanIp
+    remoteLanIps.value = rc.lanIps || [rc.lanIp]
     remotePort.value = rc.port
     remotePin.value = rc.pin
     remoteTrustedDevices.value = rc.trustedDevices
@@ -1011,6 +1017,7 @@ async function toggleRemote() {
     await window.api.remoteStartServer()
     const rc = await window.api.getRemoteConfig()
     remoteLanIp.value = rc.lanIp
+    remoteLanIps.value = rc.lanIps || [rc.lanIp]
     remotePort.value = rc.port
     remotePin.value = rc.pin
     remoteTrustedDevices.value = rc.trustedDevices
