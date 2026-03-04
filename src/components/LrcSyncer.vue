@@ -294,10 +294,13 @@ function undoLast() {
 }
 
 function resetAll() {
+  // Remove instrumental lines (empty text) that were added dynamically
+  lines.value = lines.value.filter(l => l.text.length > 0)
   for (const line of lines.value) {
     line.time = null
   }
   currentStampIndex.value = 0
+  lineElRefs.value = {}
   nextTick(() => {
     const el = lineElRefs.value[0]
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
