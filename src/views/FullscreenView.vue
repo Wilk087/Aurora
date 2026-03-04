@@ -2,6 +2,7 @@
   <div
     v-if="player.currentTrack"
     class="fullscreen-view fixed inset-0 z-[100] select-none"
+    :class="{ 'cursor-none': idle }"
     @mousemove="onMouseActivity"
     @mousedown="onMouseActivity"
     @dblclick.self="exitFullscreen"
