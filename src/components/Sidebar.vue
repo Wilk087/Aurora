@@ -171,6 +171,18 @@
       </div>
     </Teleport>
 
+    <!-- Delete confirmation dialog -->
+    <ConfirmDialog
+      :show="deleteDialog.show"
+      title="Delete Playlist"
+      :message="`Are you sure you want to delete &quot;${deleteDialog.playlistName}&quot;? This action cannot be undone.`"
+      confirm-label="Delete"
+      cancel-label="Cancel"
+      variant="danger"
+      @confirm="onDeleteConfirm"
+      @cancel="deleteDialog.show = false"
+    />
+
     <!-- Spacer -->
     <div class="flex-1" />
 
@@ -201,11 +213,23 @@ import { useRouter, useRoute } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { usePlaylistStore, type PlaylistSortOrder } from '@/stores/playlist'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 const router = useRouter()
 const route = useRoute()
 const player = usePlayerStore()
 const library = useLibraryStore()
 const playlistStore = usePlaylistStore()
+
+// ── Delete confirmation dialog ─────────────────────────────────────────
+const deleteDialog = reactive({ show: false, playlistName: '', playlistId: '' })
+
+function onDeleteConfirm() {
+  playlistStore.deletePlaylist(deleteDialog.playlistId)
+  if (route.path === `/playlist/${deleteDialog.playlistId}`) {
+    router.replace('/playlists')
+  }
+  deleteDialog.show = false
+}
 
 // ── Playlist context menu ──────────────────────────────────────────────
 const plCtx = reactive({ show: false, x: 0, y: 0, playlist: null as Playlist | null })
@@ -229,13 +253,9 @@ function renamePlaylistPrompt() {
 function deletePlaylistConfirm() {
   plCtx.show = false
   if (!plCtx.playlist) return
-  if (window.confirm(`Delete "${plCtx.playlist.name}"?`)) {
-    playlistStore.deletePlaylist(plCtx.playlist.id)
-    // Navigate away if currently viewing the deleted playlist
-    if (route.path === `/playlist/${plCtx.playlist.id}`) {
-      router.replace('/playlists')
-    }
-  }
+  deleteDialog.playlistName = plCtx.playlist.name
+  deleteDialog.playlistId = plCtx.playlist.id
+  deleteDialog.show = true
 }
 
 function playPlaylist(shuffle: boolean) {
