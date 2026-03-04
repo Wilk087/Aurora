@@ -199,6 +199,8 @@ interface Window {
     sendRemoteState: (state: any) => void
     onRemoteDeviceAdded: (callback: (device: { name: string; ip: string }) => void) => void
     removeRemoteDeviceAddedListener: () => void
+    onRemotePinChanged: (callback: (pin: string) => void) => void
+    removeRemotePinChangedListener: () => void
     getRemoteConfig: () => Promise<{ enabled: boolean; pin: string; trustedDevices: { name: string; ip: string; createdAt: number; lastSeen: number }[]; lanIp: string; port: number }>
     setRemoteEnabled: (enabled: boolean) => Promise<{ enabled: boolean }>
     remoteRegeneratePin: () => Promise<{ pin: string }>
