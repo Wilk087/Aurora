@@ -94,11 +94,11 @@ export const usePlayerStore = defineStore('player', () => {
 
   // ── Waveform data ──────────────────────────────────────────────────────
   const waveformData = ref<number[]>([])
-  const waveformEnabled = ref(false)
+  const waveformEnabled = ref(true)
   const waveformCache = new Map<string, number[]>()
 
   // ── Animated covers ────────────────────────────────────────────────────
-  const animatedCoversEnabled = ref(false)
+  const animatedCoversEnabled = ref(true)
 
   async function generateWaveform(trackPath: string) {
     if (waveformCache.has(trackPath)) {
@@ -123,7 +123,7 @@ export const usePlayerStore = defineStore('player', () => {
   const currentAccentColor = ref<string | null>(null)
 
   // ── iOS-style sliders ──────────────────────────────────────────────────
-  const iosSliders = ref(false)
+  const iosSliders = ref(true)
 
   // ── Transparency ───────────────────────────────────────────────────
   const transparencyEnabled = ref(true) // default on
@@ -284,10 +284,10 @@ export const usePlayerStore = defineStore('player', () => {
     if (s.repeatMode && ['off', 'all', 'one'].includes(s.repeatMode)) repeatMode.value = s.repeatMode
     if (s.muted === true) { isMuted.value = true; audio.muted = true }
     if (s.lyricsOffset !== undefined) lyricsOffset.value = s.lyricsOffset
-    if (s.waveformEnabled === true) waveformEnabled.value = true
-    if (s.animatedCoversEnabled === true) animatedCoversEnabled.value = true
+    if (typeof s.waveformEnabled === 'boolean') waveformEnabled.value = s.waveformEnabled
+    if (typeof s.animatedCoversEnabled === 'boolean') animatedCoversEnabled.value = s.animatedCoversEnabled
     if (s.adaptiveAccent === true) adaptiveAccent.value = true
-    if (s.iosSliders === true) iosSliders.value = true
+    if (typeof s.iosSliders === 'boolean') iosSliders.value = s.iosSliders
     if (s.transparencyEnabled === false) transparencyEnabled.value = false
     if (s.autoFullscreen === true) autoFullscreen.value = true
     if (s.autoFullscreenDelay !== undefined) autoFullscreenDelay.value = s.autoFullscreenDelay
