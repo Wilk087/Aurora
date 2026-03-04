@@ -32,6 +32,9 @@
     <!-- Bottom player bar -->
     <PlayerBar v-if="player.currentTrack && !isFullscreen" />
 
+    <!-- First-time setup wizard -->
+    <SetupWizard v-if="showSetupWizard" @complete="showSetupWizard = false" />
+
     <!-- Toast notifications -->
     <ToastContainer />
 
@@ -52,6 +55,7 @@ import Sidebar from '@/components/Sidebar.vue'
 import PlayerBar from '@/components/PlayerBar.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
 import UpdateBanner from '@/components/UpdateBanner.vue'
+import SetupWizard from '@/components/SetupWizard.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -67,6 +71,7 @@ const favoritesStore = useFavoritesStore()
 const dynamicColor = ref<string | null>(null)
 const isWindowMaximized = ref(false)
 const isWindowFullscreen = ref(false)
+const showSetupWizard = ref(false)
 
 const isFullscreen = computed(() => route.path === '/fullscreen')
 
@@ -92,6 +97,11 @@ onMounted(async () => {
   if (settings.volume !== undefined) player.setVolume(settings.volume)
   if (settings.sortOrder) library.sortOrder = settings.sortOrder
   if (settings.albumSortOrder) library.albumSortOrder = settings.albumSortOrder
+
+  // Show first-time setup wizard if not completed
+  if (!settings.setupComplete) {
+    showSetupWizard.value = true
+  }
 
   // Restore last open tab
   if (settings.lastTab && settings.lastTab !== '/') {
