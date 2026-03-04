@@ -29,8 +29,31 @@
                 <!-- Step 0: Welcome -->
                 <div v-if="step === 0" key="welcome" class="wizard-step-content">
                   <div class="flex flex-col items-center text-center pt-4">
-                    <div class="w-16 h-16 rounded-2xl bg-accent/20 flex items-center justify-center mb-5">
-                      <div class="w-6 h-6 rounded-full bg-accent" />
+                    <div class="w-16 h-16 rounded-2xl mb-5 overflow-hidden">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" class="w-full h-full">
+                        <defs>
+                          <linearGradient id="wiz-bg" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#1a1025"/>
+                            <stop offset="100%" stop-color="#0d0b12"/>
+                          </linearGradient>
+                          <linearGradient id="wiz-aurora" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stop-color="#8b5cf6"/>
+                            <stop offset="50%" stop-color="#a78bfa"/>
+                            <stop offset="100%" stop-color="#c4b5fd"/>
+                          </linearGradient>
+                          <linearGradient id="wiz-glow" x1="0.5" y1="0" x2="0.5" y2="1">
+                            <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.6"/>
+                            <stop offset="100%" stop-color="#6d28d9" stop-opacity="0"/>
+                          </linearGradient>
+                        </defs>
+                        <rect width="512" height="512" rx="108" ry="108" fill="url(#wiz-bg)"/>
+                        <ellipse cx="256" cy="180" rx="200" ry="120" fill="url(#wiz-glow)" opacity="0.4"/>
+                        <g transform="translate(256,256)">
+                          <circle cx="0" cy="0" r="140" fill="none" stroke="url(#wiz-aurora)" stroke-width="8" opacity="0.3"/>
+                          <circle cx="0" cy="0" r="90" fill="none" stroke="url(#wiz-aurora)" stroke-width="4" opacity="0.15"/>
+                          <polygon points="-40,-65 -40,65 60,0" fill="url(#wiz-aurora)"/>
+                        </g>
+                      </svg>
                     </div>
                     <h2 class="text-2xl font-bold text-white mb-2">Welcome to Aurora</h2>
                     <p class="text-sm text-white/40 leading-relaxed max-w-[340px]">
@@ -182,9 +205,10 @@
                   <div class="flex items-center gap-2 mb-1">
                     <h2 class="text-lg font-semibold text-white">Discord Rich Presence</h2>
                     <!-- Discord icon -->
-                    <svg class="w-5 h-5 text-[#5865F2]/80" viewBox="0 0 24 24" fill="currentColor">
+                    <!--<svg class="w-5 h-5 text-[#5865F2]/80" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03z" />
-                    </svg>
+                    </svg>-->
+                      <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-yellow-500/20 text-yellow-400 uppercase tracking-wider">WIP</span>
                   </div>
                   <p class="text-xs text-white/35 mb-5">Show what you're listening to on your Discord profile. You can customize everything later in Settings.</p>
 
@@ -393,7 +417,7 @@
                   ? 'bg-green-500/80 hover:bg-green-500/90 shadow-lg shadow-green-500/20'
                   : 'bg-accent hover:bg-accent-hover shadow-lg shadow-accent/20'"
               >
-                {{ step === 0 ? 'Get Started' : step === lastStep ? 'Start Listening' : step === 1 && library.folders.length === 0 ? 'Skip for Now' : 'Continue' }}
+                {{ step === 0 ? 'Get Started' : step === lastStep ? 'Start Listening' : showSkip ? 'Skip' : 'Continue' }}
               </button>
             </div>
           </div>
@@ -404,7 +428,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 
@@ -461,6 +485,15 @@ const visible = ref(true)
 const step = ref(0)
 const lastStep = 7 // welcome(0), folders(1), appearance(2), playback(3), discord(4), subsonic(5), remote(6), done(7)
 const totalSteps = Array.from({ length: lastStep + 1 })
+
+/** Show "Skip" instead of "Continue" when the step has nothing configured */
+const showSkip = computed(() => {
+  if (step.value === 1) return library.folders.length === 0
+  if (step.value === 4) return !discordEnabled.value
+  if (step.value === 5) return !subsonicUrl.value && !subsonicUsername.value && !subsonicPassword.value
+  if (step.value === 6) return !remoteEnabled.value
+  return false
+})
 
 /**
  * Image slots for each step — add images here later.
