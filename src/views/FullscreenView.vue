@@ -5,7 +5,6 @@
     :class="{ 'cursor-none': idle }"
     @mousemove="onMouseActivity"
     @mousedown="onMouseActivity"
-    @click="showImmersiveMenu = false"
     @dblclick.self="exitFullscreen"
   >
     <!-- ── Fluid gradient background from cover colors ─────────── -->
@@ -241,7 +240,7 @@
       </div>
     </div>
 
-    <!-- Immersive settings menu (top-left, fades with idle) -->
+    <!-- Immersive settings button (top-left, fades with idle) -->
     <div
       class="absolute top-0 left-0 p-6 z-20 fs-fade"
       :class="idle && !showImmersiveMenu ? 'fs-idle' : ''"
@@ -257,34 +256,76 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
       </button>
+    </div>
 
-      <!-- Dropdown panel -->
-      <Transition name="immersive-menu">
+    <!-- Immersive Settings Panel (slide from left, like Queue) -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div v-if="showImmersiveMenu" class="fixed inset-0 z-[80] bg-black/50" @click="showImmersiveMenu = false" />
+      </Transition>
+      <Transition name="slide-left">
         <div
           v-if="showImmersiveMenu"
-          class="mt-2 w-64 rounded-2xl bg-[#12121f]/90 backdrop-blur-2xl border border-white/[0.08] shadow-2xl p-4 space-y-4"
-          @click.stop
+          class="fixed top-0 left-0 bottom-0 z-[85] w-[300px] max-w-[85vw] flex flex-col bg-[#0e0e1c]/95 backdrop-blur-2xl border-r border-white/[0.08] shadow-2xl"
         >
-          <!-- Style preset -->
-          <div>
-            <p class="text-[10px] font-semibold uppercase tracking-wider text-white/30 mb-2">Style</p>
-            <div class="flex gap-2">
-              <button
-                v-for="style in immersiveStyles"
-                :key="style.id"
-                @click="immersiveStyle = style.id"
-                class="flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors"
-                :class="immersiveStyle === style.id
-                  ? 'bg-accent/20 text-accent border border-accent/30'
-                  : 'bg-white/[0.06] text-white/50 hover:text-white/70 border border-transparent hover:border-white/[0.08]'"
-              >
-                {{ style.label }}
-              </button>
+          <!-- Header -->
+          <div class="flex items-center justify-between px-5 pt-5 pb-4 shrink-0">
+            <div>
+              <h2 class="text-base font-bold text-white">Settings</h2>
+              <p class="text-[11px] text-white/30 mt-0.5">Immersive mode</p>
+            </div>
+            <button
+              @click="showImmersiveMenu = false"
+              class="w-8 h-8 flex items-center justify-center rounded-lg text-white/30 hover:text-white hover:bg-white/[0.08] transition-colors"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Content -->
+          <div class="flex-1 overflow-y-auto px-5 pb-5 space-y-5">
+            <!-- Style -->
+            <div>
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-white/25 mb-2">Style</p>
+              <div class="relative" ref="styleDropdownRef">
+                <button
+                  @click.stop="showStyleDropdown = !showStyleDropdown"
+                  class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.08] hover:border-white/[0.12] transition-colors"
+                >
+                  <span class="text-sm text-white/70">{{ currentStyleLabel }}</span>
+                  <svg class="w-4 h-4 text-white/30 transition-transform" :class="showStyleDropdown ? 'rotate-180' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                <Transition name="dropdown">
+                  <div
+                    v-if="showStyleDropdown"
+                    class="absolute top-full left-0 right-0 mt-1.5 rounded-xl bg-[#16162a]/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl py-1 z-10"
+                  >
+                    <button
+                      v-for="style in immersiveStyles"
+                      :key="style.id"
+                      @click="immersiveStyle = style.id; showStyleDropdown = false"
+                      class="w-full flex items-center justify-between px-3.5 py-2 text-sm transition-colors"
+                      :class="immersiveStyle === style.id
+                        ? 'text-accent bg-accent/[0.08]'
+                        : 'text-white/60 hover:text-white hover:bg-white/[0.06]'"
+                    >
+                      <span>{{ style.label }}</span>
+                      <svg v-if="immersiveStyle === style.id" class="w-4 h-4 text-accent" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                      </svg>
+                    </button>
+                  </div>
+                </Transition>
+              </div>
             </div>
           </div>
         </div>
       </Transition>
-    </div>
+    </Teleport>
 
     <!-- Queue Panel -->
     <QueuePanel :show="showQueue" @close="showQueue = false" />
@@ -309,6 +350,8 @@ const player = usePlayerStore()
 const library = useLibraryStore()
 const showQueue = ref(false)
 const showImmersiveMenu = ref(false)
+const showStyleDropdown = ref(false)
+const styleDropdownRef = ref<HTMLElement | null>(null)
 
 // ── Immersive settings ───────────────────────────────────────────────
 const immersiveStyle = ref('default')
@@ -317,6 +360,9 @@ const immersiveStyles = [
   { id: 'minimal', label: 'Minimal' },
   { id: 'artwork', label: 'Artwork' },
 ]
+const currentStyleLabel = computed(() =>
+  immersiveStyles.find(s => s.id === immersiveStyle.value)?.label ?? 'Default'
+)
 
 // ── Idle / Active state ──────────────────────────────────────────────
 const idle = ref(false)
@@ -614,9 +660,16 @@ onUnmounted(() => {
   opacity: 1;
 }
 
-/* ── Immersive menu transition ────────────────────────────────── */
-.immersive-menu-enter-active { transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
-.immersive-menu-leave-active { transition: all 0.15s ease-in; }
-.immersive-menu-enter-from, .immersive-menu-leave-to { opacity: 0; transform: translateY(-4px) scale(0.97); }
-.immersive-menu-enter-to, .immersive-menu-leave-from { opacity: 1; transform: translateY(0) scale(1); }
+/* ── Immersive panel slide from left ──────────────────────────── */
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+.slide-left-enter-active { transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+.slide-left-leave-active { transition: transform 0.2s ease-in; }
+.slide-left-enter-from, .slide-left-leave-to { transform: translateX(-100%); }
+
+/* ── Dropdown transition ─────────────────────────────────────── */
+.dropdown-enter-active { transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1); }
+.dropdown-leave-active { transition: all 0.1s ease-in; }
+.dropdown-enter-from, .dropdown-leave-to { opacity: 0; transform: translateY(-4px); }
+.dropdown-enter-to, .dropdown-leave-from { opacity: 1; transform: translateY(0); }
 </style>
