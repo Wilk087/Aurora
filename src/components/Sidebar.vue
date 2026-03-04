@@ -183,6 +183,50 @@
       @cancel="deleteDialog.show = false"
     />
 
+    <!-- Rename dialog -->
+    <Teleport to="body">
+      <Transition name="fade">
+        <div v-if="renameDialog.show" class="fixed inset-0 z-[80] bg-black/50" @click="renameDialog.show = false" />
+      </Transition>
+      <Transition name="dialog-slide">
+        <div
+          v-if="renameDialog.show"
+          class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[90] w-[360px] max-w-[90vw] rounded-2xl bg-[#12121f]/95 backdrop-blur-2xl border border-white/[0.08] shadow-2xl"
+        >
+          <div class="p-6">
+            <div class="w-10 h-10 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center mb-4">
+              <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" />
+              </svg>
+            </div>
+            <h3 class="text-base font-semibold text-white mb-3">Rename Playlist</h3>
+            <input
+              ref="renameInput"
+              v-model="renameDialog.name"
+              @keydown.enter="onRenameConfirm"
+              @keydown.escape="renameDialog.show = false"
+              class="w-full px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/20 outline-none focus:border-accent/40 transition-colors"
+              placeholder="Playlist name"
+            />
+            <div class="flex items-center justify-end gap-2.5 mt-6">
+              <button
+                @click="renameDialog.show = false"
+                class="px-4 py-2 rounded-lg text-sm font-medium text-white/60 hover:text-white hover:bg-white/[0.06] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                @click="onRenameConfirm"
+                class="px-4 py-2 rounded-lg text-sm font-medium bg-accent/20 text-accent hover:bg-accent/30 border border-accent/20 transition-colors"
+              >
+                Rename
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- Spacer -->
     <div class="flex-1" />
 
@@ -208,7 +252,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, computed } from 'vue'
+import { ref, reactive, watch, computed, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
@@ -241,13 +285,28 @@ function openPlaylistCtx(e: MouseEvent, pl: Playlist) {
   plCtx.show = true
 }
 
+// ── Rename dialog ──────────────────────────────────────────────────────
+const renameDialog = reactive({ show: false, playlistId: '', name: '' })
+const renameInput = ref<HTMLInputElement | null>(null)
+
 function renamePlaylistPrompt() {
   plCtx.show = false
   if (!plCtx.playlist) return
-  const newName = window.prompt('Rename playlist:', plCtx.playlist.name)
-  if (newName && newName.trim() && newName.trim() !== plCtx.playlist.name) {
-    playlistStore.renamePlaylist(plCtx.playlist.id, newName.trim())
+  renameDialog.playlistId = plCtx.playlist.id
+  renameDialog.name = plCtx.playlist.name
+  renameDialog.show = true
+  nextTick(() => {
+    renameInput.value?.focus()
+    renameInput.value?.select()
+  })
+}
+
+function onRenameConfirm() {
+  const trimmed = renameDialog.name.trim()
+  if (trimmed && trimmed !== plCtx.playlist?.name) {
+    playlistStore.renamePlaylist(renameDialog.playlistId, trimmed)
   }
+  renameDialog.show = false
 }
 
 function deletePlaylistConfirm() {
@@ -330,3 +389,12 @@ const navItems = [
   },
 ]
 </script>
+
+<style scoped>
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+.dialog-slide-enter-active { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+.dialog-slide-leave-active { transition: all 0.2s ease-in; }
+.dialog-slide-enter-from, .dialog-slide-leave-to { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
+.dialog-slide-enter-to, .dialog-slide-leave-from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+</style>
