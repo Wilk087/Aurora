@@ -1274,6 +1274,10 @@ app.whenReady().then(async () => {
     if (!mainWindow) return
     mainWindow.setFullScreen(false)
   })
+  ipcMain.on('window:set-opacity', (_, value: number) => {
+    if (!mainWindow) return
+    mainWindow.setOpacity(Math.max(0.1, Math.min(1, value)))
+  })
 
   // ── IPC: MPRIS updates (renderer → main → D-Bus) ──
   ipcMain.on('mpris:metadata', (_, data) => updateMprisMetadata(data))
