@@ -352,6 +352,24 @@
                 </Transition>
               </div>
             </div>
+
+            <!-- Animated Covers -->
+            <div>
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-white/25 mb-2">Media</p>
+              <label class="flex items-center justify-between cursor-pointer">
+                <span class="text-sm text-white/70">Animated covers</span>
+                <button
+                  @click="player.setAnimatedCoversEnabled(!player.animatedCoversEnabled)"
+                  class="relative w-9 h-5 rounded-full transition-colors duration-200"
+                  :class="player.animatedCoversEnabled ? 'bg-accent' : 'bg-white/15'"
+                >
+                  <span
+                    class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200"
+                    :class="player.animatedCoversEnabled ? 'translate-x-4' : ''"
+                  />
+                </button>
+              </label>
+            </div>
           </div>
         </div>
       </Transition>
@@ -384,7 +402,8 @@ const showStyleDropdown = ref(false)
 const styleDropdownRef = ref<HTMLElement | null>(null)
 
 // ── Immersive settings ───────────────────────────────────────────────
-const immersiveStyle = ref('default')
+const IMMERSIVE_STYLE_KEY = 'aurora:immersive-style'
+const immersiveStyle = ref(localStorage.getItem(IMMERSIVE_STYLE_KEY) || 'default')
 const immersiveStyles = [
   { id: 'default', label: 'Default' },
   { id: 'minimal', label: 'Minimal' },
@@ -393,6 +412,7 @@ const immersiveStyles = [
 const currentStyleLabel = computed(() =>
   immersiveStyles.find(s => s.id === immersiveStyle.value)?.label ?? 'Default'
 )
+watch(immersiveStyle, (v) => localStorage.setItem(IMMERSIVE_STYLE_KEY, v))
 
 // ── Idle / Active state ──────────────────────────────────────────────
 const idle = ref(false)
