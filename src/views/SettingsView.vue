@@ -189,19 +189,46 @@
             </option>
           </select>
         </div>
-        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05] opacity-50">
+        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
           <div>
-            <p class="text-sm text-white/80">Exclusive Mode <span class="ml-1.5 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded bg-yellow-500/20 text-yellow-400/80">WIP</span></p>
-            <p class="text-xs text-white/30 mt-0.5">Not available — Chromium audio backend does not support exclusive device access</p>
+            <p class="text-sm text-white/80">Exclusive Mode</p>
+            <p class="text-xs text-white/30 mt-0.5">
+              {{ exclusiveModeDescription }}
+            </p>
+            <p v-if="exclusiveNeedsRestart" class="text-xs text-yellow-400/70 mt-1 flex items-center gap-1">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+              </svg>
+              Restart required to apply
+            </p>
           </div>
           <button
-            disabled
-            class="relative w-11 h-6 rounded-full transition-colors duration-200 cursor-not-allowed bg-white/15"
+            @click="toggleExclusive"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="exclusiveMode ? 'bg-accent' : 'bg-white/15'"
           >
             <div
-              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200 translate-x-0.5"
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              :class="exclusiveMode ? 'translate-x-[22px]' : 'translate-x-0.5'"
             />
           </button>
+        </div>
+        <!-- ALSA device picker (Linux only, shown when exclusive is on) -->
+        <div v-if="exclusiveMode && isLinux" class="px-4 py-3 rounded-xl bg-white/[0.05]">
+          <p class="text-sm text-white/80 mb-1.5">ALSA Output Device</p>
+          <p class="text-xs text-white/30 mb-2">Select a hardware device to bypass PipeWire/PulseAudio. Uses the ALSA <code class="text-white/40">hw:</code> interface for direct, exclusive access.</p>
+          <select
+            v-model="exclusiveAlsaDevice"
+            @change="onAlsaDeviceChange"
+            class="w-full px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white/70 outline-none focus:border-accent/40 transition-colors"
+            :disabled="alsaLoading"
+          >
+            <option value="">None (use PipeWire/PulseAudio)</option>
+            <option v-for="d in alsaDevices" :key="d.id" :value="d.id">
+              {{ d.label }}
+            </option>
+          </select>
+          <p v-if="alsaDevices.length === 0 && !alsaLoading" class="text-xs text-white/25 mt-1.5">No ALSA hardware devices found. Make sure <code class="text-white/35">alsa-utils</code> is installed.</p>
         </div>
       </div>
     </section>
@@ -841,13 +868,13 @@
     </section>
   </div>
 
-  <!-- Restart dialog after import -->
+  <!-- Restart dialog -->
   <Teleport to="body">
     <Transition name="fade">
       <div v-if="showRestartDialog" class="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
         <div class="bg-[#1a1a1a] border border-white/[0.08] rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
-          <h3 class="text-lg font-semibold text-white mb-2">Restart to Apply</h3>
-          <p class="text-sm text-white/50 mb-6">Settings were imported successfully. Restart the app to fully apply all changes?</p>
+          <h3 class="text-lg font-semibold text-white mb-2">{{ restartDialogTitle }}</h3>
+          <p class="text-sm text-white/50 mb-6">{{ restartDialogMessage }}</p>
           <div class="flex items-center justify-end gap-3">
             <button
               @click="dismissRestart"
@@ -891,6 +918,28 @@ const discordClientId = ref('')
 // Audio output
 const selectedDevice = ref('')
 const exclusiveMode = ref(false)
+const exclusiveModeActiveAtStartup = ref(false) // whether flags were applied at process level
+const exclusivePlatform = ref('')
+const exclusiveAlsaDevice = ref('') // selected ALSA hw: device for Linux exclusive
+const alsaDevices = ref<{ id: string; name: string; label: string }[]>([])
+const alsaLoading = ref(false)
+
+const exclusiveNeedsRestart = computed(() => {
+  // Restart needed when the setting doesn't match the active process state
+  return exclusiveMode.value !== exclusiveModeActiveAtStartup.value
+})
+
+const isLinux = computed(() => exclusivePlatform.value === 'linux')
+
+const exclusiveModeDescription = computed(() => {
+  if (exclusivePlatform.value === 'win32') {
+    return 'Bypass Windows audio mixer (WASAPI Exclusive) for bit-perfect output'
+  }
+  if (exclusiveAlsaDevice.value) {
+    return `ALSA exclusive output to ${exclusiveAlsaDevice.value} — bypasses PipeWire/PulseAudio completely`
+  }
+  return 'Bypass PipeWire/PulseAudio by routing audio directly to an ALSA hardware device'
+})
 
 // Scrobbling
 const scrobblingEnabled = ref(false)
@@ -966,6 +1015,22 @@ onMounted(async () => {
   // Load audio / playback settings
   selectedDevice.value = settings.outputDeviceId || ''
   exclusiveMode.value = settings.exclusiveMode === true
+
+  // Query process-level exclusive mode status
+  try {
+    const status = await window.api.getExclusiveStatus()
+    exclusiveModeActiveAtStartup.value = status.active
+    exclusivePlatform.value = status.platform
+    exclusiveAlsaDevice.value = settings.exclusiveAlsaDevice || ''
+  } catch {
+    exclusiveModeActiveAtStartup.value = false
+  }
+
+  // Enumerate ALSA devices if on Linux
+  if (exclusivePlatform.value === 'linux') {
+    loadAlsaDevices()
+  }
+
   scrobblingEnabled.value = settings.scrobblingEnabled === true
   lastfmApiKey.value = settings.lastfmApiKey || ''
   lastfmApiSecret.value = settings.lastfmApiSecret || ''
@@ -1106,7 +1171,48 @@ async function toggleExclusive() {
   exclusiveMode.value = !exclusiveMode.value
   const settings = await window.api.getSettings()
   settings.exclusiveMode = exclusiveMode.value
+  // Clear ALSA device when disabling
+  if (!exclusiveMode.value) {
+    settings.exclusiveAlsaDevice = ''
+    exclusiveAlsaDevice.value = ''
+  }
   await window.api.saveSettings(settings)
+  if (exclusiveNeedsRestart.value) {
+    showRestart(
+      'Restart Required',
+      exclusiveMode.value
+        ? 'Exclusive mode has been enabled. The app needs to restart to apply low-level audio changes.'
+        : 'Exclusive mode has been disabled. The app needs to restart to revert audio changes.'
+    )
+  } else {
+    toast.success(`Exclusive mode ${exclusiveMode.value ? 'enabled' : 'disabled'}`)
+  }
+}
+
+async function loadAlsaDevices() {
+  alsaLoading.value = true
+  try {
+    alsaDevices.value = await window.api.listAlsaDevices()
+  } catch {
+    alsaDevices.value = []
+  } finally {
+    alsaLoading.value = false
+  }
+}
+
+async function onAlsaDeviceChange() {
+  const settings = await window.api.getSettings()
+  settings.exclusiveAlsaDevice = exclusiveAlsaDevice.value
+  await window.api.saveSettings(settings)
+  // Always needs restart to change ALSA device
+  if (exclusiveModeActiveAtStartup.value) {
+    showRestart(
+      'Restart Required',
+      exclusiveAlsaDevice.value
+        ? `ALSA device changed to ${exclusiveAlsaDevice.value}. Restart to apply.`
+        : 'ALSA device cleared. The app will use PipeWire/PulseAudio after restart.'
+    )
+  }
 }
 
 // ── Playback ──────────────────────────────
@@ -1317,6 +1423,8 @@ async function runExport() {
 }
 
 const showRestartDialog = ref(false)
+const restartDialogTitle = ref('Restart to Apply')
+const restartDialogMessage = ref('Settings were imported successfully. Restart the app to fully apply all changes?')
 
 async function runImport() {
   importing.value = true
@@ -1337,7 +1445,7 @@ async function runImport() {
     exportPath.value = settings.exportPath || ''
     // If settings were imported, offer a restart to fully apply
     if (result.settings) {
-      showRestartDialog.value = true
+      showRestart('Restart to Apply', 'Settings were imported successfully. Restart the app to fully apply all changes?')
     }
   } catch (e: any) {
     toast.error(`Import failed: ${e.message || e}`)
@@ -1352,6 +1460,12 @@ function restartApp() {
 
 function dismissRestart() {
   showRestartDialog.value = false
+}
+
+function showRestart(title: string, message: string) {
+  restartDialogTitle.value = title
+  restartDialogMessage.value = message
+  showRestartDialog.value = true
 }
 
 // ── Cache Management ──────────────────────

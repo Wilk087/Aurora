@@ -122,6 +122,9 @@ interface Window {
     removeWindowStateChangeListener: () => void
     // App lifecycle
     relaunchApp: () => void
+    // Audio exclusive mode
+    getExclusiveStatus: () => Promise<{ active: boolean; alsaDevice: string; platform: string }>
+    listAlsaDevices: () => Promise<{ id: string; name: string; label: string }[]>
     getSettings: () => Promise<any>
     saveSettings: (settings: any) => Promise<void>
     // Favorites

@@ -1,9 +1,10 @@
 import { app, BrowserWindow, ipcMain, dialog, protocol, net, shell, screen } from 'electron'
 import { join, extname, basename, dirname } from 'path'
 import { readdir, readFile, writeFile, mkdir, stat, rm, copyFile } from 'fs/promises'
-import { existsSync, createReadStream } from 'fs'
+import { existsSync, createReadStream, readFileSync } from 'fs'
 import { createHash } from 'crypto'
 import { request as httpsRequest, get as httpsGet } from 'https'
+import { execFile } from 'child_process'
 import {
   initMpris, destroyMpris, updateMprisMetadata, updateMprisPlaybackStatus,
   updateMprisPosition, updateMprisVolume, updateMprisLoopStatus, updateMprisShuffle,
@@ -243,12 +244,67 @@ protocol.registerSchemesAsPrivileged([
   },
 ])
 
+// ── Exclusive audio mode (must apply Chromium flags before app.ready) ───────
+// Chromium only respects the *last* --disable-features switch, so we collect
+// all features to disable and apply them in one call at the end.
+let exclusiveModeActive = false
+let exclusiveAlsaDevice = ''
+const disabledFeatures: string[] = []
+
+{
+  const earlySettingsPath = join(app.getPath('userData'), 'settings.json')
+  try {
+    if (existsSync(earlySettingsPath)) {
+      const earlySettings = JSON.parse(readFileSync(earlySettingsPath, 'utf-8'))
+      if (earlySettings.exclusiveMode === true) {
+        exclusiveModeActive = true
+        if (process.platform === 'win32') {
+          // WASAPI exclusive mode — bypasses Windows audio mixer for bit-perfect output
+          app.commandLine.appendSwitch('enable-exclusive-audio')
+        }
+        // Disable the audio service sandbox — removes an extra process hop and
+        // lets the renderer talk directly to the audio backend (ALSA/PipeWire/WASAPI).
+        disabledFeatures.push('AudioServiceSandbox')
+        // Prevent Chromium from resampling audio to the system rate.
+        app.commandLine.appendSwitch('disable-audio-output-resampler')
+        // On Linux, use ALSA directly to bypass PipeWire/PulseAudio mixer entirely
+        // This gives true exclusive device access — same approach as Tidal on Linux.
+        if (process.platform === 'linux') {
+          const alsaDev = earlySettings.exclusiveAlsaDevice || ''
+          if (alsaDev) {
+            exclusiveAlsaDevice = alsaDev
+            // Force Chromium to use ALSA backend instead of PulseAudio/PipeWire
+            app.commandLine.appendSwitch('audio-backend', 'alsa')
+            // Point at the raw hardware device (hw:X,Y) — no dmix, no resampling
+            app.commandLine.appendSwitch('alsa-output-device', alsaDev)
+            console.log(`Exclusive audio: ALSA backend, device=${alsaDev}`)
+          } else {
+            // No ALSA device selected — fall back to PipeWire optimizations
+            process.env.PIPEWIRE_LATENCY = '256/48000'
+            process.env.PIPEWIRE_PROPS = 'media.role=Music'
+            console.log('Exclusive audio: PipeWire optimized mode (no ALSA device selected)')
+          }
+        } else {
+          console.log('Exclusive audio mode enabled')
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Failed to read settings for exclusive mode:', e)
+  }
+}
+
 // ── MPRIS / Desktop identity ───────────────────────────────────────────────
 app.setName('Aurora Player')
 if (process.platform === 'linux') {
   // Disable Chromium's built-in MPRIS so our custom D-Bus service is the only one
-  app.commandLine.appendSwitch('disable-features', 'HardwareMediaKeyHandling,MediaSessionService')
+  disabledFeatures.push('HardwareMediaKeyHandling', 'MediaSessionService')
   process.env.BAMF_DESKTOP_FILE_HINT = 'aurora-player.desktop'
+}
+
+// Apply all collected --disable-features in a single call
+if (disabledFeatures.length > 0) {
+  app.commandLine.appendSwitch('disable-features', disabledFeatures.join(','))
 }
 
 // ── Globals ────────────────────────────────────────────────────────────────
@@ -1122,6 +1178,46 @@ app.whenReady().then(async () => {
   // ── IPC: Settings ──
   ipcMain.handle('settings:get', async () => await loadSettings())
   ipcMain.handle('settings:set', async (_, settings: any) => await saveSettings(settings))
+
+  // ── IPC: Exclusive audio mode status ──
+  ipcMain.handle('audio:exclusive-status', () => ({
+    active: exclusiveModeActive,
+    alsaDevice: exclusiveAlsaDevice,
+    platform: process.platform,
+  }))
+
+  // ── IPC: Enumerate ALSA hardware devices (Linux only) ──
+  ipcMain.handle('audio:list-alsa-devices', () => {
+    if (process.platform !== 'linux') return []
+    return new Promise<{ id: string; name: string; label: string }[]>((resolve) => {
+      execFile('aplay', ['-l'], { timeout: 5000 }, (err, stdout) => {
+        if (err) {
+          console.error('Failed to enumerate ALSA devices:', err.message)
+          resolve([])
+          return
+        }
+        // Parse output like:
+        // card 0: PCH [HDA Intel PCH], device 0: ALC892 Analog [ALC892 Analog]
+        const devices: { id: string; name: string; label: string }[] = []
+        const lines = stdout.split('\n')
+        for (const line of lines) {
+          const match = line.match(/^card\s+(\d+):\s+\S+\s+\[([^\]]+)\],\s+device\s+(\d+):\s+(.+?)\s+\[([^\]]+)\]/)
+          if (match) {
+            const cardNum = match[1]
+            const cardName = match[2]
+            const devNum = match[3]
+            const devName = match[5]
+            devices.push({
+              id: `hw:${cardNum},${devNum}`,
+              name: `${cardName} - ${devName}`,
+              label: `hw:${cardNum},${devNum} — ${cardName} - ${devName}`,
+            })
+          }
+        }
+        resolve(devices)
+      })
+    })
+  })
 
   // ── IPC: Update checker ──
   ipcMain.handle('app:check-update', async () => {

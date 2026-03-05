@@ -23,9 +23,23 @@ export const usePlayerStore = defineStore('player', () => {
   let compressorNode: DynamicsCompressorNode | null = null
   let gainNode: GainNode | null = null
 
+  // ── Exclusive mode (process-level flag from main process) ──────────────
+  let exclusiveModeActive = false
+  // Query async at init, stored for AudioContext creation
+  window.api.getExclusiveStatus().then(s => { exclusiveModeActive = s.active }).catch(() => {})
+
+  function createAudioContext(): AudioContext {
+    // When exclusive mode is active, use 'playback' latency hint for higher quality
+    // and avoid unnecessary processing. Otherwise use default (interactive).
+    const opts: AudioContextOptions = exclusiveModeActive
+      ? { latencyHint: 'playback' }
+      : {}
+    return new AudioContext(opts)
+  }
+
   function initAudioChain() {
     if (audioCtx) return
-    audioCtx = new AudioContext()
+    audioCtx = createAudioContext()
     sourceNode = audioCtx.createMediaElementSource(audio)
     compressorNode = audioCtx.createDynamicsCompressor()
     // Gentle normalization settings
@@ -44,7 +58,7 @@ export const usePlayerStore = defineStore('player', () => {
 
   function initAudioBypass() {
     if (audioCtx) return
-    audioCtx = new AudioContext()
+    audioCtx = createAudioContext()
     sourceNode = audioCtx.createMediaElementSource(audio)
     sourceNode.connect(audioCtx.destination)
   }

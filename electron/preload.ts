@@ -32,6 +32,12 @@ contextBridge.exposeInMainWorld('api', {
   // App lifecycle
   relaunchApp: () => ipcRenderer.send('app:relaunch'),
 
+  // Audio exclusive mode
+  getExclusiveStatus: (): Promise<{ active: boolean; alsaDevice: string; platform: string }> =>
+    ipcRenderer.invoke('audio:exclusive-status'),
+  listAlsaDevices: (): Promise<{ id: string; name: string; label: string }[]> =>
+    ipcRenderer.invoke('audio:list-alsa-devices'),
+
   // Settings
   getSettings: () => ipcRenderer.invoke('settings:get'),
   saveSettings: (settings: any) => ipcRenderer.invoke('settings:set', settings),
