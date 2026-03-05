@@ -246,7 +246,7 @@
           <img
             v-if="player.currentTrack?.coverArt"
             :src="coverUrl"
-            class="absolute top-0 left-0 w-[85%] h-full object-cover modern-ambient-blur"
+            class="absolute top-0 left-0 w-full h-full object-cover modern-ambient-blur"
           />
         </div>
 
@@ -802,10 +802,10 @@ const bgStyle = computed(() => {
   if (immersiveStyle.value === 'modern') {
     return {
       background: `
-        radial-gradient(ellipse 90% 80% at 20% 60%, ${c.c1} 0%, transparent 75%),
-        radial-gradient(ellipse 85% 90% at 80% 30%, ${c.c2} 0%, transparent 70%),
-        radial-gradient(ellipse 75% 60% at 55% 90%, ${c.c3} 0%, transparent 65%),
-        radial-gradient(ellipse 100% 70% at 35% 10%, ${c.c4} 0%, transparent 75%)
+        radial-gradient(ellipse 100% 80% at 25% 60%, ${c.c1} 0%, transparent 80%),
+        radial-gradient(ellipse 100% 100% at 85% 35%, ${c.c2} 0%, transparent 75%),
+        radial-gradient(ellipse 90% 70% at 60% 90%, ${c.c3} 0%, transparent 70%),
+        radial-gradient(ellipse 110% 80% at 40% 10%, ${c.c4} 0%, transparent 80%)
       `,
     }
   }
