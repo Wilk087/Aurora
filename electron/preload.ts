@@ -94,6 +94,7 @@ contextBridge.exposeInMainWorld('api', {
   // Export / Import
   exportRun: (customPath?: string): Promise<string> => ipcRenderer.invoke('export:run', customPath),
   exportImport: (): Promise<{ settings: boolean; favorites: number; playlists: number } | null> => ipcRenderer.invoke('export:import'),
+  exportImportFile: (filePath: string): Promise<{ settings: boolean; favorites: number; playlists: number } | null> => ipcRenderer.invoke('export:import-file', filePath),
   exportChooseDir: (): Promise<string | null> => ipcRenderer.invoke('export:choose-dir'),
   exportGetDefaultPath: (): Promise<string> => ipcRenderer.invoke('export:get-default-path'),
 

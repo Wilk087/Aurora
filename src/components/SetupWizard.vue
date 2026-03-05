@@ -431,6 +431,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
+import { usePlaylistStore } from '@/stores/playlist'
+import { useFavoritesStore } from '@/stores/favorites'
 
 /* ── Sub-component: Toggle row (inline) ───────────────────── */
 import { defineComponent, h } from 'vue'
@@ -476,12 +478,15 @@ const WizardToggle = defineComponent({
 
 const player = usePlayerStore()
 const library = useLibraryStore()
+const playlistStore = usePlaylistStore()
+const favoritesStore = useFavoritesStore()
 
 const emit = defineEmits<{
   (e: 'complete'): void
 }>()
 
-const visible = ref(true)
+const visible = ref(false) // start hidden — shown after backup check
+const checkingBackup = ref(true)
 const step = ref(0)
 const lastStep = 7 // welcome(0), folders(1), appearance(2), playback(3), discord(4), subsonic(5), remote(6), done(7)
 const totalSteps = Array.from({ length: lastStep + 1 })
@@ -529,6 +534,29 @@ const remotePort = ref(19876)
 const remotePin = ref('')
 
 onMounted(async () => {
+  // ── Try auto-importing a backup from the default location ──
+  try {
+    const defaultPath = await window.api.exportGetDefaultPath()
+    const backupFile = `${defaultPath}/aurora-backup-latest.json`
+    const result = await window.api.exportImportFile(backupFile)
+    if (result && (result.settings || result.favorites > 0 || result.playlists > 0)) {
+      // Backup found and imported — mark setup complete and skip wizard
+      const s = await window.api.getSettings()
+      s.setupComplete = true
+      await window.api.saveSettings(s)
+      // Reload stores with imported data
+      await library.loadLibrary()
+      await playlistStore.loadPlaylists()
+      await favoritesStore.load()
+      checkingBackup.value = false
+      emit('complete')
+      return
+    }
+  } catch { /* no backup found or import failed — continue with wizard */ }
+
+  checkingBackup.value = false
+  visible.value = true
+
   // Load current settings
   try {
     const settings = await window.api.getSettings()

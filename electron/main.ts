@@ -1732,6 +1732,14 @@ app.whenReady().then(async () => {
     return await performImport(result.filePaths[0])
   })
 
+  ipcMain.handle('export:import-file', async (_, filePath: string) => {
+    try {
+      return await performImport(filePath)
+    } catch {
+      return null
+    }
+  })
+
   ipcMain.handle('export:choose-dir', async () => {
     if (!mainWindow) return null
     const result = await dialog.showOpenDialog(mainWindow, {

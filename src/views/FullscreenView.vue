@@ -596,10 +596,12 @@
               </div>
             </div>
 
-            <!-- Background (default / artwork) -->
-            <div v-if="immersiveStyle !== 'modern'">
+            <!-- Background effects -->
+            <div>
               <p class="text-[10px] font-semibold uppercase tracking-wider text-white/25 mb-2">Background</p>
-              <label class="flex items-center justify-between cursor-pointer">
+
+              <!-- Vibrant (not shown for modern — it's always vibrant) -->
+              <label v-if="immersiveStyle !== 'modern'" class="flex items-center justify-between cursor-pointer">
                 <div>
                   <span class="text-sm text-white/70">Vibrant background</span>
                   <p class="text-[11px] text-white/30 mt-0.5">Brighter colors, no noise</p>
@@ -615,12 +617,13 @@
                   />
                 </button>
               </label>
-            </div>
 
-            <!-- Animated Colors (modern / artwork when vibrant) -->
-            <div v-if="immersiveStyle === 'modern' || (immersiveStyle === 'artwork' && effectiveVibrant)">
-              <p v-if="immersiveStyle === 'modern'" class="text-[10px] font-semibold uppercase tracking-wider text-white/25 mb-2">Background</p>
-              <label class="flex items-center justify-between cursor-pointer" :class="immersiveStyle !== 'modern' ? 'mt-3' : ''">
+              <!-- Animated colors (modern / artwork only) -->
+              <label
+                v-if="immersiveStyle === 'modern' || (immersiveStyle === 'artwork' && effectiveVibrant)"
+                class="flex items-center justify-between cursor-pointer"
+                :class="immersiveStyle !== 'modern' ? 'mt-3' : ''"
+              >
                 <div>
                   <span class="text-sm text-white/70">Animated colors</span>
                   <p class="text-[11px] text-white/30 mt-0.5">Fluid moving color accents</p>
@@ -688,9 +691,8 @@ const styleDropdownRef = ref<HTMLElement | null>(null)
 const modernControlsHover = ref(false)
 
 // ── Immersive settings ───────────────────────────────────────────────
-const IMMERSIVE_STYLE_KEY = 'aurora:immersive-style'
-const _storedStyle = localStorage.getItem(IMMERSIVE_STYLE_KEY) || 'default'
-const immersiveStyle = ref(['default', 'modern', 'artwork'].includes(_storedStyle) ? _storedStyle : 'default')
+type StyleId = 'default' | 'modern' | 'artwork'
+const immersiveStyle = ref<string>('default')
 const immersiveStyles = [
   { id: 'default', label: 'Default' },
   { id: 'modern', label: 'Modern' },
@@ -699,20 +701,77 @@ const immersiveStyles = [
 const currentStyleLabel = computed(() =>
   immersiveStyles.find(s => s.id === immersiveStyle.value)?.label ?? 'Default'
 )
-watch(immersiveStyle, (v) => localStorage.setItem(IMMERSIVE_STYLE_KEY, v))
 
-const VIBRANT_BG_KEY = 'aurora:vibrant-background'
-const vibrantBackground = ref(localStorage.getItem(VIBRANT_BG_KEY) === 'true' || (localStorage.getItem(VIBRANT_BG_KEY) === null && immersiveStyle.value === 'modern'))
-watch(vibrantBackground, (v) => localStorage.setItem(VIBRANT_BG_KEY, String(v)))
+// Per-style effect toggles (each style remembers its own vibrant & animated state)
+const vibrantPerStyle = ref<Record<StyleId, boolean>>({ default: false, modern: true, artwork: false })
+const animatedPerStyle = ref<Record<StyleId, boolean>>({ default: false, modern: false, artwork: false })
 
-const ANIMATED_BG_KEY = 'aurora:animated-background'
-const animatedBackground = ref(localStorage.getItem(ANIMATED_BG_KEY) === 'true')
-watch(animatedBackground, (v) => localStorage.setItem(ANIMATED_BG_KEY, String(v)))
+// Convenience accessors for the current style's toggles
+const vibrantBackground = computed({
+  get: () => vibrantPerStyle.value[immersiveStyle.value as StyleId] ?? false,
+  set: (v: boolean) => { vibrantPerStyle.value[immersiveStyle.value as StyleId] = v; saveImmersiveSettings() },
+})
+const animatedBackground = computed({
+  get: () => animatedPerStyle.value[immersiveStyle.value as StyleId] ?? false,
+  set: (v: boolean) => { animatedPerStyle.value[immersiveStyle.value as StyleId] = v; saveImmersiveSettings() },
+})
 
 // Modern always uses vibrant; for default/artwork it's a toggle
 const effectiveVibrant = computed(() => immersiveStyle.value === 'modern' || vibrantBackground.value)
 // Animated bg only for modern/artwork, and requires vibrant
 const effectiveAnimated = computed(() => animatedBackground.value && effectiveVibrant.value && (immersiveStyle.value === 'modern' || immersiveStyle.value === 'artwork'))
+
+// Persist immersive settings to Electron settings.json (included in backups)
+async function saveImmersiveSettings() {
+  try {
+    const settings = await window.api.getSettings()
+    settings.immersiveStyle = immersiveStyle.value
+    settings.immersiveVibrant = { ...vibrantPerStyle.value }
+    settings.immersiveAnimated = { ...animatedPerStyle.value }
+    await window.api.saveSettings(settings)
+  } catch { /* ignore */ }
+}
+
+// Load persisted immersive settings on mount
+async function loadImmersiveSettings() {
+  try {
+    const settings = await window.api.getSettings()
+
+    // Migrate old localStorage keys (one-time)
+    const oldStyle = localStorage.getItem('aurora:immersive-style')
+    const oldVibrant = localStorage.getItem('aurora:vibrant-background')
+    const oldAnimated = localStorage.getItem('aurora:animated-background')
+    if (!settings.immersiveStyle && (oldStyle || oldVibrant !== null || oldAnimated !== null)) {
+      if (oldStyle && ['default', 'modern', 'artwork'].includes(oldStyle)) {
+        immersiveStyle.value = oldStyle
+      }
+      if (oldVibrant === 'true') {
+        vibrantPerStyle.value[immersiveStyle.value as StyleId] = true
+      }
+      if (oldAnimated === 'true') {
+        animatedPerStyle.value[immersiveStyle.value as StyleId] = true
+      }
+      // Clean up old keys
+      localStorage.removeItem('aurora:immersive-style')
+      localStorage.removeItem('aurora:vibrant-background')
+      localStorage.removeItem('aurora:animated-background')
+      await saveImmersiveSettings()
+      return
+    }
+
+    if (settings.immersiveStyle && ['default', 'modern', 'artwork'].includes(settings.immersiveStyle)) {
+      immersiveStyle.value = settings.immersiveStyle
+    }
+    if (settings.immersiveVibrant && typeof settings.immersiveVibrant === 'object') {
+      vibrantPerStyle.value = { ...vibrantPerStyle.value, ...settings.immersiveVibrant }
+    }
+    if (settings.immersiveAnimated && typeof settings.immersiveAnimated === 'object') {
+      animatedPerStyle.value = { ...animatedPerStyle.value, ...settings.immersiveAnimated }
+    }
+  } catch { /* first run, defaults are fine */ }
+}
+
+watch(immersiveStyle, () => saveImmersiveSettings())
 
 // Luminance of the cover art (0 = black, 255 = white)
 const coverLuminance = ref(50)
@@ -1038,11 +1097,13 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   window.api.enterFullscreen()
   document.addEventListener('keydown', onKeydown)
   // Start idle timer immediately
   idleTimer = setTimeout(() => { idle.value = true }, IDLE_DELAY)
+  // Load persisted immersive settings from settings.json
+  await loadImmersiveSettings()
 })
 
 onUnmounted(() => {

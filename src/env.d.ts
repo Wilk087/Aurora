@@ -177,6 +177,7 @@ interface Window {
     // Export / Import
     exportRun: (customPath?: string) => Promise<string>
     exportImport: () => Promise<{ settings: boolean; favorites: number; playlists: number } | null>
+    exportImportFile: (filePath: string) => Promise<{ settings: boolean; favorites: number; playlists: number } | null>
     exportChooseDir: () => Promise<string | null>
     exportGetDefaultPath: () => Promise<string>
     // Subsonic / Navidrome
