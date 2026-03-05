@@ -1132,6 +1132,29 @@ function onKeydown(e: KeyboardEvent) {
   } else if (e.key === 'ArrowDown') {
     e.preventDefault()
     player.setVolume(Math.max(0, player.volume - 0.05))
+  } else if (e.key === 's' || e.key === 'S') {
+    // DEV: cycle immersive style
+    const ids = immersiveStyles.map(s => s.id)
+    const next = ids[(ids.indexOf(immersiveStyle.value) + 1) % ids.length]
+    immersiveStyle.value = next
+    saveImmersiveSettings()
+  } else if (e.key === 'a' || e.key === 'A') {
+    // DEV: toggle animated background for current style
+    animatedBackground.value = !animatedBackground.value
+  } else if (e.key === 'n' || e.key === 'N') {
+    // DEV: play next album in library
+    const allAlbums = library.albums
+    if (allAlbums.length === 0) return
+    const cur = player.currentTrack
+    let idx = 0
+    if (cur) {
+      const curIdx = allAlbums.findIndex(a => a.name === cur.album && a.artist === cur.albumArtist)
+      idx = curIdx >= 0 ? (curIdx + 1) % allAlbums.length : 0
+    }
+    const album = allAlbums[idx]
+    if (album.tracks.length > 0) {
+      player.playAll(album.tracks, 0)
+    }
   }
 }
 
