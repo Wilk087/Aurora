@@ -18,72 +18,146 @@ export const usePlayerStore = defineStore('player', () => {
   audio.preload = 'auto'
   audio.crossOrigin = 'anonymous' // Required for Web Audio API with cross-origin sources (e.g. Navidrome streams)
 
-  // ── Subsonic stream preload cache ────────────────────────────────────────
-  // Keeps resolved stream URLs and a pre-buffering Audio element for upcoming
-  // tracks so the transition is near-instant (avoids IPC + HTTP round-trip).
-  const _preloadCache = new Map<string, { url: string; audio: HTMLAudioElement }>()
-  let _preloadAbort: AbortController | null = null   // cancel in-flight preload
+  // ── Subsonic stream preload system ─────────────────────────────────────
+  // Two-tier cache:
+  //  1. _urlCache   – resolved stream URLs for ALL subsonic tracks in the
+  //                   queue. Just strings, negligible memory. Eliminates
+  //                   IPC + HTTP round-trip on every track change.
+  //  2. _bufferCache – live Audio elements that pre-download audio data
+  //                    for a sliding window around the current track
+  //                    (1 behind, 3 ahead). These consume real bandwidth
+  //                    but guarantee gapless playback on slow connections.
+  //
+  // When loadTrack() runs, the URL is resolved instantly from _urlCache.
+  // The browser often serves the same URL from its HTTP/disk cache because
+  // the buffer element already fetched (or is fetching) that data.
+  // Consumed buffer elements are kept alive for 30 s so the HTTP cache
+  // entry doesn't get evicted before the main <audio> finishes loading.
 
-  /** Preload the next subsonic track(s) in the queue. Call after any track
-   *  load or queue mutation so at least 1 upcoming song is always buffered. */
-  function _preloadUpcoming() {
-    // Determine the next track to preload
-    const nextIdx = currentIndex.value + 1
-    const nextTrack = nextIdx < queue.value.length ? queue.value[nextIdx] : null
+  const _urlCache = new Map<string, string>()           // trackId → streamUrl
+  const _urlInFlight = new Set<string>()                // trackIds being resolved
+  const _bufferCache = new Map<string, HTMLAudioElement>() // trackId → preloading Audio
+  const _disposalTimers = new Map<string, ReturnType<typeof setTimeout>>() // delayed cleanup
 
-    // Nothing to preload or not a subsonic track
-    if (!nextTrack || nextTrack.source !== 'subsonic' || !nextTrack.path.startsWith('subsonic://')) {
-      _disposePreloadCache()
-      return
+  // How many tracks to buffer ahead / behind the current index
+  const BUFFER_AHEAD = 3
+  const BUFFER_BEHIND = 1
+
+  /** Resolve stream URLs for every subsonic track in the queue. Cheap (string
+   *  only) and done in small batches to avoid flooding the server. */
+  function _resolveAllUrls() {
+    const q = queue.value
+    for (const track of q) {
+      if (
+        track.source !== 'subsonic' ||
+        !track.path.startsWith('subsonic://') ||
+        _urlCache.has(track.id) ||
+        _urlInFlight.has(track.id)
+      ) continue
+
+      _urlInFlight.add(track.id)
+      const songId = track.path.replace('subsonic://', '')
+      window.api.subsonicGetStreamUrl(songId).then((url) => {
+        _urlInFlight.delete(track.id)
+        _urlCache.set(track.id, url)
+      }).catch(() => {
+        _urlInFlight.delete(track.id)
+      })
+    }
+  }
+
+  /** Maintain the audio-buffer sliding window (1 behind, 3 ahead). */
+  function _updateBufferWindow() {
+    const idx = currentIndex.value
+    const q = queue.value
+
+    // Determine which track IDs should have active buffer elements
+    const wantBuffered = new Set<string>()
+    const lo = Math.max(0, idx - BUFFER_BEHIND)
+    const hi = Math.min(q.length - 1, idx + BUFFER_AHEAD)
+    for (let i = lo; i <= hi; i++) {
+      const t = q[i]
+      if (t && t.source === 'subsonic' && t.path.startsWith('subsonic://')) {
+        wantBuffered.add(t.id)
+      }
     }
 
-    // Already cached for this track
-    if (_preloadCache.has(nextTrack.id)) return
+    // Evict buffer entries outside the window (with delayed disposal)
+    for (const [id, el] of _bufferCache) {
+      if (!wantBuffered.has(id)) {
+        _bufferCache.delete(id)
+        _scheduleDisposal(id, el)
+      }
+    }
 
-    // Cancel any in-flight preload for a different track
-    if (_preloadAbort) { _preloadAbort.abort(); _preloadAbort = null }
+    // Create buffer elements for tracks in the window that aren't buffered yet
+    for (let i = lo; i <= hi; i++) {
+      const t = q[i]
+      if (!t || t.source !== 'subsonic' || !t.path.startsWith('subsonic://')) continue
+      if (_bufferCache.has(t.id)) continue
 
-    // Clear stale entries (only keep the one we're about to create)
-    _disposePreloadCache()
+      // We need a resolved URL to start buffering
+      const url = _urlCache.get(t.id)
+      if (!url) {
+        // URL not ready yet — _resolveAllUrls is working on it.
+        // We'll pick it up on the next _updateBufferWindow call.
+        continue
+      }
 
-    const ac = new AbortController()
-    _preloadAbort = ac
+      // Cancel any pending delayed disposal for this track (re-entering window)
+      _cancelDisposal(t.id)
 
-    const songId = nextTrack.path.replace('subsonic://', '')
-    window.api.subsonicGetStreamUrl(songId).then((streamUrl) => {
-      if (ac.signal.aborted) return
-      // Create a lightweight Audio element to start buffering the stream
       const preAudio = new Audio()
       preAudio.preload = 'auto'
       preAudio.crossOrigin = 'anonymous'
-      preAudio.src = streamUrl
+      preAudio.src = url
       preAudio.load()
-      _preloadCache.set(nextTrack.id, { url: streamUrl, audio: preAudio })
-      _preloadAbort = null
-    }).catch(() => {
-      // URL resolution failed — nothing fatal, track will load normally
-      _preloadAbort = null
-    })
-  }
-
-  /** Consume a preloaded stream URL (returns it and removes from cache) */
-  function _consumePreload(trackId: string): string | null {
-    const entry = _preloadCache.get(trackId)
-    if (!entry) return null
-    // Stop and discard the pre-buffering element
-    entry.audio.src = ''
-    entry.audio.load()
-    _preloadCache.delete(trackId)
-    return entry.url
-  }
-
-  /** Dispose all preload cache entries */
-  function _disposePreloadCache() {
-    for (const [, entry] of _preloadCache) {
-      entry.audio.src = ''
-      entry.audio.load()
+      _bufferCache.set(t.id, preAudio)
     }
-    _preloadCache.clear()
+  }
+
+  /** Schedule delayed disposal of a buffer element so the browser HTTP cache
+   *  stays warm for the main audio element. */
+  function _scheduleDisposal(id: string, el: HTMLAudioElement) {
+    // If thre's already a pending timer for a different element, clear it
+    _cancelDisposal(id)
+    _disposalTimers.set(id, setTimeout(() => {
+      el.src = ''
+      el.load()
+      _disposalTimers.delete(id)
+    }, 30_000))
+  }
+
+  function _cancelDisposal(id: string) {
+    const timer = _disposalTimers.get(id)
+    if (timer) {
+      clearTimeout(timer)
+      _disposalTimers.delete(id)
+    }
+  }
+
+  /** Main preload entry point — call after track loads or queue mutations. */
+  function _preloadAdjacent() {
+    _resolveAllUrls()
+    _updateBufferWindow()
+
+    // Retry buffer creation shortly — some URLs may still be in flight
+    setTimeout(_updateBufferWindow, 1500)
+  }
+
+  /** Get a resolved stream URL from cache (returns null if not yet resolved). */
+  function _getCachedUrl(trackId: string): string | null {
+    return _urlCache.get(trackId) ?? null
+  }
+
+  /** Dispose all preload caches (on clearQueue etc.) */
+  function _disposePreloadCache() {
+    for (const [, el] of _bufferCache) { el.src = ''; el.load() }
+    _bufferCache.clear()
+    for (const [, timer] of _disposalTimers) clearTimeout(timer)
+    _disposalTimers.clear()
+    _urlCache.clear()
+    _urlInFlight.clear()
   }
 
   // ── Web Audio API chain for normalization ───────────────────────────────
@@ -550,13 +624,15 @@ export const usePlayerStore = defineStore('player', () => {
 
     // Resolve audio source
     if (track.source === 'subsonic' && track.path.startsWith('subsonic://')) {
-      // Check preload cache first – avoids IPC round-trip + HTTP latency
-      const cached = _consumePreload(track.id)
-      if (cached) {
-        audio.src = cached
+      // Try the URL cache first (instant), fall back to live IPC resolve
+      const cachedUrl = _getCachedUrl(track.id)
+      if (cachedUrl) {
+        audio.src = cachedUrl
       } else {
         const songId = track.path.replace('subsonic://', '')
-        audio.src = await window.api.subsonicGetStreamUrl(songId)
+        const url = await window.api.subsonicGetStreamUrl(songId)
+        _urlCache.set(track.id, url)   // populate cache for future use
+        audio.src = url
       }
       // Wait for remote stream to become playable before returning
       await new Promise<void>((resolve) => {
@@ -569,8 +645,8 @@ export const usePlayerStore = defineStore('player', () => {
       audio.load()
     }
 
-    // Preload the next subsonic track in queue so it's ready when needed
-    _preloadUpcoming()
+    // Update preload caches (resolve remaining URLs + shift buffer window)
+    _preloadAdjacent()
 
     // Reset scrobble tracking for new track
     scrobbleReported = false
@@ -777,7 +853,7 @@ export const usePlayerStore = defineStore('player', () => {
         currentIndex.value = queue.value.findIndex((t) => t.id === current.id)
       }
     }
-    _preloadUpcoming()
+    _preloadAdjacent()
   }
 
   function cycleRepeat() {
@@ -815,7 +891,7 @@ export const usePlayerStore = defineStore('player', () => {
       await loadTrack(queue.value[currentIndex.value])
       play()
     } else {
-      _preloadUpcoming()
+      _preloadAdjacent()
     }
   }
 
@@ -844,7 +920,7 @@ export const usePlayerStore = defineStore('player', () => {
     } else {
       queue.value.splice(index, 1)
       if (index < currentIndex.value) currentIndex.value--
-      _preloadUpcoming()
+      _preloadAdjacent()
     }
   }
 
@@ -872,7 +948,7 @@ export const usePlayerStore = defineStore('player', () => {
     const insertAt = currentIndex.value + 1
     queue.value.splice(insertAt, 0, ...tracks)
     originalQueue.value.splice(insertAt, 0, ...tracks)
-    _preloadUpcoming()
+    _preloadAdjacent()
   }
 
   /** Append a track or tracks to the end of the queue */
@@ -890,7 +966,7 @@ export const usePlayerStore = defineStore('player', () => {
     }
     queue.value.push(...tracks)
     originalQueue.value.push(...tracks)
-    _preloadUpcoming()
+    _preloadAdjacent()
   }
 
   /** Move a queue item from one index to another (for drag reorder) */
@@ -912,7 +988,7 @@ export const usePlayerStore = defineStore('player', () => {
         currentIndex.value++
       }
     }
-    _preloadUpcoming()
+    _preloadAdjacent()
   }
 
   function setLyricsOffset(offset: number) {
