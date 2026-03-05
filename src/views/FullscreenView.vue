@@ -15,18 +15,32 @@
         class="absolute inset-0 transition-all duration-[2s] ease-out"
         :style="bgStyle"
       />
-      <!-- Animated background: dominant fill + drifting accent blobs (2 per color for split/merge) -->
-      <div v-if="effectiveAnimated" class="absolute inset-0 overflow-hidden" :class="`blobs-${immersiveStyle}`">
-        <div class="absolute inset-0 transition-[background] duration-[2s] ease-out" :style="{ background: brightColors.c1 }" />
-        <!-- Accent 1: primary + satellite -->
-        <div class="animated-blob blob-a1" :style="{ background: brightColors.c2, boxShadow: `0 0 80px 40px ${brightColors.c2}` }" />
-        <div class="animated-blob blob-a2" :style="{ background: brightColors.c2, boxShadow: `0 0 60px 30px ${brightColors.c2}` }" />
-        <!-- Accent 2: primary + satellite -->
-        <div class="animated-blob blob-b1" :style="{ background: brightColors.c3, boxShadow: `0 0 80px 40px ${brightColors.c3}` }" />
-        <div class="animated-blob blob-b2" :style="{ background: brightColors.c3, boxShadow: `0 0 60px 30px ${brightColors.c3}` }" />
-        <!-- Accent 3: primary + satellite -->
-        <div class="animated-blob blob-c1" :style="{ background: brightColors.c4, boxShadow: `0 0 80px 40px ${brightColors.c4}` }" />
-        <div class="animated-blob blob-c2" :style="{ background: brightColors.c4, boxShadow: `0 0 60px 30px ${brightColors.c4}` }" />
+      <!-- Animated background layer -->
+      <div v-if="effectiveAnimated" class="absolute inset-0 overflow-hidden" :class="[`anim-${immersiveStyle}`]">
+        <!-- Lava Lamp: dominant fill + drifting accent blobs -->
+        <template v-if="animatedStyle === 'lava-lamp'">
+          <div class="absolute inset-0 transition-[background] duration-[2s] ease-out" :style="{ background: brightColors.c1 }" />
+          <div class="animated-blob blob-a1" :style="{ background: brightColors.c2, boxShadow: `0 0 80px 40px ${brightColors.c2}` }" />
+          <div class="animated-blob blob-a2" :style="{ background: brightColors.c2, boxShadow: `0 0 60px 30px ${brightColors.c2}` }" />
+          <div class="animated-blob blob-b1" :style="{ background: brightColors.c3, boxShadow: `0 0 80px 40px ${brightColors.c3}` }" />
+          <div class="animated-blob blob-b2" :style="{ background: brightColors.c3, boxShadow: `0 0 60px 30px ${brightColors.c3}` }" />
+          <div class="animated-blob blob-c1" :style="{ background: brightColors.c4, boxShadow: `0 0 80px 40px ${brightColors.c4}` }" />
+          <div class="animated-blob blob-c2" :style="{ background: brightColors.c4, boxShadow: `0 0 60px 30px ${brightColors.c4}` }" />
+        </template>
+
+        <!-- Sonar Ripple: expanding halos from cover center -->
+        <template v-else-if="animatedStyle === 'sonar-ripple'">
+          <div class="absolute inset-0 transition-[background] duration-[2s] ease-out" :style="{ background: darkDominant }" />
+          <canvas ref="sonarCanvas" class="absolute inset-0 w-full h-full" />
+        </template>
+
+        <!-- Cinematic Grain: film grain + orbiting spotlights -->
+        <template v-else-if="animatedStyle === 'cinematic-grain'">
+          <div class="absolute inset-0 transition-[background] duration-[2s] ease-out" :style="{ background: darkDominant }" />
+          <div class="spotlight spotlight-1" :style="{ background: `radial-gradient(ellipse at center, ${brightColors.c2}bb 0%, ${brightColors.c2}44 40%, transparent 70%)` }" />
+          <div class="spotlight spotlight-2" :style="{ background: `radial-gradient(ellipse at center, ${brightColors.c3}bb 0%, ${brightColors.c3}44 40%, transparent 70%)` }" />
+          <canvas ref="grainCanvas" class="absolute inset-0 w-full h-full opacity-[0.06] pointer-events-none" style="mix-blend-mode: overlay;" />
+        </template>
       </div>
       <div v-if="!effectiveVibrant" class="absolute inset-0 opacity-[0.03]" style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 /%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22 /%3E%3C/svg%3E')" />
     </div>
@@ -632,8 +646,8 @@
                 :class="immersiveStyle !== 'modern' ? 'mt-3' : ''"
               >
                 <div>
-                  <span class="text-sm text-white/70">Animated colors</span>
-                  <p class="text-[11px] text-white/30 mt-0.5">Fluid moving color accents</p>
+                  <span class="text-sm text-white/70">Animated background</span>
+                  <p class="text-[11px] text-white/30 mt-0.5">Dynamic moving backgrounds</p>
                 </div>
                 <button
                   @click="animatedBackground = !animatedBackground"
@@ -646,6 +660,48 @@
                   />
                 </button>
               </label>
+
+              <!-- Animated style dropdown (shown when animated is on) -->
+              <div
+                v-if="effectiveAnimated"
+                class="mt-3"
+              >
+                <div class="relative" ref="animStyleDropdownRef">
+                  <button
+                    @click.stop="showAnimStyleDropdown = !showAnimStyleDropdown"
+                    class="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] hover:border-white/[0.12] transition-colors"
+                  >
+                    <span class="text-sm text-white/70">{{ currentAnimStyleLabel }}</span>
+                    <svg class="w-4 h-4 text-white/30 transition-transform" :class="showAnimStyleDropdown ? 'rotate-180' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  <Transition name="dropdown">
+                    <div
+                      v-if="showAnimStyleDropdown"
+                      class="absolute top-full left-0 right-0 mt-1.5 rounded-xl bg-[#16162a]/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl py-1 z-10"
+                    >
+                      <button
+                        v-for="animOpt in animatedStyles"
+                        :key="animOpt.id"
+                        @click="animatedStyle = animOpt.id; showAnimStyleDropdown = false"
+                        class="w-full flex items-center justify-between px-3.5 py-2 text-left transition-colors"
+                        :class="animatedStyle === animOpt.id
+                          ? 'text-accent bg-accent/[0.08]'
+                          : 'text-white/60 hover:text-white hover:bg-white/[0.06]'"
+                      >
+                        <div>
+                          <span class="text-sm">{{ animOpt.label }}</span>
+                          <p class="text-[10px] opacity-50 mt-0.5">{{ animOpt.desc }}</p>
+                        </div>
+                        <svg v-if="animatedStyle === animOpt.id" class="w-4 h-4 text-accent shrink-0 ml-2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                      </button>
+                    </div>
+                  </Transition>
+                </div>
+              </div>
             </div>
 
             <!-- Playback controls (modern only) -->
@@ -735,6 +791,24 @@ const vibrantPerStyle = ref<Record<StyleId, boolean>>({ default: false, modern: 
 const animatedPerStyle = ref<Record<StyleId, boolean>>({ default: false, modern: false, artwork: false })
 const hideControlsPerStyle = ref<Record<StyleId, boolean>>({ default: false, modern: false, artwork: false })
 
+// Animated background style selection (per immersive style)
+type AnimStyleId = 'lava-lamp' | 'sonar-ripple' | 'cinematic-grain'
+const animatedStyles = [
+  { id: 'lava-lamp', label: 'Lava Lamp', desc: 'Drifting color blobs' },
+  { id: 'sonar-ripple', label: 'Sonar Ripple', desc: 'Expanding halos from cover' },
+  { id: 'cinematic-grain', label: 'Cinematic Grain', desc: 'Film grain & orbiting spotlights' },
+] as const
+const animStylePerStyle = ref<Record<StyleId, AnimStyleId>>({ default: 'lava-lamp', modern: 'lava-lamp', artwork: 'lava-lamp' })
+const animatedStyle = computed({
+  get: () => animStylePerStyle.value[immersiveStyle.value as StyleId] ?? 'lava-lamp',
+  set: (v: AnimStyleId) => { animStylePerStyle.value[immersiveStyle.value as StyleId] = v; saveImmersiveSettings() },
+})
+const currentAnimStyleLabel = computed(() =>
+  animatedStyles.find(s => s.id === animatedStyle.value)?.label ?? 'Lava Lamp'
+)
+const showAnimStyleDropdown = ref(false)
+const animStyleDropdownRef = ref<HTMLElement>()
+
 // Convenience accessors for the current style's toggles
 const vibrantBackground = computed({
   get: () => vibrantPerStyle.value[immersiveStyle.value as StyleId] ?? false,
@@ -761,6 +835,7 @@ async function saveImmersiveSettings() {
     settings.immersiveStyle = immersiveStyle.value
     settings.immersiveVibrant = { ...vibrantPerStyle.value }
     settings.immersiveAnimated = { ...animatedPerStyle.value }
+    settings.immersiveAnimStyle = { ...animStylePerStyle.value }
     settings.immersiveHideControls = { ...hideControlsPerStyle.value }
     await window.api.saveSettings(settings)
   } catch { /* ignore */ }
@@ -801,6 +876,9 @@ async function loadImmersiveSettings() {
     }
     if (settings.immersiveAnimated && typeof settings.immersiveAnimated === 'object') {
       animatedPerStyle.value = { ...animatedPerStyle.value, ...settings.immersiveAnimated }
+    }
+    if (settings.immersiveAnimStyle && typeof settings.immersiveAnimStyle === 'object') {
+      animStylePerStyle.value = { ...animStylePerStyle.value, ...settings.immersiveAnimStyle }
     }
     if (settings.immersiveHideControls && typeof settings.immersiveHideControls === 'object') {
       hideControlsPerStyle.value = { ...hideControlsPerStyle.value, ...settings.immersiveHideControls }
@@ -964,6 +1042,20 @@ const brightColors = ref<{ c1: string; c2: string; c3: string; c4: string }>({
   c3: 'rgba(60,25,75,0.95)',
   c4: 'rgba(20,10,40,0.95)',
 })
+// Raw RGB values for canvas rendering
+const rawColors = ref<{ r: number; g: number; b: number }[]>([
+  { r: 50, g: 20, b: 70 }, { r: 30, g: 15, b: 55 },
+  { r: 60, g: 25, b: 75 }, { r: 20, g: 10, b: 40 },
+])
+// Dark dominant color for Sonar Ripple / Cinematic Grain base
+const darkDominant = computed(() => {
+  const c = rawColors.value[0]
+  return `rgb(${Math.round(c.r * 0.2)},${Math.round(c.g * 0.15)},${Math.round(c.b * 0.25)})`
+})
+
+// Canvas refs for animated styles
+const sonarCanvas = ref<HTMLCanvasElement>()
+const grainCanvas = ref<HTMLCanvasElement>()
 
 const bgStyle = computed(() => {
   const c = effectiveVibrant.value ? brightColors.value : colors.value
@@ -1058,6 +1150,9 @@ function extractColors(src: string) {
     }
     while (picked.length < 4) picked.push(dominant)
 
+    // Store raw RGB for canvas rendering
+    rawColors.value = picked.map(c => ({ r: c.r, g: c.g, b: c.b }))
+
     // Dark variant (default mode)
     const dark = picked.map(c => {
       const dr = Math.round(c.r * 0.45)
@@ -1141,6 +1236,13 @@ function onKeydown(e: KeyboardEvent) {
   } else if (e.key === 'a' || e.key === 'A') {
     // DEV: toggle animated background for current style
     animatedBackground.value = !animatedBackground.value
+  } else if (e.key === 'd' || e.key === 'D') {
+    // DEV: cycle animated style for current immersive style
+    if (effectiveAnimated.value) {
+      const ids = animatedStyles.map(s => s.id)
+      const next = ids[(ids.indexOf(animatedStyle.value) + 1) % ids.length] as AnimStyleId
+      animatedStyle.value = next
+    }
   } else if (e.key === 'n' || e.key === 'N') {
     // DEV: play next album in library
     const allAlbums = library.albums
@@ -1158,6 +1260,141 @@ function onKeydown(e: KeyboardEvent) {
   }
 }
 
+// ── Animated background renderers ──────────────────────────────────────
+let animFrameId = 0
+let grainFrameId = 0
+let sonarRipples: { x: number; y: number; age: number; maxAge: number; intensity: number }[] = []
+let lastSonarSpawn = 0
+
+function stopAnimLoop() {
+  if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = 0 }
+  if (grainFrameId) { cancelAnimationFrame(grainFrameId); grainFrameId = 0 }
+  sonarRipples = []
+}
+
+function startAnimLoop() {
+  stopAnimLoop()
+  if (!effectiveAnimated.value) return
+
+  const style = animatedStyle.value
+  if (style === 'sonar-ripple') startSonarLoop()
+  else if (style === 'cinematic-grain') startGrainLoop()
+}
+
+// ── Sonar Ripple renderer (expanding halos) ───────────────────────────
+function startSonarLoop() {
+  const canvas = sonarCanvas.value
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  lastSonarSpawn = 0
+
+  function draw(timestamp: number) {
+    const w = canvas.width = canvas.clientWidth * (window.devicePixelRatio > 1 ? 2 : 1)
+    const h = canvas.height = canvas.clientHeight * (window.devicePixelRatio > 1 ? 2 : 1)
+    ctx.clearRect(0, 0, w, h)
+
+    // Origin: left-center for modern, center for artwork
+    const isModern = immersiveStyle.value === 'modern'
+    const ox = isModern ? w * 0.29 : w * 0.5
+    const oy = h * 0.5
+
+    // Get bass energy for ripple spawning intensity
+    const freq = player.getFrequencyData()
+    let bass = 0.4
+    if (freq) {
+      let sum = 0
+      for (let i = 0; i < 6; i++) sum += freq[i]
+      bass = sum / (6 * 255)
+    }
+
+    // Spawn new ripple at intervals (faster with more bass)
+    const spawnInterval = 1800 - bass * 800
+    if (timestamp - lastSonarSpawn > spawnInterval) {
+      sonarRipples.push({
+        x: ox, y: oy,
+        age: 0,
+        maxAge: 4000 + Math.random() * 2000,
+        intensity: 0.15 + bass * 0.25,
+      })
+      lastSonarSpawn = timestamp
+      // Limit ripple count
+      if (sonarRipples.length > 8) sonarRipples.shift()
+    }
+
+    const rc = rawColors.value
+    for (const ripple of sonarRipples) {
+      ripple.age += 16
+      const progress = ripple.age / ripple.maxAge
+      if (progress > 1) continue
+      const radius = Math.max(w, h) * 0.8 * progress
+      const alpha = ripple.intensity * (1 - progress) * (1 - progress)
+      const ci = rc[(Math.floor(ripple.age / 1000) % 3) + 1]
+
+      ctx.beginPath()
+      ctx.arc(ripple.x, ripple.y, radius, 0, Math.PI * 2)
+      ctx.strokeStyle = `rgba(${ci.r},${ci.g},${ci.b},${alpha})`
+      ctx.lineWidth = 30 + 20 * (1 - progress)
+      ctx.filter = 'blur(15px)'
+      ctx.stroke()
+      ctx.filter = 'none'
+
+      // Inner glow
+      ctx.beginPath()
+      ctx.arc(ripple.x, ripple.y, radius * 0.95, 0, Math.PI * 2)
+      ctx.strokeStyle = `rgba(${ci.r},${ci.g},${ci.b},${alpha * 0.4})`
+      ctx.lineWidth = 60 + 30 * (1 - progress)
+      ctx.stroke()
+    }
+    sonarRipples = sonarRipples.filter(r => r.age / r.maxAge <= 1)
+
+    animFrameId = requestAnimationFrame(draw)
+  }
+  animFrameId = requestAnimationFrame(draw)
+}
+
+// ── Cinematic Grain renderer (low-fps noise) ─────────────────────────
+function startGrainLoop() {
+  const canvas = grainCanvas.value
+  if (!canvas) return
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  let lastFrame = 0
+  const grainFPS = 14
+
+  function draw(timestamp: number) {
+    // Low framerate grain (12-15fps feel)
+    if (timestamp - lastFrame < 1000 / grainFPS) {
+      grainFrameId = requestAnimationFrame(draw)
+      return
+    }
+    lastFrame = timestamp
+
+    const w = canvas.width = Math.ceil(canvas.clientWidth / 3)
+    const h = canvas.height = Math.ceil(canvas.clientHeight / 3)
+    const imageData = ctx.createImageData(w, h)
+    const data = imageData.data
+
+    for (let i = 0; i < data.length; i += 4) {
+      const v = Math.random() * 255
+      data[i] = v
+      data[i + 1] = v
+      data[i + 2] = v
+      data[i + 3] = 255
+    }
+    ctx.putImageData(imageData, 0, 0)
+    grainFrameId = requestAnimationFrame(draw)
+  }
+  grainFrameId = requestAnimationFrame(draw)
+}
+
+// Start/stop animation loop when style or enabled state changes
+watch([effectiveAnimated, animatedStyle], () => {
+  nextTick(() => startAnimLoop())
+}, { immediate: false })
+
 onMounted(async () => {
   window.api.enterFullscreen()
   document.addEventListener('keydown', onKeydown)
@@ -1165,12 +1402,15 @@ onMounted(async () => {
   idleTimer = setTimeout(() => { idle.value = true }, IDLE_DELAY)
   // Load persisted immersive settings from settings.json
   await loadImmersiveSettings()
+  // Start animated background if enabled
+  nextTick(() => startAnimLoop())
 })
 
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
   if (idleTimer) clearTimeout(idleTimer)
   destroyHls()
+  stopAnimLoop()
 })
 </script>
 
@@ -1335,7 +1575,7 @@ onUnmounted(() => {
   pointer-events: auto;
 }
 
-/* ── Animated background: drifting accent blobs ────────────────── */
+/* ── Animated background: drifting accent blobs (Lava Lamp) ────── */
 .animated-blob {
   position: absolute;
   border-radius: 40% 60% 55% 45% / 55% 40% 60% 45%;
@@ -1345,28 +1585,28 @@ onUnmounted(() => {
   transition: background 2s ease, width 1s ease, height 1s ease, top 1s ease, right 1s ease, bottom 1s ease, left 1s ease;
 }
 
-/* ========== MODERN: right-half positioning ========== */
-.blobs-modern .blob-a1 {
+/* ========== MODERN: right-half positioning (Lava Lamp) ========== */
+.anim-modern .blob-a1 {
   width: 28%; height: 35%; top: -5%; right: 2%;
   animation: drift-a1-m 20s ease-in-out infinite;
 }
-.blobs-modern .blob-a2 {
+.anim-modern .blob-a2 {
   width: 18%; height: 22%; top: 8%; right: 20%; opacity: 0.7;
   animation: drift-a2-m 15s ease-in-out infinite;
 }
-.blobs-modern .blob-b1 {
+.anim-modern .blob-b1 {
   width: 26%; height: 32%; bottom: -3%; right: 12%;
   animation: drift-b1-m 24s ease-in-out infinite;
 }
-.blobs-modern .blob-b2 {
+.anim-modern .blob-b2 {
   width: 16%; height: 20%; bottom: 15%; right: 30%; opacity: 0.7;
   animation: drift-b2-m 17s ease-in-out infinite;
 }
-.blobs-modern .blob-c1 {
+.anim-modern .blob-c1 {
   width: 24%; height: 30%; top: 30%; right: 5%;
   animation: drift-c1-m 22s ease-in-out infinite;
 }
-.blobs-modern .blob-c2 {
+.anim-modern .blob-c2 {
   width: 15%; height: 18%; top: 45%; right: 28%; opacity: 0.7;
   animation: drift-c2-m 16s ease-in-out infinite;
 }
@@ -1415,28 +1655,28 @@ onUnmounted(() => {
   78% { transform: translate(-8%, -20%) scale(0.9) rotate(4deg); }
 }
 
-/* ========== ARTWORK: full-screen positioning ========== */
-.blobs-artwork .blob-a1 {
+/* ========== ARTWORK: full-screen positioning (Lava Lamp) ========== */
+.anim-artwork .blob-a1 {
   width: 45%; height: 50%; top: -8%; right: -5%;
   animation: drift-a1-f 20s ease-in-out infinite;
 }
-.blobs-artwork .blob-a2 {
+.anim-artwork .blob-a2 {
   width: 28%; height: 30%; top: 5%; left: 8%; opacity: 0.7;
   animation: drift-a2-f 15s ease-in-out infinite;
 }
-.blobs-artwork .blob-b1 {
+.anim-artwork .blob-b1 {
   width: 42%; height: 46%; bottom: -6%; left: -3%;
   animation: drift-b1-f 24s ease-in-out infinite;
 }
-.blobs-artwork .blob-b2 {
+.anim-artwork .blob-b2 {
   width: 25%; height: 28%; bottom: 15%; right: 10%; opacity: 0.7;
   animation: drift-b2-f 17s ease-in-out infinite;
 }
-.blobs-artwork .blob-c1 {
+.anim-artwork .blob-c1 {
   width: 38%; height: 42%; top: 25%; left: 30%;
   animation: drift-c1-f 22s ease-in-out infinite;
 }
-.blobs-artwork .blob-c2 {
+.anim-artwork .blob-c2 {
   width: 22%; height: 24%; top: 55%; right: 25%; opacity: 0.7;
   animation: drift-c2-f 16s ease-in-out infinite;
 }
@@ -1483,5 +1723,39 @@ onUnmounted(() => {
   38% { transform: translate(-20%, 30%) scale(0.8) rotate(6deg); }
   58% { transform: translate(28%, 12%) scale(1.15) rotate(-3deg); }
   78% { transform: translate(-12%, -18%) scale(0.9) rotate(4deg); }
+}
+
+/* ── Cinematic Grain: orbiting spotlights ─────────────────────── */
+.spotlight {
+  position: absolute;
+  width: 70%;
+  height: 70%;
+  border-radius: 50%;
+  filter: blur(50px);
+  opacity: 0.8;
+  will-change: transform;
+  transition: background 2s ease;
+}
+.spotlight-1 {
+  top: -20%; right: -15%;
+  animation: orbit-1 28s linear infinite;
+}
+.spotlight-2 {
+  bottom: -20%; left: -15%;
+  animation: orbit-2 34s linear infinite;
+}
+@keyframes orbit-1 {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-30%, 25%); }
+  50% { transform: translate(-15%, 50%); }
+  75% { transform: translate(20%, 20%); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes orbit-2 {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(25%, -30%); }
+  50% { transform: translate(15%, -50%); }
+  75% { transform: translate(-20%, -20%); }
+  100% { transform: translate(0, 0); }
 }
 </style>

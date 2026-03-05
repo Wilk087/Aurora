@@ -22,6 +22,8 @@ export const usePlayerStore = defineStore('player', () => {
   let sourceNode: MediaElementAudioSourceNode | null = null
   let compressorNode: DynamicsCompressorNode | null = null
   let gainNode: GainNode | null = null
+  let analyserNode: AnalyserNode | null = null
+  const frequencyBuf = new Uint8Array(128)
 
   // ── Exclusive mode (process-level flag from main process) ──────────────
   let exclusiveModeActive = false
@@ -50,17 +52,25 @@ export const usePlayerStore = defineStore('player', () => {
     compressorNode.release.value = 0.25    // moderate release
     gainNode = audioCtx.createGain()
     gainNode.gain.value = 1.4              // make-up gain
-    // Chain: source -> compressor -> gain -> output
+    analyserNode = audioCtx.createAnalyser()
+    analyserNode.fftSize = 256
+    analyserNode.smoothingTimeConstant = 0.8
+    // Chain: source -> compressor -> gain -> analyser -> output
     sourceNode.connect(compressorNode)
     compressorNode.connect(gainNode)
-    gainNode.connect(audioCtx.destination)
+    gainNode.connect(analyserNode)
+    analyserNode.connect(audioCtx.destination)
   }
 
   function initAudioBypass() {
     if (audioCtx) return
     audioCtx = createAudioContext()
     sourceNode = audioCtx.createMediaElementSource(audio)
-    sourceNode.connect(audioCtx.destination)
+    analyserNode = audioCtx.createAnalyser()
+    analyserNode.fftSize = 256
+    analyserNode.smoothingTimeConstant = 0.8
+    sourceNode.connect(analyserNode)
+    analyserNode.connect(audioCtx.destination)
   }
   // ── Reactive state ───────────────────────────────────────────────────────
   const currentTrack = ref<Track | null>(null)
@@ -839,6 +849,13 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
+  /** Returns the current frequency data (0-255) from the AnalyserNode, or null if unavailable */
+  function getFrequencyData(): Uint8Array | null {
+    if (!analyserNode) return null
+    analyserNode.getByteFrequencyData(frequencyBuf)
+    return frequencyBuf
+  }
+
   function setAnimatedCoversEnabled(enabled: boolean) {
     animatedCoversEnabled.value = enabled
     window.api.getSettings().then((s: any) => {
@@ -1093,5 +1110,7 @@ export const usePlayerStore = defineStore('player', () => {
     sleepTimerRemaining,
     startSleepTimer,
     cancelSleepTimer,
+    // Audio analyser (for visual effects)
+    getFrequencyData,
   }
 })
