@@ -246,12 +246,12 @@
           <img
             v-if="player.currentTrack?.coverArt"
             :src="coverUrl"
-            class="absolute top-0 left-0 w-[65%] h-full object-cover modern-ambient-blur"
+            class="absolute top-0 left-0 w-[85%] h-full object-cover modern-ambient-blur"
           />
         </div>
 
         <!-- Left: full-height cover with alpha mask -->
-        <div class="relative w-[50%] h-full shrink-0 z-[2]">
+        <div class="relative w-[58%] h-full shrink-0 z-[2]">
           <div class="absolute inset-0 modern-cover-masked">
             <video
               v-show="animatedCoverActive"
@@ -799,6 +799,16 @@ const brightColors = ref<{ c1: string; c2: string; c3: string; c4: string }>({
 
 const bgStyle = computed(() => {
   const c = immersiveStyle.value === 'modern' ? brightColors.value : colors.value
+  if (immersiveStyle.value === 'modern') {
+    return {
+      background: `
+        radial-gradient(ellipse 90% 80% at 20% 60%, ${c.c1} 0%, transparent 75%),
+        radial-gradient(ellipse 85% 90% at 80% 30%, ${c.c2} 0%, transparent 70%),
+        radial-gradient(ellipse 75% 60% at 55% 90%, ${c.c3} 0%, transparent 65%),
+        radial-gradient(ellipse 100% 70% at 35% 10%, ${c.c4} 0%, transparent 75%)
+      `,
+    }
+  }
   return {
     background: `
       radial-gradient(ellipse 80% 70% at 15% 60%, ${c.c1} 0%, transparent 70%),
@@ -867,9 +877,9 @@ function extractColors(src: string) {
         }
       }
       if (count === 0) return 'rgba(40,20,60,0.95)'
-      const br = Math.min(255, Math.round((r / count) * 0.7))
-      const bg = Math.min(255, Math.round((g / count) * 0.6))
-      const bb = Math.min(255, Math.round((b / count) * 0.75))
+      const br = Math.min(255, Math.round((r / count) * 0.9))
+      const bg = Math.min(255, Math.round((g / count) * 0.8))
+      const bb = Math.min(255, Math.round((b / count) * 0.95))
       return `rgba(${br},${bg},${bb},0.95)`
     })
     brightColors.value = { c1: bright[0], c2: bright[1], c3: bright[2], c4: bright[3] }
@@ -1004,28 +1014,28 @@ onUnmounted(() => {
 
 /* Layer 1: Alpha gradient mask on the sharp cover ─ curved ")" dissolve */
 .modern-cover-masked {
-  mask-image: radial-gradient(ellipse 70% 100% at 35% 50%, black 0%, black 50%, transparent 85%);
-  -webkit-mask-image: radial-gradient(ellipse 70% 100% at 35% 50%, black 0%, black 50%, transparent 85%);
+  mask-image: radial-gradient(ellipse 68% 100% at 38% 50%, black 0%, black 45%, transparent 85%);
+  -webkit-mask-image: radial-gradient(ellipse 68% 100% at 38% 50%, black 0%, black 45%, transparent 85%);
 }
 
 /* Layer 2: Blurred ambient backdrop ─ smears cover hues into the transition */
 .modern-ambient-blur {
-  filter: blur(60px) saturate(1.4) brightness(0.7);
-  transform: scale(1.1); /* prevent blur edge artifacts */
+  filter: blur(60px) saturate(1.4) brightness(0.95);
+  transform: scale(1.15); /* prevent blur edge artifacts */
 }
 
 /* Layer 3: Darkening vignette at the transition midpoint */
 .modern-vignette {
   position: absolute;
   top: 0;
-  right: -20%;
-  width: 40%;
+  right: -25%;
+  width: 45%;
   height: 100%;
   z-index: 25;
   pointer-events: none;
   background: radial-gradient(
     ellipse 50% 70% at 50% 50%,
-    rgba(0, 0, 0, 0.3) 0%,
+    rgba(0, 0, 0, 0.15) 0%,
     transparent 100%
   );
 }
