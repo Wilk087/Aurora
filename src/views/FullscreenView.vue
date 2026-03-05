@@ -13,7 +13,7 @@
         class="absolute inset-0 transition-all duration-[2s] ease-out"
         :style="bgStyle"
       />
-      <div v-if="immersiveStyle !== 'modern'" class="absolute inset-0 opacity-[0.03]" style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 /%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22 /%3E%3C/svg%3E')" />
+      <div v-if="!vibrantBackground" class="absolute inset-0 opacity-[0.03]" style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 /%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22 /%3E%3C/svg%3E')" />
     </div>
 
     <!-- ── Two-column layout ──────────────────────────────────── -->
@@ -584,6 +584,27 @@
               </div>
             </div>
 
+            <!-- Background -->
+            <div>
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-white/25 mb-2">Background</p>
+              <label class="flex items-center justify-between cursor-pointer">
+                <div>
+                  <span class="text-sm text-white/70">Vibrant background</span>
+                  <p class="text-[11px] text-white/30 mt-0.5">Brighter colors, no noise</p>
+                </div>
+                <button
+                  @click="vibrantBackground = !vibrantBackground"
+                  class="relative w-9 h-5 rounded-full transition-colors duration-200"
+                  :class="vibrantBackground ? 'bg-accent' : 'bg-white/15'"
+                >
+                  <span
+                    class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200"
+                    :class="vibrantBackground ? 'translate-x-4' : ''"
+                  />
+                </button>
+              </label>
+            </div>
+
             <!-- Animated Covers -->
             <div>
               <p class="text-[10px] font-semibold uppercase tracking-wider text-white/25 mb-2">Media</p>
@@ -646,6 +667,10 @@ const currentStyleLabel = computed(() =>
   immersiveStyles.find(s => s.id === immersiveStyle.value)?.label ?? 'Default'
 )
 watch(immersiveStyle, (v) => localStorage.setItem(IMMERSIVE_STYLE_KEY, v))
+
+const VIBRANT_BG_KEY = 'aurora:vibrant-background'
+const vibrantBackground = ref(localStorage.getItem(VIBRANT_BG_KEY) === 'true' || (localStorage.getItem(VIBRANT_BG_KEY) === null && immersiveStyle.value === 'modern'))
+watch(vibrantBackground, (v) => localStorage.setItem(VIBRANT_BG_KEY, String(v)))
 
 // ── Idle / Active state ──────────────────────────────────────────────
 const idle = ref(false)
@@ -798,8 +823,8 @@ const brightColors = ref<{ c1: string; c2: string; c3: string; c4: string }>({
 })
 
 const bgStyle = computed(() => {
-  const c = immersiveStyle.value === 'modern' ? brightColors.value : colors.value
-  if (immersiveStyle.value === 'modern') {
+  const c = vibrantBackground.value ? brightColors.value : colors.value
+  if (vibrantBackground.value) {
     return {
       background: `
         radial-gradient(ellipse 100% 80% at 25% 60%, ${c.c1} 0%, transparent 80%),
