@@ -15,12 +15,18 @@
         class="absolute inset-0 transition-all duration-[2s] ease-out"
         :style="bgStyle"
       />
-      <!-- Animated background: dominant fill + drifting accent blobs -->
-      <div v-if="effectiveAnimated" class="absolute inset-0 overflow-hidden">
+      <!-- Animated background: dominant fill + drifting accent blobs (2 per color for split/merge) -->
+      <div v-if="effectiveAnimated" class="absolute inset-0 overflow-hidden" :class="`blobs-${immersiveStyle}`">
         <div class="absolute inset-0 transition-[background] duration-[2s] ease-out" :style="{ background: brightColors.c1 }" />
-        <div class="animated-blob blob-a" :style="{ background: brightColors.c2, boxShadow: `0 0 80px 40px ${brightColors.c2}` }" />
-        <div class="animated-blob blob-b" :style="{ background: brightColors.c3, boxShadow: `0 0 80px 40px ${brightColors.c3}` }" />
-        <div class="animated-blob blob-c" :style="{ background: brightColors.c4, boxShadow: `0 0 80px 40px ${brightColors.c4}` }" />
+        <!-- Accent 1: primary + satellite -->
+        <div class="animated-blob blob-a1" :style="{ background: brightColors.c2, boxShadow: `0 0 80px 40px ${brightColors.c2}` }" />
+        <div class="animated-blob blob-a2" :style="{ background: brightColors.c2, boxShadow: `0 0 60px 30px ${brightColors.c2}` }" />
+        <!-- Accent 2: primary + satellite -->
+        <div class="animated-blob blob-b1" :style="{ background: brightColors.c3, boxShadow: `0 0 80px 40px ${brightColors.c3}` }" />
+        <div class="animated-blob blob-b2" :style="{ background: brightColors.c3, boxShadow: `0 0 60px 30px ${brightColors.c3}` }" />
+        <!-- Accent 3: primary + satellite -->
+        <div class="animated-blob blob-c1" :style="{ background: brightColors.c4, boxShadow: `0 0 80px 40px ${brightColors.c4}` }" />
+        <div class="animated-blob blob-c2" :style="{ background: brightColors.c4, boxShadow: `0 0 60px 30px ${brightColors.c4}` }" />
       </div>
       <div v-if="!effectiveVibrant" class="absolute inset-0 opacity-[0.03]" style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 /%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22 /%3E%3C/svg%3E')" />
     </div>
@@ -1278,49 +1284,149 @@ onUnmounted(() => {
 .animated-blob {
   position: absolute;
   border-radius: 40% 60% 55% 45% / 55% 40% 60% 45%;
-  filter: blur(70px) saturate(1.4);
+  filter: blur(60px) saturate(1.4);
   opacity: 0.85;
   will-change: transform;
-  transition: background 2s ease;
-}
-.blob-a {
-  width: 60%;
-  height: 65%;
-  top: -10%;
-  right: -5%;
-  animation: accent-drift-a 18s ease-in-out infinite;
-}
-.blob-b {
-  width: 55%;
-  height: 60%;
-  bottom: -8%;
-  left: -3%;
-  animation: accent-drift-b 24s ease-in-out infinite;
-}
-.blob-c {
-  width: 50%;
-  height: 55%;
-  top: 25%;
-  left: 25%;
-  animation: accent-drift-c 21s ease-in-out infinite;
+  transition: background 2s ease, width 1s ease, height 1s ease, top 1s ease, right 1s ease, bottom 1s ease, left 1s ease;
 }
 
-@keyframes accent-drift-a {
+/* ========== MODERN: right-half positioning ========== */
+.blobs-modern .blob-a1 {
+  width: 28%; height: 35%; top: -5%; right: 2%;
+  animation: drift-a1-m 20s ease-in-out infinite;
+}
+.blobs-modern .blob-a2 {
+  width: 18%; height: 22%; top: 8%; right: 20%; opacity: 0.7;
+  animation: drift-a2-m 15s ease-in-out infinite;
+}
+.blobs-modern .blob-b1 {
+  width: 26%; height: 32%; bottom: -3%; right: 12%;
+  animation: drift-b1-m 24s ease-in-out infinite;
+}
+.blobs-modern .blob-b2 {
+  width: 16%; height: 20%; bottom: 15%; right: 30%; opacity: 0.7;
+  animation: drift-b2-m 17s ease-in-out infinite;
+}
+.blobs-modern .blob-c1 {
+  width: 24%; height: 30%; top: 30%; right: 5%;
+  animation: drift-c1-m 22s ease-in-out infinite;
+}
+.blobs-modern .blob-c2 {
+  width: 15%; height: 18%; top: 45%; right: 28%; opacity: 0.7;
+  animation: drift-c2-m 16s ease-in-out infinite;
+}
+
+/* Modern primary blobs — sweep within the right half */
+@keyframes drift-a1-m {
   0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
-  25% { transform: translate(-20%, 25%) scale(1.12) rotate(5deg); }
-  50% { transform: translate(15%, 45%) scale(0.92) rotate(-3deg); }
-  75% { transform: translate(-10%, 10%) scale(1.06) rotate(2deg); }
+  20% { transform: translate(-8%, 25%) scale(1.1) rotate(4deg); }
+  45% { transform: translate(5%, 45%) scale(0.88) rotate(-3deg); }
+  70% { transform: translate(-15%, 12%) scale(1.06) rotate(2deg); }
+  90% { transform: translate(3%, -8%) scale(0.95) rotate(-1deg); }
 }
-@keyframes accent-drift-b {
-  0%, 100% { transform: translate(0, 0) scale(1.05) rotate(0deg); }
-  25% { transform: translate(25%, -20%) scale(0.88) rotate(-4deg); }
-  50% { transform: translate(10%, -35%) scale(1.12) rotate(6deg); }
-  75% { transform: translate(-15%, -10%) scale(0.98) rotate(-2deg); }
+@keyframes drift-b1-m {
+  0%, 100% { transform: translate(0, 0) scale(1.02) rotate(0deg); }
+  25% { transform: translate(8%, -22%) scale(0.9) rotate(-3deg); }
+  50% { transform: translate(-10%, -35%) scale(1.1) rotate(5deg); }
+  75% { transform: translate(5%, 10%) scale(0.94) rotate(-2deg); }
 }
-@keyframes accent-drift-c {
+@keyframes drift-c1-m {
   0%, 100% { transform: translate(0, 0) scale(0.95) rotate(0deg); }
-  25% { transform: translate(-18%, 20%) scale(1.12) rotate(4deg); }
-  50% { transform: translate(20%, -15%) scale(1.02) rotate(-5deg); }
-  75% { transform: translate(12%, 8%) scale(1.08) rotate(3deg); }
+  30% { transform: translate(-12%, 20%) scale(1.12) rotate(4deg); }
+  55% { transform: translate(10%, -22%) scale(0.98) rotate(-4deg); }
+  80% { transform: translate(5%, 8%) scale(1.08) rotate(2deg); }
+}
+/* Modern satellite blobs */
+@keyframes drift-a2-m {
+  0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  15% { transform: translate(15%, -30%) scale(1.2) rotate(-6deg); }
+  35% { transform: translate(-12%, 25%) scale(0.8) rotate(5deg); }
+  55% { transform: translate(10%, 50%) scale(1.15) rotate(-4deg); }
+  75% { transform: translate(-20%, 10%) scale(0.85) rotate(6deg); }
+  90% { transform: translate(8%, -15%) scale(1.05) rotate(-2deg); }
+}
+@keyframes drift-b2-m {
+  0%, 100% { transform: translate(0, 0) scale(1.05) rotate(0deg); }
+  20% { transform: translate(-18%, 30%) scale(0.8) rotate(6deg); }
+  40% { transform: translate(15%, -20%) scale(1.2) rotate(-5deg); }
+  60% { transform: translate(-5%, -35%) scale(0.9) rotate(3deg); }
+  80% { transform: translate(12%, 15%) scale(1.1) rotate(-4deg); }
+}
+@keyframes drift-c2-m {
+  0%, 100% { transform: translate(0, 0) scale(0.9) rotate(0deg); }
+  18% { transform: translate(18%, -28%) scale(1.2) rotate(-5deg); }
+  38% { transform: translate(-15%, 25%) scale(0.8) rotate(6deg); }
+  58% { transform: translate(12%, 15%) scale(1.15) rotate(-3deg); }
+  78% { transform: translate(-8%, -20%) scale(0.9) rotate(4deg); }
+}
+
+/* ========== ARTWORK: full-screen positioning ========== */
+.blobs-artwork .blob-a1 {
+  width: 45%; height: 50%; top: -8%; right: -5%;
+  animation: drift-a1-f 20s ease-in-out infinite;
+}
+.blobs-artwork .blob-a2 {
+  width: 28%; height: 30%; top: 5%; left: 8%; opacity: 0.7;
+  animation: drift-a2-f 15s ease-in-out infinite;
+}
+.blobs-artwork .blob-b1 {
+  width: 42%; height: 46%; bottom: -6%; left: -3%;
+  animation: drift-b1-f 24s ease-in-out infinite;
+}
+.blobs-artwork .blob-b2 {
+  width: 25%; height: 28%; bottom: 15%; right: 10%; opacity: 0.7;
+  animation: drift-b2-f 17s ease-in-out infinite;
+}
+.blobs-artwork .blob-c1 {
+  width: 38%; height: 42%; top: 25%; left: 30%;
+  animation: drift-c1-f 22s ease-in-out infinite;
+}
+.blobs-artwork .blob-c2 {
+  width: 22%; height: 24%; top: 55%; right: 25%; opacity: 0.7;
+  animation: drift-c2-f 16s ease-in-out infinite;
+}
+
+/* Artwork primary blobs — sweep across entire screen */
+@keyframes drift-a1-f {
+  0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  20% { transform: translate(-20%, 25%) scale(1.08) rotate(4deg); }
+  45% { transform: translate(15%, 45%) scale(0.9) rotate(-3deg); }
+  70% { transform: translate(-25%, 15%) scale(1.05) rotate(2deg); }
+  90% { transform: translate(8%, -5%) scale(0.96) rotate(-1deg); }
+}
+@keyframes drift-b1-f {
+  0%, 100% { transform: translate(0, 0) scale(1.02) rotate(0deg); }
+  25% { transform: translate(22%, -18%) scale(0.88) rotate(-3deg); }
+  50% { transform: translate(8%, -40%) scale(1.1) rotate(5deg); }
+  75% { transform: translate(-12%, -8%) scale(0.95) rotate(-2deg); }
+}
+@keyframes drift-c1-f {
+  0%, 100% { transform: translate(0, 0) scale(0.95) rotate(0deg); }
+  30% { transform: translate(-20%, 22%) scale(1.1) rotate(4deg); }
+  55% { transform: translate(22%, -18%) scale(1.0) rotate(-4deg); }
+  80% { transform: translate(10%, 12%) scale(1.06) rotate(2deg); }
+}
+/* Artwork satellite blobs */
+@keyframes drift-a2-f {
+  0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  15% { transform: translate(30%, -20%) scale(1.2) rotate(-6deg); }
+  35% { transform: translate(-15%, 35%) scale(0.8) rotate(5deg); }
+  55% { transform: translate(25%, 50%) scale(1.15) rotate(-4deg); }
+  75% { transform: translate(-30%, 15%) scale(0.85) rotate(6deg); }
+  90% { transform: translate(12%, -12%) scale(1.05) rotate(-2deg); }
+}
+@keyframes drift-b2-f {
+  0%, 100% { transform: translate(0, 0) scale(1.05) rotate(0deg); }
+  20% { transform: translate(-25%, 25%) scale(0.8) rotate(6deg); }
+  40% { transform: translate(30%, -15%) scale(1.2) rotate(-5deg); }
+  60% { transform: translate(5%, -40%) scale(0.9) rotate(3deg); }
+  80% { transform: translate(-20%, 10%) scale(1.1) rotate(-4deg); }
+}
+@keyframes drift-c2-f {
+  0%, 100% { transform: translate(0, 0) scale(0.9) rotate(0deg); }
+  18% { transform: translate(25%, -28%) scale(1.2) rotate(-5deg); }
+  38% { transform: translate(-20%, 30%) scale(0.8) rotate(6deg); }
+  58% { transform: translate(28%, 12%) scale(1.15) rotate(-3deg); }
+  78% { transform: translate(-12%, -18%) scale(0.9) rotate(4deg); }
 }
 </style>
