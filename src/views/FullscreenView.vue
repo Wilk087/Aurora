@@ -9,11 +9,20 @@
   >
     <!-- ── Fluid gradient background from cover colors ─────────── -->
     <div class="absolute inset-0 bg-black transition-colors duration-1000">
+      <!-- Static gradient background -->
       <div
+        v-if="!effectiveAnimated"
         class="absolute inset-0 transition-all duration-[2s] ease-out"
         :style="bgStyle"
       />
-      <div v-if="!vibrantBackground" class="absolute inset-0 opacity-[0.03]" style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 /%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22 /%3E%3C/svg%3E')" />
+      <!-- Animated background: dominant fill + drifting accent blobs -->
+      <div v-if="effectiveAnimated" class="absolute inset-0 overflow-hidden">
+        <div class="absolute inset-0 transition-[background] duration-[2s] ease-out" :style="{ background: brightColors.c1 }" />
+        <div class="animated-blob blob-a" :style="{ background: brightColors.c2, boxShadow: `0 0 80px 40px ${brightColors.c2}` }" />
+        <div class="animated-blob blob-b" :style="{ background: brightColors.c3, boxShadow: `0 0 80px 40px ${brightColors.c3}` }" />
+        <div class="animated-blob blob-c" :style="{ background: brightColors.c4, boxShadow: `0 0 80px 40px ${brightColors.c4}` }" />
+      </div>
+      <div v-if="!effectiveVibrant" class="absolute inset-0 opacity-[0.03]" style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 /%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22 /%3E%3C/svg%3E')" />
     </div>
 
     <!-- ── Two-column layout ──────────────────────────────────── -->
@@ -242,7 +251,10 @@
       <!-- Main content area: Modern mode (full-height cover + ambient fade + lyrics) -->
       <div v-else-if="immersiveStyle === 'modern'" class="flex-1 flex min-h-0">
         <!-- Blurred ambient backdrop (extends cover's colors into the transition zone) -->
-        <div class="absolute inset-0 z-[1] overflow-hidden pointer-events-none">
+        <div
+          class="absolute inset-0 z-[1] overflow-hidden pointer-events-none transition-opacity duration-1000"
+          :class="effectiveAnimated ? 'opacity-40' : 'opacity-100'"
+        >
           <img
             v-if="player.currentTrack?.coverArt"
             :src="coverUrl"
@@ -584,8 +596,8 @@
               </div>
             </div>
 
-            <!-- Background -->
-            <div>
+            <!-- Background (default / artwork) -->
+            <div v-if="immersiveStyle !== 'modern'">
               <p class="text-[10px] font-semibold uppercase tracking-wider text-white/25 mb-2">Background</p>
               <label class="flex items-center justify-between cursor-pointer">
                 <div>
@@ -600,6 +612,27 @@
                   <span
                     class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200"
                     :class="vibrantBackground ? 'translate-x-4' : ''"
+                  />
+                </button>
+              </label>
+            </div>
+
+            <!-- Animated Colors (modern / artwork when vibrant) -->
+            <div v-if="immersiveStyle === 'modern' || (immersiveStyle === 'artwork' && effectiveVibrant)">
+              <p v-if="immersiveStyle === 'modern'" class="text-[10px] font-semibold uppercase tracking-wider text-white/25 mb-2">Background</p>
+              <label class="flex items-center justify-between cursor-pointer" :class="immersiveStyle !== 'modern' ? 'mt-3' : ''">
+                <div>
+                  <span class="text-sm text-white/70">Animated colors</span>
+                  <p class="text-[11px] text-white/30 mt-0.5">Fluid moving color accents</p>
+                </div>
+                <button
+                  @click="animatedBackground = !animatedBackground"
+                  class="relative w-9 h-5 rounded-full transition-colors duration-200"
+                  :class="animatedBackground ? 'bg-accent' : 'bg-white/15'"
+                >
+                  <span
+                    class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200"
+                    :class="animatedBackground ? 'translate-x-4' : ''"
                   />
                 </button>
               </label>
@@ -672,9 +705,18 @@ const VIBRANT_BG_KEY = 'aurora:vibrant-background'
 const vibrantBackground = ref(localStorage.getItem(VIBRANT_BG_KEY) === 'true' || (localStorage.getItem(VIBRANT_BG_KEY) === null && immersiveStyle.value === 'modern'))
 watch(vibrantBackground, (v) => localStorage.setItem(VIBRANT_BG_KEY, String(v)))
 
+const ANIMATED_BG_KEY = 'aurora:animated-background'
+const animatedBackground = ref(localStorage.getItem(ANIMATED_BG_KEY) === 'true')
+watch(animatedBackground, (v) => localStorage.setItem(ANIMATED_BG_KEY, String(v)))
+
+// Modern always uses vibrant; for default/artwork it's a toggle
+const effectiveVibrant = computed(() => immersiveStyle.value === 'modern' || vibrantBackground.value)
+// Animated bg only for modern/artwork, and requires vibrant
+const effectiveAnimated = computed(() => animatedBackground.value && effectiveVibrant.value && (immersiveStyle.value === 'modern' || immersiveStyle.value === 'artwork'))
+
 // Luminance of the cover art (0 = black, 255 = white)
 const coverLuminance = ref(50)
-const isLightBackground = computed(() => vibrantBackground.value && coverLuminance.value > 140)
+const isLightBackground = computed(() => effectiveVibrant.value && coverLuminance.value > 140)
 provide('isLightBackground', isLightBackground)
 
 // ── Idle / Active state ──────────────────────────────────────────────
@@ -828,8 +870,8 @@ const brightColors = ref<{ c1: string; c2: string; c3: string; c4: string }>({
 })
 
 const bgStyle = computed(() => {
-  const c = vibrantBackground.value ? brightColors.value : colors.value
-  if (vibrantBackground.value) {
+  const c = effectiveVibrant.value ? brightColors.value : colors.value
+  if (effectiveVibrant.value) {
     return {
       background: `
         radial-gradient(ellipse 100% 80% at 25% 60%, ${c.c1} 0%, transparent 80%),
@@ -864,53 +906,76 @@ function extractColors(src: string) {
   img.src = src
   img.onload = () => {
     const canvas = document.createElement('canvas')
-    canvas.width = 16
-    canvas.height = 16
+    const sz = 32
+    canvas.width = sz
+    canvas.height = sz
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    ctx.drawImage(img, 0, 0, 16, 16)
-    const data = ctx.getImageData(0, 0, 16, 16).data
+    ctx.drawImage(img, 0, 0, sz, sz)
+    const data = ctx.getImageData(0, 0, sz, sz).data
 
-    // Sample 4 quadrants for different color regions
-    const quadrants = [
-      { sx: 0, sy: 0, ex: 8, ey: 8 },    // top-left
-      { sx: 8, sy: 0, ex: 16, ey: 8 },   // top-right
-      { sx: 0, sy: 8, ex: 8, ey: 16 },   // bottom-left
-      { sx: 8, sy: 8, ex: 16, ey: 16 },  // bottom-right
-    ]
+    // Collect all pixels
+    const pixels: { r: number; g: number; b: number; sat: number }[] = []
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2]
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b)
+      const sat = mx === 0 ? 0 : (mx - mn) / mx
+      pixels.push({ r, g, b, sat })
+    }
 
-    const extracted = quadrants.map((q) => {
-      let r = 0, g = 0, b = 0, count = 0
-      for (let y = q.sy; y < q.ey; y++) {
-        for (let x = q.sx; x < q.ex; x++) {
-          const i = (y * 16 + x) * 4
-          r += data[i]; g += data[i + 1]; b += data[i + 2]; count++
-        }
+    const colorDist = (a: { r: number; g: number; b: number }, b: { r: number; g: number; b: number }) =>
+      Math.abs(a.r - b.r) + Math.abs(a.g - b.g) + Math.abs(a.b - b.b)
+
+    // Find the dominant (most frequent) color via simple bucketing
+    const bucketSize = 24
+    const buckets = new Map<string, { r: number; g: number; b: number; count: number; tr: number; tg: number; tb: number }>()
+    for (const px of pixels) {
+      const key = `${Math.floor(px.r / bucketSize)},${Math.floor(px.g / bucketSize)},${Math.floor(px.b / bucketSize)}`
+      const b = buckets.get(key)
+      if (b) { b.count++; b.tr += px.r; b.tg += px.g; b.tb += px.b }
+      else buckets.set(key, { r: px.r, g: px.g, b: px.b, count: 1, tr: px.r, tg: px.g, tb: px.b })
+    }
+    // Sort buckets by frequency
+    const sortedBuckets = [...buckets.values()]
+      .sort((a, b) => b.count - a.count)
+      .map(b => ({ r: Math.round(b.tr / b.count), g: Math.round(b.tg / b.count), b: Math.round(b.tb / b.count) }))
+
+    // c1 = most frequent (dominant), c2-c4 = most saturated distinct accents
+    const dominant = sortedBuckets[0] || { r: 30, g: 30, b: 50 }
+    const picked: { r: number; g: number; b: number }[] = [dominant]
+
+    // Sort by saturation for accent picks
+    const sorted = [...pixels].sort((a, b) => b.sat - a.sat)
+    for (const px of sorted) {
+      if (picked.length >= 4) break
+      if (picked.every(p => colorDist(p, px) > 70)) {
+        picked.push({ r: px.r, g: px.g, b: px.b })
       }
-      if (count === 0) return 'rgba(20,10,30,0.9)'
-      // Darken and saturate for a moody look
-      const dr = Math.round((r / count) * 0.45)
-      const dg = Math.round((g / count) * 0.35)
-      const db = Math.round((b / count) * 0.5)
+    }
+    // Fill remaining with next most frequent buckets
+    for (const bucket of sortedBuckets) {
+      if (picked.length >= 4) break
+      if (picked.every(p => colorDist(p, bucket) > 50)) {
+        picked.push(bucket)
+      }
+    }
+    while (picked.length < 4) picked.push(dominant)
+
+    // Dark variant (default mode)
+    const dark = picked.map(c => {
+      const dr = Math.round(c.r * 0.45)
+      const dg = Math.round(c.g * 0.35)
+      const db = Math.round(c.b * 0.5)
       return `rgba(${dr},${dg},${db},0.9)`
     })
+    colors.value = { c1: dark[0], c2: dark[1], c3: dark[2], c4: dark[3] }
 
-    colors.value = { c1: extracted[0], c2: extracted[1], c3: extracted[2], c4: extracted[3] }
-
-    // Brighter variant for Modern mode
-    const bright = quadrants.map((q) => {
-      let r = 0, g = 0, b = 0, count = 0
-      for (let y = q.sy; y < q.ey; y++) {
-        for (let x = q.sx; x < q.ex; x++) {
-          const i = (y * 16 + x) * 4
-          r += data[i]; g += data[i + 1]; b += data[i + 2]; count++
-        }
-      }
-      if (count === 0) return 'rgba(40,20,60,0.95)'
-      const br = Math.min(255, Math.round((r / count) * 0.9))
-      const bg = Math.min(255, Math.round((g / count) * 0.8))
-      const bb = Math.min(255, Math.round((b / count) * 0.95))
-      return `rgba(${br},${bg},${bb},0.95)`
+    // Bright variant — preserve actual hues
+    const bright = picked.map(c => {
+      const br = Math.min(255, Math.round(c.r * 0.95))
+      const bg = Math.min(255, Math.round(c.g * 0.95))
+      const bb = Math.min(255, Math.round(c.b * 0.95))
+      return `rgba(${br},${bg},${bb},1)`
     })
     brightColors.value = { c1: bright[0], c2: bright[1], c3: bright[2], c4: bright[3] }
 
@@ -919,8 +984,8 @@ function extractColors(src: string) {
     for (let i = 0; i < data.length; i += 4) {
       totalR += data[i]; totalG += data[i + 1]; totalB += data[i + 2]
     }
-    const px = data.length / 4
-    coverLuminance.value = (0.299 * (totalR / px) + 0.587 * (totalG / px) + 0.114 * (totalB / px))
+    const totalPx = data.length / 4
+    coverLuminance.value = (0.299 * (totalR / totalPx) + 0.587 * (totalG / totalPx) + 0.114 * (totalB / totalPx))
   }
 }
 
@@ -950,7 +1015,13 @@ function onKeydown(e: KeyboardEvent) {
 
   if (e.key === 'Escape' || e.key === 'F11') {
     e.preventDefault()
-    exitFullscreen()
+    if (showImmersiveMenu.value) {
+      showImmersiveMenu.value = false
+    } else if (showQueue.value) {
+      showQueue.value = false
+    } else {
+      exitFullscreen()
+    }
   } else if (e.key === ' ') {
     e.preventDefault()
     player.togglePlay()
@@ -1140,5 +1211,55 @@ onUnmounted(() => {
 .modern-controls-collapsed .modern-header-mini {
   opacity: 1;
   pointer-events: auto;
+}
+
+/* ── Animated background: drifting accent blobs ────────────────── */
+.animated-blob {
+  position: absolute;
+  border-radius: 40% 60% 55% 45% / 55% 40% 60% 45%;
+  filter: blur(70px) saturate(1.4);
+  opacity: 0.85;
+  will-change: transform;
+  transition: background 2s ease;
+}
+.blob-a {
+  width: 60%;
+  height: 65%;
+  top: -10%;
+  right: -5%;
+  animation: accent-drift-a 18s ease-in-out infinite;
+}
+.blob-b {
+  width: 55%;
+  height: 60%;
+  bottom: -8%;
+  left: -3%;
+  animation: accent-drift-b 24s ease-in-out infinite;
+}
+.blob-c {
+  width: 50%;
+  height: 55%;
+  top: 25%;
+  left: 25%;
+  animation: accent-drift-c 21s ease-in-out infinite;
+}
+
+@keyframes accent-drift-a {
+  0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  25% { transform: translate(-20%, 25%) scale(1.12) rotate(5deg); }
+  50% { transform: translate(15%, 45%) scale(0.92) rotate(-3deg); }
+  75% { transform: translate(-10%, 10%) scale(1.06) rotate(2deg); }
+}
+@keyframes accent-drift-b {
+  0%, 100% { transform: translate(0, 0) scale(1.05) rotate(0deg); }
+  25% { transform: translate(25%, -20%) scale(0.88) rotate(-4deg); }
+  50% { transform: translate(10%, -35%) scale(1.12) rotate(6deg); }
+  75% { transform: translate(-15%, -10%) scale(0.98) rotate(-2deg); }
+}
+@keyframes accent-drift-c {
+  0%, 100% { transform: translate(0, 0) scale(0.95) rotate(0deg); }
+  25% { transform: translate(-18%, 20%) scale(1.12) rotate(4deg); }
+  50% { transform: translate(20%, -15%) scale(1.02) rotate(-5deg); }
+  75% { transform: translate(12%, 8%) scale(1.08) rotate(3deg); }
 }
 </style>
