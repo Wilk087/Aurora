@@ -633,7 +633,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick, provide } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
@@ -671,6 +671,11 @@ watch(immersiveStyle, (v) => localStorage.setItem(IMMERSIVE_STYLE_KEY, v))
 const VIBRANT_BG_KEY = 'aurora:vibrant-background'
 const vibrantBackground = ref(localStorage.getItem(VIBRANT_BG_KEY) === 'true' || (localStorage.getItem(VIBRANT_BG_KEY) === null && immersiveStyle.value === 'modern'))
 watch(vibrantBackground, (v) => localStorage.setItem(VIBRANT_BG_KEY, String(v)))
+
+// Luminance of the cover art (0 = black, 255 = white)
+const coverLuminance = ref(50)
+const isLightBackground = computed(() => vibrantBackground.value && coverLuminance.value > 140)
+provide('isLightBackground', isLightBackground)
 
 // ── Idle / Active state ──────────────────────────────────────────────
 const idle = ref(false)
@@ -908,6 +913,14 @@ function extractColors(src: string) {
       return `rgba(${br},${bg},${bb},0.95)`
     })
     brightColors.value = { c1: bright[0], c2: bright[1], c3: bright[2], c4: bright[3] }
+
+    // Compute overall luminance (0–255) from full image average
+    let totalR = 0, totalG = 0, totalB = 0
+    for (let i = 0; i < data.length; i += 4) {
+      totalR += data[i]; totalG += data[i + 1]; totalB += data[i + 2]
+    }
+    const px = data.length / 4
+    coverLuminance.value = (0.299 * (totalR / px) + 0.587 * (totalG / px) + 0.114 * (totalB / px))
   }
 }
 

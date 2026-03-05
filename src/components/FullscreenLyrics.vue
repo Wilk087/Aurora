@@ -23,13 +23,17 @@
         <p
           v-for="(line, i) in plainLyricsLines"
           :key="i"
-          class="text-center text-white/30 text-lg font-light leading-relaxed py-1"
+          class="text-center text-xl font-semibold leading-loose py-1.5"
+          :class="isLightBackground ? 'text-black/70' : 'text-white/80 drop-shadow-[0_2px_6px_rgba(0,0,0,0.8)]'"
         >
           {{ line || '\u00A0' }}
         </p>
       </div>
       <div class="text-center">
-        <p class="text-white/15 text-sm mb-4">These lyrics aren't synced yet</p>
+        <span
+          class="inline-block px-4 py-1.5 mb-4 rounded-full text-xs font-medium tracking-wide"
+          :class="isLightBackground ? 'bg-black/[0.1] text-black/50' : 'bg-white/[0.08] text-white/50'"
+        >These lyrics aren't synced yet</span>
         <button
           v-if="player.currentTrack?.source !== 'subsonic'"
           @click="showSyncer = true"
@@ -128,13 +132,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, inject } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { parseLRC, findCurrentLine, type LyricLine } from '@/utils/lrcParser'
 import LyricsCard from '@/components/LyricsCard.vue'
 import LrcSyncer from '@/components/LrcSyncer.vue'
 
 const player = usePlayerStore()
+const isLightBackground = inject('isLightBackground', computed(() => false))
 
 const lyrics = ref<LyricLine[]>([])
 const plainLyricsText = ref('')
