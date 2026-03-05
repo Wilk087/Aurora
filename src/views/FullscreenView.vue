@@ -973,7 +973,8 @@ const bgStyle = computed(() => {
         radial-gradient(ellipse 100% 80% at 25% 60%, ${c.c1} 0%, transparent 80%),
         radial-gradient(ellipse 100% 100% at 85% 35%, ${c.c2} 0%, transparent 75%),
         radial-gradient(ellipse 90% 70% at 60% 90%, ${c.c3} 0%, transparent 70%),
-        radial-gradient(ellipse 110% 80% at 40% 10%, ${c.c4} 0%, transparent 80%)
+        radial-gradient(ellipse 110% 80% at 40% 10%, ${c.c4} 0%, transparent 80%),
+        ${c.c1}
       `,
     }
   }
