@@ -301,6 +301,7 @@
 
         <!-- Floating controls box -->
         <div
+          v-show="!hideControls"
           class="modern-controls-box"
           :class="{ 'modern-controls-collapsed': idle && !modernControlsHover }"
           @mouseenter="modernControlsHover = true"
@@ -647,6 +648,27 @@
               </label>
             </div>
 
+            <!-- Playback controls (modern only) -->
+            <div v-if="immersiveStyle === 'modern'">
+              <p class="text-[10px] font-semibold uppercase tracking-wider text-white/25 mb-2">Controls</p>
+              <label class="flex items-center justify-between cursor-pointer">
+                <div>
+                  <span class="text-sm text-white/70">Hide playback controls</span>
+                  <p class="text-[11px] text-white/30 mt-0.5">Shortcuts still work</p>
+                </div>
+                <button
+                  @click="hideControls = !hideControls"
+                  class="relative w-9 h-5 rounded-full transition-colors duration-200"
+                  :class="hideControls ? 'bg-accent' : 'bg-white/15'"
+                >
+                  <span
+                    class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200"
+                    :class="hideControls ? 'translate-x-4' : ''"
+                  />
+                </button>
+              </label>
+            </div>
+
             <!-- Animated Covers -->
             <div>
               <p class="text-[10px] font-semibold uppercase tracking-wider text-white/25 mb-2">Media</p>
@@ -711,6 +733,7 @@ const currentStyleLabel = computed(() =>
 // Per-style effect toggles (each style remembers its own vibrant & animated state)
 const vibrantPerStyle = ref<Record<StyleId, boolean>>({ default: false, modern: true, artwork: false })
 const animatedPerStyle = ref<Record<StyleId, boolean>>({ default: false, modern: false, artwork: false })
+const hideControlsPerStyle = ref<Record<StyleId, boolean>>({ default: false, modern: false, artwork: false })
 
 // Convenience accessors for the current style's toggles
 const vibrantBackground = computed({
@@ -720,6 +743,10 @@ const vibrantBackground = computed({
 const animatedBackground = computed({
   get: () => animatedPerStyle.value[immersiveStyle.value as StyleId] ?? false,
   set: (v: boolean) => { animatedPerStyle.value[immersiveStyle.value as StyleId] = v; saveImmersiveSettings() },
+})
+const hideControls = computed({
+  get: () => hideControlsPerStyle.value[immersiveStyle.value as StyleId] ?? false,
+  set: (v: boolean) => { hideControlsPerStyle.value[immersiveStyle.value as StyleId] = v; saveImmersiveSettings() },
 })
 
 // Modern always uses vibrant; for default/artwork it's a toggle
@@ -734,6 +761,7 @@ async function saveImmersiveSettings() {
     settings.immersiveStyle = immersiveStyle.value
     settings.immersiveVibrant = { ...vibrantPerStyle.value }
     settings.immersiveAnimated = { ...animatedPerStyle.value }
+    settings.immersiveHideControls = { ...hideControlsPerStyle.value }
     await window.api.saveSettings(settings)
   } catch { /* ignore */ }
 }
@@ -773,6 +801,9 @@ async function loadImmersiveSettings() {
     }
     if (settings.immersiveAnimated && typeof settings.immersiveAnimated === 'object') {
       animatedPerStyle.value = { ...animatedPerStyle.value, ...settings.immersiveAnimated }
+    }
+    if (settings.immersiveHideControls && typeof settings.immersiveHideControls === 'object') {
+      hideControlsPerStyle.value = { ...hideControlsPerStyle.value, ...settings.immersiveHideControls }
     }
   } catch { /* first run, defaults are fine */ }
 }
