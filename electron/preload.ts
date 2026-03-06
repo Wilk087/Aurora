@@ -65,6 +65,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // Waveform generation
   generateWaveform: (trackPath: string): Promise<number[]> => ipcRenderer.invoke('track:generate-waveform', trackPath),
+  generateWaveformSubsonic: (songId: string): Promise<number[]> => ipcRenderer.invoke('track:generate-waveform-subsonic', songId),
 
   // Artist info
   getArtistInfo: (artistName: string) => ipcRenderer.invoke('artist:get-info', artistName),

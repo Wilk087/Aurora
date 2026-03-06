@@ -216,15 +216,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { formatTime } from '@/utils/formatTime'
 import ArtistLinks from '@/components/ArtistLinks.vue'
 
-defineProps<{ show: boolean }>()
-defineEmits(['close'])
+const props = defineProps<{ show: boolean }>()
+const emit = defineEmits(['close'])
+
+// ── Close on Escape ────────────────────────────────────────
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && props.show) {
+    e.preventDefault()
+    e.stopPropagation()
+    emit('close')
+  }
+}
+
+watch(() => props.show, (visible) => {
+  if (visible) {
+    document.addEventListener('keydown', onKeydown, { capture: true })
+  } else {
+    document.removeEventListener('keydown', onKeydown, { capture: true })
+  }
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', onKeydown, { capture: true })
+})
 
 const router = useRouter()
 const player = usePlayerStore()

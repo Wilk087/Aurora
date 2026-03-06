@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog, protocol, net, shell, screen } from 'electron'
 import { join, extname, basename, dirname } from 'path'
-import { readdir, readFile, writeFile, mkdir, stat, rm, copyFile } from 'fs/promises'
+import { readdir, readFile, writeFile, mkdir, stat, rm, copyFile, unlink } from 'fs/promises'
 import { existsSync, createReadStream, readFileSync } from 'fs'
 import { createHash } from 'crypto'
 import { request as httpsRequest, get as httpsGet } from 'https'
@@ -1545,6 +1545,70 @@ app.whenReady().then(async () => {
       scheduleWaveformFlush()
     }
     return result
+  })
+
+  // ── IPC: Waveform generation for subsonic/Navidrome streams ──
+  ipcMain.handle('track:generate-waveform-subsonic', async (_, songId: string) => {
+    const cacheKey = `subsonic-${songId}`
+    if (waveformDiskCache[cacheKey]) {
+      return waveformDiskCache[cacheKey]
+    }
+
+    let tmpFile = ''
+    try {
+      const streamUrl = getStreamUrl(songId)
+      const { execFile } = await import('child_process')
+      const { promisify } = await import('util')
+      const execFileAsync = promisify(execFile)
+
+      // Download the stream to a temp file first (avoids ffmpeg HTTPS/protocol issues)
+      const tmpDir = join(userDataPath, 'tmp')
+      if (!existsSync(tmpDir)) await mkdir(tmpDir, { recursive: true })
+      tmpFile = join(tmpDir, `waveform-${songId}`)
+
+      const response = await fetch(streamUrl)
+      if (!response.ok) throw new Error(`Stream fetch failed: ${response.status}`)
+      const arrayBuf = await response.arrayBuffer()
+      await writeFile(tmpFile, Buffer.from(arrayBuf))
+
+      const BARS = 200
+      const ffResult = await execFileAsync('ffmpeg', [
+        '-i', tmpFile, '-ac', '1', '-ar', '8000',
+        '-f', 's16le', '-v', 'quiet', 'pipe:1'
+      ], { maxBuffer: 8000 * 2 * 600 + 1024, encoding: 'buffer' as any })
+
+      const pcmBuffer = ffResult.stdout as unknown as Buffer
+      const totalSamples = Math.floor(pcmBuffer.length / 2)
+      if (totalSamples === 0) return []
+      const samplesPerBar = Math.floor(totalSamples / BARS)
+      if (samplesPerBar === 0) return []
+      const peaks: number[] = []
+
+      for (let bar = 0; bar < BARS; bar++) {
+        let sum = 0, count = 0
+        const startSample = bar * samplesPerBar
+        for (let s = startSample; s < startSample + samplesPerBar && s < totalSamples; s++) {
+          sum += Math.abs(pcmBuffer.readInt16LE(s * 2)) / 32768; count++
+        }
+        peaks.push(count > 0 ? sum / count : 0)
+      }
+      const max = Math.max(...peaks, 0.001)
+      const result = peaks.map(p => p / max)
+
+      if (result.length > 0) {
+        waveformDiskCache[cacheKey] = result
+        scheduleWaveformFlush()
+      }
+      return result
+    } catch (err) {
+      console.error('Subsonic waveform generation error:', err)
+      return []
+    } finally {
+      // Clean up temp file
+      if (tmpFile) {
+        try { await unlink(tmpFile) } catch {}
+      }
+    }
   })
 
   // ── IPC: Artist info (MusicBrainz + Wikipedia summary) ──

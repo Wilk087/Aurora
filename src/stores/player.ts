@@ -285,6 +285,25 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
+  async function generateSubsonicWaveform(songId: string) {
+    const cacheKey = `subsonic-${songId}`
+    if (waveformCache.has(cacheKey)) {
+      waveformData.value = waveformCache.get(cacheKey)!
+      return
+    }
+    waveformData.value = []
+    try {
+      const result = await window.api.generateWaveformSubsonic(songId)
+      if (result && result.length > 0) {
+        waveformCache.set(cacheKey, result)
+        waveformData.value = result
+      }
+    } catch (err) {
+      console.error('Subsonic waveform generation error:', err)
+      waveformData.value = []
+    }
+  }
+
   // ── Adaptive accent ────────────────────────────────────────────────────
   const adaptiveAccent = ref(false)
   const currentAccentColor = ref<string | null>(null)
@@ -652,11 +671,14 @@ export const usePlayerStore = defineStore('player', () => {
     scrobbleReported = false
     if (scrobbleTimer) { clearTimeout(scrobbleTimer); scrobbleTimer = null }
 
-    // Generate waveform if enabled (only for local files)
-    if (waveformEnabled.value && track.source !== 'subsonic') {
-      generateWaveform(track.path)
-    } else if (track.source === 'subsonic') {
-      waveformData.value = []
+    // Generate waveform if enabled
+    if (waveformEnabled.value) {
+      if (track.source === 'subsonic' && track.path.startsWith('subsonic://')) {
+        const songId = track.path.replace('subsonic://', '')
+        generateSubsonicWaveform(songId)
+      } else {
+        generateWaveform(track.path)
+      }
     }
 
     // Scrobble: update now playing
@@ -1006,7 +1028,12 @@ export const usePlayerStore = defineStore('player', () => {
       window.api.saveSettings(s)
     })
     if (enabled && currentTrack.value) {
-      generateWaveform(currentTrack.value.path)
+      const t = currentTrack.value
+      if (t.source === 'subsonic' && t.path.startsWith('subsonic://')) {
+        generateSubsonicWaveform(t.path.replace('subsonic://', ''))
+      } else {
+        generateWaveform(t.path)
+      }
     }
   }
 

@@ -147,6 +147,7 @@ interface Window {
     getTrackCredits: (trackPath: string) => Promise<TrackCredits>
     // Waveform
     generateWaveform: (trackPath: string) => Promise<number[]>
+    generateWaveformSubsonic: (songId: string) => Promise<number[]>
     // Artist info
     getArtistInfo: (artistName: string) => Promise<ArtistInfo | null>
     // Folder structure
