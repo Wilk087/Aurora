@@ -24,7 +24,7 @@
         <h1 class="text-4xl font-bold text-white mb-2 line-clamp-2">{{ album.name }}</h1>
         <p class="text-lg text-white/60 mb-4 cursor-pointer hover:text-accent transition-colors" @click="goToArtist">{{ album.artist }}</p>
         <div class="flex items-center gap-3 text-sm text-white/40">
-          <span v-if="album.year">{{ album.year }}</span>
+          <span v-if="album.year" class="cursor-pointer hover:text-accent transition-colors" @click="goToYear">{{ album.year }}</span>
           <span v-if="album.year">&bull;</span>
           <span>{{ album.tracks.length }} songs</span>
           <span>&bull;</span>
@@ -206,6 +206,12 @@ const totalDuration = computed(() => {
 function goToArtist() {
   if (album.value) {
     router.push(`/artist/${encodeURIComponent(album.value.artist)}`)
+  }
+}
+
+function goToYear() {
+  if (album.value?.year) {
+    router.push(`/year/${album.value.year}`)
   }
 }
 

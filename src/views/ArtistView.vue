@@ -134,7 +134,7 @@
             </div>
           </div>
           <p class="text-sm font-medium text-white truncate">{{ album.name }}</p>
-          <p class="text-xs text-white/40">{{ album.year || '' }} &bull; {{ album.tracks.length }} tracks</p>
+          <p class="text-xs text-white/40"><span v-if="album.year" class="cursor-pointer hover:text-white/60 transition-colors" @click.stop="$router.push(`/year/${album.year}`)">{{ album.year }}</span><span v-if="album.year"> &bull; </span>{{ album.tracks.length }} tracks</p>
         </div>
       </div>
     </section>

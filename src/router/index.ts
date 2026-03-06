@@ -26,6 +26,11 @@ const router = createRouter({
       component: () => import('@/views/ArtistView.vue'),
     },
     {
+      path: '/year/:year',
+      name: 'year-detail',
+      component: () => import('@/views/YearView.vue'),
+    },
+    {
       path: '/folders',
       name: 'folders',
       component: () => import('@/views/FolderView.vue'),

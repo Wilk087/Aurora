@@ -40,7 +40,7 @@
       <ArtistLinks
         :artist="album.artist"
         hover-class="hover:text-white/60"
-      />{{ album.year ? ` • ${album.year}` : '' }}
+      /><span v-if="album.year"> • <span class="hover:text-white/60 cursor-pointer transition-colors" @click.stop="goToYear">{{ album.year }}</span></span>
     </p>
 
     <!-- Context menu -->
@@ -197,6 +197,12 @@ function addToQueue() {
 function goToArtist() {
   showCtx.value = false
   router.push(`/artist/${encodeURIComponent(props.album.artist)}`)
+}
+
+function goToYear() {
+  if (props.album.year) {
+    router.push(`/year/${props.album.year}`)
+  }
 }
 
 function openInExplorer() {
