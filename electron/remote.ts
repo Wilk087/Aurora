@@ -7,6 +7,7 @@ import { join } from 'path'
 import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { randomBytes, createHash } from 'crypto'
 import { networkInterfaces } from 'os'
+import { logger } from './logger'
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const PORT = 19876
@@ -393,7 +394,7 @@ export function startRemoteServer(win: BrowserWindow, getDataPath: () => string)
   })
 
   httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`Aurora Remote: http://${getLanIp()}:${PORT}`)
+    logger.info(`Aurora Remote: http://${getLanIp()}:${PORT}`)
   })
 
   // ── mDNS advertisement ──────────────────────────────────────────────
@@ -406,7 +407,7 @@ export function startRemoteServer(win: BrowserWindow, getDataPath: () => string)
       txt: { path: '/', version: '1', auth: 'pin' },
     })
   } catch (err) {
-    console.error('mDNS publish failed (non-fatal):', err)
+    logger.warn('mDNS publish failed (non-fatal):', err)
   }
 
   // ── PIN auto-refresh every 5 minutes ────────────────────────────────

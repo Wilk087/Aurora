@@ -16,6 +16,10 @@ import {
 } from './subsonic'
 import { startRemoteServer, stopRemoteServer, registerRemoteIPC, isRemoteEnabled } from './remote'
 import { registerAnimatedCoverIPC } from './animated-covers'
+import { logger, installGlobalLogHandlers, getLogPath } from './logger'
+
+// Install global error handlers and write startup info
+installGlobalLogHandlers()
 
 // ── Discord Rich Presence ──────────────────────────────────────────────────
 // Uses discord-rpc to show what's currently playing
@@ -35,7 +39,7 @@ async function initDiscordRPC(clientId?: string) {
 
     rpcClient.on('ready', () => {
       rpcReady = true
-      console.log('Discord RPC connected')
+      logger.info('Discord RPC connected')
     })
 
     rpcClient.on('disconnected', () => {
@@ -44,7 +48,7 @@ async function initDiscordRPC(clientId?: string) {
 
     await rpcClient.login()
   } catch (err) {
-    console.log('Discord RPC not available (Discord not running?):', (err as Error).message)
+    logger.info('Discord RPC not available (Discord not running?):', (err as Error).message)
     rpcReady = false
   }
 }
@@ -128,7 +132,7 @@ async function getAlbumArtUrl(artist: string, album: string): Promise<string | n
       return artUrl
     }
   } catch (err) {
-    console.error('Album art lookup error:', err)
+    logger.error('Album art lookup error:', err)
   }
 
   albumArtCache.set(cacheKey, null)
@@ -217,7 +221,7 @@ async function updateDiscordPresence(data: {
 
     await rpcClient.user?.setActivity(activity)
   } catch (err) {
-    console.error('Discord RPC update error:', err)
+    logger.error('Discord RPC update error:', err)
   }
 }
 
@@ -244,55 +248,48 @@ protocol.registerSchemesAsPrivileged([
   },
 ])
 
-// ── Exclusive audio mode (must apply Chromium flags before app.ready) ───────
+// ── Exclusive audio mode (disabled for 2.6.0 — will revisit later) ──────────
 // Chromium only respects the *last* --disable-features switch, so we collect
 // all features to disable and apply them in one call at the end.
 let exclusiveModeActive = false
 let exclusiveAlsaDevice = ''
 const disabledFeatures: string[] = []
 
-{
-  const earlySettingsPath = join(app.getPath('userData'), 'settings.json')
-  try {
-    if (existsSync(earlySettingsPath)) {
-      const earlySettings = JSON.parse(readFileSync(earlySettingsPath, 'utf-8'))
-      if (earlySettings.exclusiveMode === true) {
-        exclusiveModeActive = true
-        if (process.platform === 'win32') {
-          // WASAPI exclusive mode — bypasses Windows audio mixer for bit-perfect output
-          app.commandLine.appendSwitch('enable-exclusive-audio')
-        }
-        // Disable the audio service sandbox — removes an extra process hop and
-        // lets the renderer talk directly to the audio backend (ALSA/PipeWire/WASAPI).
-        disabledFeatures.push('AudioServiceSandbox')
-        // Prevent Chromium from resampling audio to the system rate.
-        app.commandLine.appendSwitch('disable-audio-output-resampler')
-        // On Linux, use ALSA directly to bypass PipeWire/PulseAudio mixer entirely
-        // This gives true exclusive device access — same approach as Tidal on Linux.
-        if (process.platform === 'linux') {
-          const alsaDev = earlySettings.exclusiveAlsaDevice || ''
-          if (alsaDev) {
-            exclusiveAlsaDevice = alsaDev
-            // Force Chromium to use ALSA backend instead of PulseAudio/PipeWire
-            app.commandLine.appendSwitch('audio-backend', 'alsa')
-            // Point at the raw hardware device (hw:X,Y) — no dmix, no resampling
-            app.commandLine.appendSwitch('alsa-output-device', alsaDev)
-            console.log(`Exclusive audio: ALSA backend, device=${alsaDev}`)
-          } else {
-            // No ALSA device selected — fall back to PipeWire optimizations
-            process.env.PIPEWIRE_LATENCY = '256/48000'
-            process.env.PIPEWIRE_PROPS = 'media.role=Music'
-            console.log('Exclusive audio: PipeWire optimized mode (no ALSA device selected)')
-          }
-        } else {
-          console.log('Exclusive audio mode enabled')
-        }
-      }
-    }
-  } catch (e) {
-    console.error('Failed to read settings for exclusive mode:', e)
-  }
-}
+// NOTE: Exclusive mode startup logic is intentionally skipped for 2.6.0.
+// The code below is kept for reference and future re-enablement.
+// {
+//   const earlySettingsPath = join(app.getPath('userData'), 'settings.json')
+//   try {
+//     if (existsSync(earlySettingsPath)) {
+//       const earlySettings = JSON.parse(readFileSync(earlySettingsPath, 'utf-8'))
+//       if (earlySettings.exclusiveMode === true) {
+//         exclusiveModeActive = true
+//         if (process.platform === 'win32') {
+//           app.commandLine.appendSwitch('enable-exclusive-audio')
+//         }
+//         disabledFeatures.push('AudioServiceSandbox')
+//         app.commandLine.appendSwitch('disable-audio-output-resampler')
+//         if (process.platform === 'linux') {
+//           const alsaDev = earlySettings.exclusiveAlsaDevice || ''
+//           if (alsaDev) {
+//             exclusiveAlsaDevice = alsaDev
+//             app.commandLine.appendSwitch('audio-backend', 'alsa')
+//             app.commandLine.appendSwitch('alsa-output-device', alsaDev)
+//             console.log(`Exclusive audio: ALSA backend, device=${alsaDev}`)
+//           } else {
+//             process.env.PIPEWIRE_LATENCY = '256/48000'
+//             process.env.PIPEWIRE_PROPS = 'media.role=Music'
+//             console.log('Exclusive audio: PipeWire optimized mode (no ALSA device selected)')
+//           }
+//         } else {
+//           console.log('Exclusive audio mode enabled')
+//         }
+//       }
+//     }
+//   } catch (e) {
+//     console.error('Failed to read settings for exclusive mode:', e)
+//   }
+// }
 
 // ── MPRIS / Desktop identity ───────────────────────────────────────────────
 app.setName('Aurora Player')
@@ -440,7 +437,7 @@ async function loadCache(): Promise<void> {
       cache.tracks = data.tracks || []
     }
   } catch (e) {
-    console.error('Failed to load library cache:', e)
+    logger.error('Failed to load library cache:', e)
     cache.folders = []
     cache.tracks = []
   }
@@ -460,7 +457,7 @@ function scheduleFlush() {
       await writeFile(storePath, JSON.stringify({ folders: cache.folders, tracks: cache.tracks }, null, 2))
       cache.dirty = false
     } catch (e) {
-      console.error('Failed to flush library cache:', e)
+      logger.error('Failed to flush library cache:', e)
     }
   }, 2000) // debounce writes to 2 seconds
 }
@@ -660,7 +657,7 @@ async function scanDirectory(dirPath: string): Promise<string[]> {
         }
       }
     } catch (err) {
-      console.error(`Error scanning ${dir}:`, err)
+      logger.error(`Error scanning ${dir}:`, err)
     }
   }
 
@@ -706,7 +703,7 @@ async function parseTrack(filePath: string): Promise<any> {
       comment: metadata.common.comment ? metadata.common.comment[0] || '' : '',
     }
   } catch (err) {
-    console.error(`Error parsing ${filePath}:`, err)
+    logger.error(`Error parsing ${filePath}:`, err)
     return {
       id: generateId(filePath),
       path: filePath,
@@ -782,7 +779,7 @@ async function fetchLRCLIB(track: { title: string; artist: string; album: string
       if (results[0].plainLyrics) return results[0].plainLyrics
     }
   } catch (err) {
-    console.error('LRCLIB fetch error:', err)
+    logger.error('LRCLIB fetch error:', err)
   }
   return null
 }
@@ -794,7 +791,7 @@ async function saveLyricsFile(audioPath: string, lrcContent: string): Promise<vo
   try {
     await writeFile(lrcPath, lrcContent, 'utf-8')
   } catch (err) {
-    console.error('Failed to save .lrc file:', err)
+    logger.error('Failed to save .lrc file:', err)
   }
 }
 
@@ -966,6 +963,7 @@ async function createWindow() {
 
   // Initialize custom MPRIS service (Linux only)
   initMpris(mainWindow)
+  logger.info('Window created')
 }
 
 // ── App lifecycle ──────────────────────────────────────────────────────────
@@ -1079,7 +1077,7 @@ app.whenReady().then(async () => {
   await loadCache()
   await loadArtistCache()
   await loadWaveformCache()
-  console.log(`Library cache loaded: ${cache.tracks.length} tracks, ${cache.folders.length} folders`)
+  logger.info(`Library cache loaded: ${cache.tracks.length} tracks, ${cache.folders.length} folders`)
 
   // Initialize Discord Rich Presence
   loadSettings().then((settings) => {
@@ -1179,6 +1177,17 @@ app.whenReady().then(async () => {
   ipcMain.handle('settings:get', async () => await loadSettings())
   ipcMain.handle('settings:set', async (_, settings: any) => await saveSettings(settings))
 
+  // ── IPC: Logging ──
+  ipcMain.handle('logger:get-path', () => getLogPath())
+  ipcMain.on('logger:write', (_, level: string, message: string) => {
+    switch (level) {
+      case 'error': logger.error('[renderer]', message); break
+      case 'warn':  logger.warn('[renderer]', message); break
+      case 'info':  logger.info('[renderer]', message); break
+      default:      logger.debug('[renderer]', message); break
+    }
+  })
+
   // ── IPC: Exclusive audio mode status ──
   ipcMain.handle('audio:exclusive-status', () => ({
     active: exclusiveModeActive,
@@ -1192,7 +1201,7 @@ app.whenReady().then(async () => {
     return new Promise<{ id: string; name: string; label: string }[]>((resolve) => {
       execFile('aplay', ['-l'], { timeout: 5000 }, (err, stdout) => {
         if (err) {
-          console.error('Failed to enumerate ALSA devices:', err.message)
+          logger.error('Failed to enumerate ALSA devices:', err.message)
           resolve([])
           return
         }
@@ -1416,7 +1425,7 @@ app.whenReady().then(async () => {
         lossless: f.lossless || false,
       }
     } catch (err) {
-      console.error('Failed to read track credits:', err)
+      logger.error('Failed to read track credits:', err)
       return {
         composer: [], lyricist: [], conductor: [], producer: [],
         engineer: [], mixer: [], remixer: [], writer: [], label: [],
@@ -1535,7 +1544,7 @@ app.whenReady().then(async () => {
         }
       }
     } catch (err) {
-      console.error('Waveform generation error:', err)
+      logger.error('Waveform generation error:', err)
       return []
     }
 
@@ -1601,7 +1610,7 @@ app.whenReady().then(async () => {
       }
       return result
     } catch (err) {
-      console.error('Subsonic waveform generation error:', err)
+      logger.error('Subsonic waveform generation error:', err)
       return []
     } finally {
       // Clean up temp file
@@ -1715,7 +1724,7 @@ app.whenReady().then(async () => {
             }
           }
         } catch (wikiErr) {
-          console.error('Wikipedia fetch error:', wikiErr)
+          logger.error('Wikipedia fetch error:', wikiErr)
         }
       }
 
@@ -1739,7 +1748,7 @@ app.whenReady().then(async () => {
       saveArtistCache()
       return info
     } catch (err) {
-      console.error('Artist info fetch error:', err)
+      logger.error('Artist info fetch error:', err)
       return null
     }
   })
@@ -1905,7 +1914,7 @@ app.whenReady().then(async () => {
       try {
         await lastfmScrobble(settings.lastfmApiKey, settings.lastfmApiSecret, settings.lastfmSessionKey, data)
       } catch (err) {
-        console.error('Last.fm scrobble error:', err)
+        logger.error('Last.fm scrobble error:', err)
       }
     }
 
@@ -1914,7 +1923,7 @@ app.whenReady().then(async () => {
       try {
         await listenbrainzSubmit(settings.listenbrainzToken, 'single', data)
       } catch (err) {
-        console.error('ListenBrainz scrobble error:', err)
+        logger.error('ListenBrainz scrobble error:', err)
       }
     }
 
@@ -1928,7 +1937,7 @@ app.whenReady().then(async () => {
       try {
         await lastfmUpdateNowPlaying(settings.lastfmApiKey, settings.lastfmApiSecret, settings.lastfmSessionKey, data)
       } catch (err) {
-        console.error('Last.fm now-playing error:', err)
+        logger.error('Last.fm now-playing error:', err)
       }
     }
 
@@ -1936,7 +1945,7 @@ app.whenReady().then(async () => {
       try {
         await listenbrainzSubmit(settings.listenbrainzToken, 'playing_now', data)
       } catch (err) {
-        console.error('ListenBrainz now-playing error:', err)
+        logger.error('ListenBrainz now-playing error:', err)
       }
     }
 
@@ -1978,6 +1987,7 @@ app.whenReady().then(async () => {
 })
 
 app.on('window-all-closed', async () => {
+  logger.info('All windows closed, shutting down')
   await forceFlush()
   stopRemoteServer()
   destroyDiscordRPC()

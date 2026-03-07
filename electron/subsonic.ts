@@ -1,5 +1,6 @@
 // ── Subsonic/Navidrome API client ─────────────────────────────────────────
 import { createHash } from 'crypto'
+import { logger } from './logger'
 
 interface SubsonicConfig {
   url: string        // e.g. https://navidrome.example.com
@@ -198,7 +199,7 @@ export async function subsonicGetAllSongs(): Promise<any[]> {
         tracks.push(subsonicSongToTrack(song, albumArtist))
       }
     } catch (err) {
-      console.error(`Failed to fetch album ${album.id}:`, err)
+      logger.error(`Failed to fetch album ${album.id}:`, err)
     }
   }
 

@@ -176,6 +176,11 @@ contextBridge.exposeInMainWorld('api', {
   clearAnimatedCoverCache: (): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('animated-cover:clear-cache'),
 
+  // Logging
+  getLogPath: (): Promise<string> => ipcRenderer.invoke('logger:get-path'),
+  log: (level: 'info' | 'warn' | 'error' | 'debug', message: string) =>
+    ipcRenderer.send('logger:write', level, message),
+
   // Remote control
   onRemoteCommand: (callback: (command: string, data?: any) => void) => {
     ipcRenderer.on('remote:command', (_, command, data) => callback(command, data))

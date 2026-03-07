@@ -266,6 +266,7 @@ export const usePlayerStore = defineStore('player', () => {
 
   // ── Animated covers ────────────────────────────────────────────────────
   const animatedCoversEnabled = ref(true)
+  const pauseAnimatedOnBlur = ref(false)
 
   async function generateWaveform(trackPath: string) {
     if (waveformCache.has(trackPath)) {
@@ -305,7 +306,7 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   // ── Adaptive accent ────────────────────────────────────────────────────
-  const adaptiveAccent = ref(false)
+  const adaptiveAccent = ref(true)
   const currentAccentColor = ref<string | null>(null)
 
   // ── iOS-style sliders ──────────────────────────────────────────────────
@@ -472,7 +473,8 @@ export const usePlayerStore = defineStore('player', () => {
     if (s.lyricsOffset !== undefined) lyricsOffset.value = s.lyricsOffset
     if (typeof s.waveformEnabled === 'boolean') waveformEnabled.value = s.waveformEnabled
     if (typeof s.animatedCoversEnabled === 'boolean') animatedCoversEnabled.value = s.animatedCoversEnabled
-    if (s.adaptiveAccent === true) adaptiveAccent.value = true
+    if (typeof s.pauseAnimatedOnBlur === 'boolean') pauseAnimatedOnBlur.value = s.pauseAnimatedOnBlur
+    if (typeof s.adaptiveAccent === 'boolean') adaptiveAccent.value = s.adaptiveAccent
     if (typeof s.iosSliders === 'boolean') iosSliders.value = s.iosSliders
     if (s.transparencyEnabled === false) transparencyEnabled.value = false
     if (s.autoFullscreen === true) autoFullscreen.value = true
@@ -1052,6 +1054,14 @@ export const usePlayerStore = defineStore('player', () => {
     })
   }
 
+  function setPauseAnimatedOnBlur(enabled: boolean) {
+    pauseAnimatedOnBlur.value = enabled
+    window.api.getSettings().then((s: any) => {
+      s.pauseAnimatedOnBlur = enabled
+      window.api.saveSettings(s)
+    })
+  }
+
   function setAdaptiveAccent(enabled: boolean) {
     adaptiveAccent.value = enabled
     window.api.getSettings().then((s: any) => {
@@ -1269,6 +1279,8 @@ export const usePlayerStore = defineStore('player', () => {
     // Animated covers
     animatedCoversEnabled,
     setAnimatedCoversEnabled,
+    pauseAnimatedOnBlur,
+    setPauseAnimatedOnBlur,
     // Adaptive accent
     adaptiveAccent,
     currentAccentColor,

@@ -189,6 +189,7 @@
             </option>
           </select>
         </div>
+        <!-- Exclusive Mode — disabled for 2.6.0, will revisit later
         <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
           <div>
             <p class="text-sm text-white/80">Exclusive Mode</p>
@@ -213,7 +214,7 @@
             />
           </button>
         </div>
-        <!-- ALSA device picker (Linux only, shown when exclusive is on) -->
+        ALSA device picker (Linux only, shown when exclusive is on)
         <div v-if="exclusiveMode && isLinux" class="px-4 py-3 rounded-xl bg-white/[0.05]">
           <p class="text-sm text-white/80 mb-1.5">ALSA Output Device</p>
           <p class="text-xs text-white/30 mb-2">Select a hardware device to bypass PipeWire/PulseAudio. Uses the ALSA <code class="text-white/40">hw:</code> interface for direct, exclusive access.</p>
@@ -230,6 +231,7 @@
           </select>
           <p v-if="alsaDevices.length === 0 && !alsaLoading" class="text-xs text-white/25 mt-1.5">No ALSA hardware devices found. Make sure <code class="text-white/35">alsa-utils</code> is installed.</p>
         </div>
+        -->
       </div>
     </section>
 
@@ -364,7 +366,7 @@
         <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
           <div>
             <p class="text-sm text-white/80">Motion Album Artwork</p>
-            <p class="text-xs text-white/30 mt-0.5">Show animated album covers in fullscreen and album pages (fetched from Apple Music)</p>
+            <p class="text-xs text-white/30 mt-0.5">Show animated album covers in fullscreen and album pages</p>
           </div>
           <button
             @click="toggleAnimatedCovers"
@@ -374,6 +376,23 @@
             <div
               class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
               :class="player.animatedCoversEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
+        <!-- Pause on focus loss -->
+        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">Pause When Unfocused</p>
+            <p class="text-xs text-white/30 mt-0.5">Pause animated covers when the window loses focus (e.g. clicking another app)</p>
+          </div>
+          <button
+            @click="togglePauseAnimatedOnBlur"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="player.pauseAnimatedOnBlur ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              :class="player.pauseAnimatedOnBlur ? 'translate-x-[22px]' : 'translate-x-0.5'"
             />
           </button>
         </div>
@@ -748,7 +767,7 @@
         <div class="flex items-center justify-between">
           <div>
             <span class="text-sm text-white/70">Animated Covers</span>
-            <p class="text-xs text-white/30">Cached motion artwork URLs from Apple Music</p>
+            <p class="text-xs text-white/30">Cached motion artwork URLs</p>
           </div>
           <button
             @click="clearAnimatedCoverCache"
@@ -851,6 +870,26 @@
       </div>
     </section>
 
+    <!-- ── Troubleshooting ────────────────────────────────────── -->
+    <section class="mb-8">
+      <h2 class="text-lg font-semibold text-white mb-4">Troubleshooting</h2>
+      <div class="px-4 py-4 rounded-xl bg-white/[0.05] space-y-3">
+        <p class="text-xs text-white/40">Aurora writes diagnostic logs to help troubleshoot issues. Share the log file when reporting bugs.</p>
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm text-white/80">Log File</p>
+            <p class="text-xs text-white/30 mt-0.5 break-all">{{ logFilePath || 'Loading...' }}</p>
+          </div>
+          <button
+            @click="openLogFile"
+            class="px-4 py-1.5 rounded-full text-xs font-medium bg-white/[0.08] hover:bg-white/[0.12] text-white/70 hover:text-white/90 transition-all"
+          >
+            Open Log Folder
+          </button>
+        </div>
+      </div>
+    </section>
+
     <!-- ── About ──────────────────────────────────────────────────── -->
     <section>
       <h2 class="text-lg font-semibold text-white mb-4">About</h2>
@@ -947,6 +986,9 @@ const lastfmApiKey = ref('')
 const lastfmApiSecret = ref('')
 const lastfmSessionKey = ref('')
 const listenbrainzToken = ref('')
+
+// Logging
+const logFilePath = ref('')
 
 // Subsonic / Navidrome
 const subsonicUrl = ref('')
@@ -1051,6 +1093,9 @@ onMounted(async () => {
 
   // Enumerate audio devices
   player.enumerateOutputDevices()
+
+  // Load log file path
+  try { logFilePath.value = await window.api.getLogPath() } catch {}
 
   // Load remote control config
   try {
@@ -1259,6 +1304,11 @@ function toggleTransparency() {
 function toggleAnimatedCovers() {
   player.setAnimatedCoversEnabled(!player.animatedCoversEnabled)
   toast.success(`Animated covers ${player.animatedCoversEnabled ? 'enabled' : 'disabled'}`)
+}
+
+function togglePauseAnimatedOnBlur() {
+  player.setPauseAnimatedOnBlur(!player.pauseAnimatedOnBlur)
+  toast.success(`Pause on focus loss ${player.pauseAnimatedOnBlur ? 'enabled' : 'disabled'}`)
 }
 
 async function clearAnimatedCoverCache() {
@@ -1515,6 +1565,12 @@ async function clearAllCaches() {
   } finally {
     for (const t of targets) cacheClearing.value[t] = false
     cacheClearing.value.animated = false
+  }
+}
+
+async function openLogFile() {
+  if (logFilePath.value) {
+    window.api.showInExplorer(logFilePath.value)
   }
 }
 </script>

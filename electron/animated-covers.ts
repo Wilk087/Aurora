@@ -16,6 +16,7 @@ import { get as httpsGet } from 'https'
 import { request as httpRequest } from 'http'
 import { createHash } from 'crypto'
 import { URL } from 'url'
+import { logger } from './logger'
 
 // ── Config ──────────────────────────────────────────────────────────────────
 const STOREFRONT = 'us' // Apple Music storefront
@@ -249,7 +250,7 @@ async function getAnimatedCover(album: string, artist: string): Promise<string |
 
     return videoUrl
   } catch (err) {
-    console.error(`Failed to fetch animated cover for "${album}" by "${artist}":`, err)
+    logger.error(`Failed to fetch animated cover for "${album}" by "${artist}":`, err)
     // Cache negative result on error too (to avoid hammering API)
     negativeLookups[key] = Date.now()
     saveNegativeCache()

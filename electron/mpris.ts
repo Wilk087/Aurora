@@ -3,6 +3,7 @@
  * Provides proper identity, cover art, and full playback control on Linux.
  * Uses dbus-next (pure JS, no native modules).
  */
+import { logger } from './logger'
 
 import type { BrowserWindow } from 'electron'
 
@@ -214,9 +215,9 @@ export async function initMpris(win: BrowserWindow) {
     // Request the well-known name
     await bus.requestName(SERVICE_NAME, 0)
 
-    console.log('[MPRIS] Service registered:', SERVICE_NAME)
+    logger.info('[MPRIS] Service registered:', SERVICE_NAME)
   } catch (err) {
-    console.error('[MPRIS] Failed to initialize:', err)
+    logger.error('[MPRIS] Failed to initialize:', err)
     bus = null
     playerIface = null
     rootIface = null
@@ -254,7 +255,7 @@ export function updateMprisMetadata(data: {
     // Emit PropertiesChanged signal
     Interface_emitPropertiesChanged(playerIface, { Metadata: meta }, [])
   } catch (err) {
-    console.error('[MPRIS] Failed to update metadata:', err)
+    logger.error('[MPRIS] Failed to update metadata:', err)
   }
 }
 
@@ -266,7 +267,7 @@ export function updateMprisPlaybackStatus(status: 'Playing' | 'Paused' | 'Stoppe
     playbackStatus = status
     Interface_emitPropertiesChanged(playerIface, { PlaybackStatus: status }, [])
   } catch (err) {
-    console.error('[MPRIS] Failed to update playback status:', err)
+    logger.error('[MPRIS] Failed to update playback status:', err)
   }
 }
 

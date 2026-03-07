@@ -1395,9 +1395,44 @@ watch([effectiveAnimated, animatedStyle], () => {
   nextTick(() => startAnimLoop())
 }, { immediate: false })
 
+// Pause animated cover when the app is backgrounded.
+// document.visibilitychange catches minimisation, but on Linux it does NOT
+// fire when another window goes fullscreen over Aurora.  Window blur/focus
+// events reliably detect that scenario on all platforms, but can be too
+// aggressive on multi-monitor setups — so they are opt-in via a setting.
+function pauseAnimatedCover() {
+  const videoEl = animatedVideoEl.value
+  if (videoEl && animatedCoverActive.value) videoEl.pause()
+}
+function resumeAnimatedCover() {
+  const videoEl = animatedVideoEl.value
+  if (videoEl && animatedCoverActive.value && !document.hidden) {
+    videoEl.play().catch(() => {})
+  }
+}
+function onVisibilityChange() {
+  if (document.hidden) pauseAnimatedCover()
+  else resumeAnimatedCover()
+}
+
+watch(() => player.pauseAnimatedOnBlur, (enabled) => {
+  if (enabled) {
+    window.addEventListener('blur', pauseAnimatedCover)
+    window.addEventListener('focus', resumeAnimatedCover)
+  } else {
+    window.removeEventListener('blur', pauseAnimatedCover)
+    window.removeEventListener('focus', resumeAnimatedCover)
+  }
+})
+
 onMounted(async () => {
   window.api.enterFullscreen()
   document.addEventListener('keydown', onKeydown)
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  if (player.pauseAnimatedOnBlur) {
+    window.addEventListener('blur', pauseAnimatedCover)
+    window.addEventListener('focus', resumeAnimatedCover)
+  }
   // Start idle timer immediately
   idleTimer = setTimeout(() => { idle.value = true }, IDLE_DELAY)
   // Load persisted immersive settings from settings.json
@@ -1408,6 +1443,9 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeydown)
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+  window.removeEventListener('blur', pauseAnimatedCover)
+  window.removeEventListener('focus', resumeAnimatedCover)
   if (idleTimer) clearTimeout(idleTimer)
   destroyHls()
   stopAnimLoop()

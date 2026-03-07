@@ -156,7 +156,7 @@
                     />
                     <WizardToggle
                       label="Motion Album Artwork"
-                      description="Show animated album covers from Apple Music in fullscreen and album pages"
+                      description="Show animated album covers in fullscreen and album pages"
                       :modelValue="player.animatedCoversEnabled"
                       @update:modelValue="player.setAnimatedCoversEnabled($event)"
                     />
