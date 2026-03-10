@@ -142,6 +142,12 @@ contextBridge.exposeInMainWorld('api', {
   removeScanProgressListener: () => {
     ipcRenderer.removeAllListeners('library:scan-progress')
   },
+  onFoundMissingMetadata: (callback: (count: number) => void) => {
+    ipcRenderer.on('library:found-missing-metadata', (_, count) => callback(count))
+  },
+  removeFoundMissingMetadataListener: () => {
+    ipcRenderer.removeAllListeners('library:found-missing-metadata')
+  },
 
   // MPRIS (renderer → main)
   mprisSendMetadata: (data: { title?: string; artist?: string; album?: string; artUrl?: string; length?: number; trackId?: string }) =>

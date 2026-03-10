@@ -24,10 +24,19 @@ import { useFavoritesStore } from '@/stores/favorites'
 import { useThemeStore } from '@/stores/theme'
 import { useToast } from '@/composables/useToast'
 import { parseLRC, findCurrentLine } from '@/utils/lrcParser'
-import type { PluginSidebarItem, PluginSettingField } from '@/types/plugin'
+import { shallowRef } from 'vue'
+import type { PluginSidebarItem, PluginSettingField, PluginContextMenuItem } from '@/types/plugin'
 
 /** Registry of sidebar items added by plugins */
 const _sidebarItems = new Map<string, PluginSidebarItem[]>()
+
+/** Registry of context menu items added by plugins */
+const _contextMenuItemsMap = new Map<string, PluginContextMenuItem[]>()
+/** Reactive flat list consumed by SongRow */
+export const pluginContextMenuItems = shallowRef<PluginContextMenuItem[]>([])
+function _syncContextMenuItems() {
+  pluginContextMenuItems.value = Array.from(_contextMenuItemsMap.values()).flat()
+}
 
 /** Registry of settings schemas registered at runtime by plugins */
 const _settingsSchemas = new Map<string, Record<string, PluginSettingField>>()
@@ -217,6 +226,18 @@ export function createPluginAPI(pluginId: string) {
       },
       removeSidebarItems() {
         _sidebarItems.delete(pluginId)
+      },
+      /**
+       * Register context menu items that appear in the song right-click menu.
+       * `onClick` receives the right-clicked track plus any other currently selected tracks.
+       */
+      addContextMenuItems(items: PluginContextMenuItem[]) {
+        _contextMenuItemsMap.set(pluginId, items)
+        _syncContextMenuItems()
+      },
+      removeContextMenuItems() {
+        _contextMenuItemsMap.delete(pluginId)
+        _syncContextMenuItems()
       },
       /**
        * Get a dedicated plugin slot container inside the PlayerBar.

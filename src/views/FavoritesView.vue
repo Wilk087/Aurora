@@ -70,6 +70,7 @@
             :index="i"
             :selected="selection.isSelected(track.id)"
             :selectable="selection.hasSelection.value"
+            :selected-tracks="selection.selectedItems.value"
             @play="selection.hasSelection.value ? selection.handleSelect(i, $event ?? { ctrlKey: true, metaKey: false, shiftKey: false }) : playFromIndex(i)"
             @select="selection.handleSelect(i, $event)"
           />

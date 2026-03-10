@@ -1131,12 +1131,23 @@ app.whenReady().then(async () => {
     }
 
     // Merge into cache – replace existing by path
+    const previousIds = new Set(cache.tracks.map((t: any) => t.id))
     for (const track of newTracks) {
       cache.trackMap.set(track.path, track)
     }
     cache.tracks = Array.from(cache.trackMap.values())
     rebuildIndexes()
     scheduleFlush()
+
+    // Notify renderer of tracks with missing essential metadata (new tracks only)
+    const genuinelyNew = newTracks.filter((t: any) => !previousIds.has(t.id))
+    const missingMeta = genuinelyNew.filter((t: any) =>
+      (!t.title || t.title === t.path.split('/').pop()?.replace(/\.[^.]+$/, '') || t.title === 'Unknown') &&
+      (!t.artist || t.artist === 'Unknown Artist')
+    )
+    if (missingMeta.length > 0 && mainWindow) {
+      mainWindow.webContents.send('library:found-missing-metadata', missingMeta.length)
+    }
 
     return cache.tracks
   })
@@ -2134,6 +2145,90 @@ app.whenReady().then(async () => {
   ipcMain.handle('plugins:open-folder', async () => {
     await mkdir(pluginsDir, { recursive: true })
     shell.openPath(pluginsDir)
+  })
+
+  // ── IPC: Audio fingerprint via fpcalc (chromaprint) ─────────────────────
+  ipcMain.handle('track:fingerprint', async (_, trackPath: string) => {
+    const { execFile } = await import('child_process')
+    const { promisify } = await import('util')
+    const { access } = await import('fs/promises')
+    const execFileAsync = promisify(execFile)
+
+    // Verify file exists before invoking fpcalc (gives a clearer error)
+    try {
+      await access(trackPath)
+    } catch {
+      throw new Error('File not found: ' + trackPath)
+    }
+
+    try {
+      const { stdout, stderr } = await execFileAsync('fpcalc', ['-json', trackPath], { timeout: 30000 })
+      if (!stdout.trim()) throw new Error(stderr || 'fpcalc produced no output')
+      return JSON.parse(stdout) // { duration: number, fingerprint: string }
+    } catch (err: any) {
+      if (err.code === 'ENOENT') {
+        throw new Error('fpcalc not found — install chromaprint (e.g. sudo pacman -S chromaprint)')
+      }
+      throw new Error('fpcalc failed: ' + err.message)
+    }
+  })
+
+  // ── IPC: Write track tags using ffmpeg ──────────────────────────────────
+  ipcMain.handle('track:write-tags', async (_, trackPath: string, tags: {
+    title?: string
+    artist?: string
+    albumArtist?: string
+    album?: string
+    year?: string
+    trackNumber?: string
+    genre?: string
+    /** Base64-encoded JPEG image data for cover art */
+    coverData?: string
+  }) => {
+    const { promisify } = await import('util')
+    const { rename, unlink, writeFile } = await import('fs/promises')
+    const path = await import('path')
+    const { execFile } = await import('child_process')
+    const execFileAsync = promisify(execFile)
+
+    const ext = path.extname(trackPath).toLowerCase()
+    const tmpPath = trackPath + '.aurora-meta-tmp' + ext
+    const coverTmpPath = trackPath + '.aurora-cover-tmp.jpg'
+
+    const args: string[] = ['-y', '-i', trackPath]
+
+    if (tags.coverData) {
+      await writeFile(coverTmpPath, Buffer.from(tags.coverData, 'base64'))
+      args.push('-i', coverTmpPath)
+      args.push('-map', '0', '-map', '1', '-c', 'copy', '-disposition:v:0', 'attached_pic')
+    } else {
+      args.push('-map', '0', '-c', 'copy')
+    }
+
+    if (tags.title !== undefined)       args.push('-metadata', `title=${tags.title}`)
+    if (tags.artist !== undefined)      args.push('-metadata', `artist=${tags.artist}`)
+    if (tags.albumArtist !== undefined) args.push('-metadata', `album_artist=${tags.albumArtist}`)
+    if (tags.album !== undefined)       args.push('-metadata', `album=${tags.album}`)
+    if (tags.year !== undefined)        args.push('-metadata', `date=${tags.year}`)
+    if (tags.trackNumber !== undefined) args.push('-metadata', `track=${tags.trackNumber}`)
+    if (tags.genre !== undefined)       args.push('-metadata', `genre=${tags.genre}`)
+
+    if (ext === '.mp3') args.push('-id3v2_version', '3')
+    // M4A/MP4: force 'mov' muxer — the default 'ipod' profile rejects FLAC audio
+    if (ext === '.m4a' || ext === '.mp4') args.push('-f', 'mov')
+
+    args.push(tmpPath)
+
+    try {
+      await execFileAsync('ffmpeg', args)
+      await rename(tmpPath, trackPath)
+      return { ok: true }
+    } catch (err: any) {
+      await unlink(tmpPath).catch(() => {})
+      throw new Error(`ffmpeg tag write failed: ${err.message}`)
+    } finally {
+      if (tags.coverData) await unlink(coverTmpPath).catch(() => {})
+    }
   })
 
   // Passthrough IPC for plugins (full trust — plugins can invoke any IPC channel)

@@ -248,6 +248,21 @@
           </svg>
           Add to Playlist…
         </button>
+        <!-- Plugin-injected context menu items -->
+        <template v-if="pluginContextMenuItems.length">
+          <div class="border-t border-white/[0.06] my-1" />
+          <button
+            v-for="item in pluginContextMenuItems"
+            :key="item.label"
+            @click.stop="runPluginCtxItem(item)"
+            class="w-full px-3.5 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2.5"
+          >
+            <svg v-if="item.icon" class="w-4 h-4 shrink-0 text-white/40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" />
+            </svg>
+            {{ item.label }}
+          </button>
+        </template>
       </div>
     </Teleport>
 
@@ -385,12 +400,15 @@ import { useToast } from '@/composables/useToast'
 import { useFavoritesStore } from '@/stores/favorites'
 import { formatTime } from '@/utils/formatTime'
 import ArtistLinks from '@/components/ArtistLinks.vue'
+import { pluginContextMenuItems } from '@/plugins/api'
 
 const props = defineProps<{
   track: Track
   index: number
   selected?: boolean
   selectable?: boolean
+  /** All currently selected tracks — passed by parent views for multi-track plugin actions */
+  selectedTracks?: Track[]
 }>()
 
 defineEmits(['play', 'select'])
@@ -550,6 +568,14 @@ async function showCredits() {
   } finally {
     creditsLoading.value = false
   }
+}
+
+function runPluginCtxItem(item: { onClick: (tracks: Track[]) => void }) {
+  showCtx.value = false
+  const tracks = props.selected && props.selectedTracks && props.selectedTracks.length > 0
+    ? props.selectedTracks
+    : [props.track]
+  try { item.onClick(tracks) } catch {}
 }
 
 const noCredits = computed(() => {

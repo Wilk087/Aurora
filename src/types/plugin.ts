@@ -76,3 +76,11 @@ export interface PluginSidebarItem {
   /** Callback when clicked */
   onClick: () => void
 }
+
+export interface PluginContextMenuItem {
+  label: string
+  /** SVG path `d` attribute string for the icon (24x24 viewBox) */
+  icon?: string
+  /** Called with the right-clicked track plus any other currently selected tracks */
+  onClick: (tracks: Track[]) => void
+}
