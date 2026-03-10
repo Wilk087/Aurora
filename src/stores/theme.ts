@@ -33,6 +33,7 @@ export const useThemeStore = defineStore('theme', () => {
     if (theme.colors.appOverlay) root.setProperty('--app-overlay', theme.colors.appOverlay)
     if (theme.colors.controlBg) root.setProperty('--control-bg', theme.colors.controlBg)
     if (theme.colors.controlFg) root.setProperty('--control-fg', theme.colors.controlFg)
+    if (theme.colors.bgSolid) root.setProperty('--bg-solid', theme.colors.bgSolid)
 
     // Glass overrides
     if (theme.glass?.background) root.setProperty('--glass-bg', theme.glass.background)

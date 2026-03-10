@@ -18,7 +18,8 @@
     "appText": "0 0 0",
     "appOverlay": "255 255 255",
     "controlBg": "30 30 30",
-    "controlFg": "255 255 255"
+    "controlFg": "255 255 255",
+    "bgSolid": "#f0f0f0"
   },
   "glass": {
     "background": "rgba(240, 240, 240, 0.8)",

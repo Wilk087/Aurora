@@ -37,6 +37,9 @@
     --slider-thumb: rgb(var(--control-bg));
     --slider-track: rgb(var(--app-text) / 0.1);
 
+    /* ── Solid fallback (transparency off) ───────────────── */
+    --bg-solid: #0c0c0c;
+
     /* ── Shadows ───────────────────────────────────────────── */
     --cover-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
   }
@@ -94,7 +97,7 @@
     -webkit-backdrop-filter: blur(60px) saturate(200%);
   }
   .bg-solid {
-    background: #0c0c0c;
+    background: var(--bg-solid);
   }
 
   /* ── Window drag ──────────────────────────────────────────────── */

@@ -196,7 +196,7 @@
             <p class="text-xs text-white/30 mt-0.5">
               {{ exclusiveModeDescription }}
             </p>
-            <p v-if="exclusiveNeedsRestart" class="text-xs text-yellow-400/70 mt-1 flex items-center gap-1">
+            <p v-if="exclusiveNeedsRestart" class="text-xs text-amber-500/90 mt-1 flex items-center gap-1">
               <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
               </svg>
@@ -406,7 +406,7 @@
         <!-- Auto-fullscreen toggle -->
         <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
           <div>
-            <p class="text-sm text-white/80">Auto-Fullscreen on Idle <span class="ml-1.5 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded bg-yellow-500/20 text-yellow-400/80">WIP</span></p>
+            <p class="text-sm text-white/80">Auto-Fullscreen on Idle <span class="ml-1.5 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded bg-amber-500/15 text-amber-500">WIP</span></p>
             <p class="text-xs text-white/30 mt-0.5">Automatically enter fullscreen mode when the mouse is idle during playback</p>
           </div>
           <button
@@ -448,7 +448,7 @@
     <section class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">
         Scrobbling
-        <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-yellow-500/20 text-yellow-400 uppercase tracking-wider align-middle">WIP</span>
+        <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/15 text-amber-500 uppercase tracking-wider align-middle">WIP</span>
       </h2>
       <div class="space-y-4">
         <!-- Enable scrobbling -->
@@ -527,7 +527,7 @@
     <section class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">
         Navidrome / Subsonic
-        <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-yellow-500/20 text-yellow-400 uppercase tracking-wider align-middle">WIP</span>
+        <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/15 text-amber-500 uppercase tracking-wider align-middle">WIP</span>
       </h2>
 
       <div class="px-4 py-4 rounded-xl bg-white/[0.05] space-y-4">
@@ -794,7 +794,7 @@
     <section class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">
         Export / Import
-        <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-yellow-500/20 text-yellow-400 uppercase tracking-wider align-middle">WIP</span>
+        <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/15 text-amber-500 uppercase tracking-wider align-middle">WIP</span>
       </h2>
 
       <div class="px-4 py-4 rounded-xl bg-white/[0.05] space-y-4">
@@ -892,7 +892,10 @@
 
     <!-- ── Themes ──────────────────────────────────────────────────── -->
     <section class="mb-8">
-      <h2 class="text-lg font-semibold text-white mb-4">Themes</h2>
+      <h2 class="text-lg font-semibold text-white mb-4">
+        Themes
+        <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/15 text-amber-500 uppercase tracking-wider align-middle">WIP</span>
+      </h2>
 
       <div class="space-y-4">
         <!-- Theme picker -->
@@ -966,7 +969,10 @@
 
     <!-- ── Plugins ──────────────────────────────────────────────────── -->
     <section class="mb-8">
-      <h2 class="text-lg font-semibold text-white mb-4">Plugins</h2>
+      <h2 class="text-lg font-semibold text-white mb-4">
+        Plugins
+        <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/15 text-amber-500 uppercase tracking-wider align-middle">WIP</span>
+      </h2>
 
       <div class="space-y-4">
         <!-- Installed plugins -->

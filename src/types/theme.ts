@@ -37,6 +37,9 @@ export interface AuroraTheme {
     /** Solid-colour buttons & toggle knobs */
     controlBg?: string
     controlFg?: string
+
+    /** Opaque background used when transparency is turned off */
+    bgSolid?: string
   }
 
   /** Override the glass panel styles */
@@ -95,6 +98,7 @@ export const DEFAULT_THEME: AuroraTheme = {
     appOverlay: '0 0 0',
     controlBg: '255 255 255',
     controlFg: '0 0 0',
+    bgSolid: '#0c0c0c',
   },
   glass: {
     background: 'rgba(20, 20, 20, 0.75)',

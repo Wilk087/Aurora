@@ -46,7 +46,7 @@ const { toasts, dismiss } = useToast()
 function toastClass(type: string) {
   switch (type) {
     case 'success': return 'bg-emerald-500/15 border-emerald-500/20 text-emerald-300'
-    case 'warning': return 'bg-amber-500/15 border-amber-500/20 text-amber-300'
+    case 'warning': return 'bg-amber-500/15 border-amber-500/20 text-amber-500'
     case 'error':   return 'bg-red-500/15 border-red-500/20 text-red-300'
     default:        return 'bg-white/[0.08] border-white/10 text-white/80'
   }
