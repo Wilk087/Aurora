@@ -7,10 +7,19 @@ export default {
   theme: {
     extend: {
       colors: {
+        /* Override white/black so every text-white/50, bg-white/[0.06],
+           border-white/[0.08] etc. becomes theme-aware automatically */
+        white: 'rgb(var(--app-text) / <alpha-value>)',
+        black: 'rgb(var(--app-overlay) / <alpha-value>)',
         accent: {
           DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
           hover: 'rgb(var(--accent-hover) / <alpha-value>)',
           dark: 'rgb(var(--accent-dark) / <alpha-value>)',
+        },
+        /* Control surfaces — play button, toggle knobs, slider thumbs */
+        control: {
+          DEFAULT: 'rgb(var(--control-bg) / <alpha-value>)',
+          fg: 'rgb(var(--control-fg) / <alpha-value>)',
         },
         surface: {
           DEFAULT: 'rgba(18, 18, 18, 0.85)',

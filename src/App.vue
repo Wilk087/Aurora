@@ -226,9 +226,10 @@ watch(
   () => player.adaptiveAccent,
   (enabled) => {
     if (!enabled) {
-      document.documentElement.style.setProperty('--accent', '139 92 246')
-      document.documentElement.style.setProperty('--accent-hover', '167 139 250')
-      document.documentElement.style.setProperty('--accent-dark', '109 40 217')
+      const t = themeStore.currentTheme
+      document.documentElement.style.setProperty('--accent', t.colors.accent)
+      document.documentElement.style.setProperty('--accent-hover', t.colors.accentHover)
+      document.documentElement.style.setProperty('--accent-dark', t.colors.accentDark)
       player.currentAccentColor = null
     } else {
       // Re-extract from current cover art by re-triggering the coverArt watcher

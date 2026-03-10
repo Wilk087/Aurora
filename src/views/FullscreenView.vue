@@ -1,7 +1,7 @@
 <template>
   <div
     v-if="player.currentTrack"
-    class="fullscreen-view fixed inset-0 z-[100] select-none"
+    class="fullscreen-view immersive-scope fixed inset-0 z-[100] select-none"
     :class="{ 'cursor-none': idle }"
     @mousemove="onMouseActivity"
     @mousedown="onMouseActivity"
@@ -102,22 +102,28 @@
 
           <!-- Track info (always visible) -->
           <div class="mt-5 max-w-[380px] w-full">
-            <h1 class="text-2xl font-extrabold text-white leading-tight line-clamp-2">
-              {{ player.currentTrack.title }}
-            </h1>
-            <p class="text-base text-white/50 mt-1.5 font-medium">
-              <ArtistLinks
-                :artist="player.currentTrack.artist"
-                :album-artist="player.currentTrack.albumArtist"
-                hover-class="hover:text-white/80"
-              />
-              <span v-if="player.currentTrack.album" class="text-white/25"> · </span>
-              <span
-                v-if="player.currentTrack.album"
-                class="text-white/25 hover:text-white/60 hover:underline underline-offset-2 cursor-pointer transition-colors"
-                @click="goToAlbum"
-              >{{ player.currentTrack.album }}</span>
-            </p>
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <h1 class="text-2xl font-extrabold text-white leading-tight line-clamp-2">
+                  {{ player.currentTrack.title }}
+                </h1>
+                <p class="text-base text-white/50 mt-1.5 font-medium">
+                  <ArtistLinks
+                    :artist="player.currentTrack.artist"
+                    :album-artist="player.currentTrack.albumArtist"
+                    hover-class="hover:text-white/80"
+                  />
+                  <span v-if="player.currentTrack.album" class="text-white/25"> · </span>
+                  <span
+                    v-if="player.currentTrack.album"
+                    class="text-white/25 hover:text-white/60 hover:underline underline-offset-2 cursor-pointer transition-colors"
+                    @click="goToAlbum"
+                  >{{ player.currentTrack.album }}</span>
+                </p>
+              </div>
+              <!-- Plugin slot (right of track info) -->
+              <div id="aurora-immersive-right-slot" class="flex items-center shrink-0 gap-2" />
+            </div>
           </div>
 
           <!-- Progress / Waveform (always visible) -->
@@ -188,7 +194,7 @@
 
                 <button
                   @click="player.togglePlay()"
-                  class="w-14 h-14 flex items-center justify-center rounded-full bg-white text-black hover:scale-105 active:scale-95 transition-transform shadow-xl"
+                  class="w-14 h-14 flex items-center justify-center rounded-full bg-control text-control-fg hover:scale-105 active:scale-95 transition-transform shadow-xl"
                 >
                   <svg v-if="player.isPlaying" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
@@ -325,22 +331,28 @@
           <div class="modern-header-zone">
             <!-- Full track info -->
             <div class="modern-header-full">
-              <h2 class="text-lg font-bold text-white leading-tight line-clamp-1">
-                {{ player.currentTrack?.title }}
-              </h2>
-              <p class="text-sm text-white/50 mt-0.5 font-medium line-clamp-1">
-                <ArtistLinks
-                  :artist="player.currentTrack?.artist ?? ''"
-                  :album-artist="player.currentTrack?.albumArtist"
-                  hover-class="hover:text-white/80"
-                />
-                <span v-if="player.currentTrack?.album" class="text-white/25"> · </span>
-                <span
-                  v-if="player.currentTrack?.album"
-                  class="text-white/25 hover:text-white/60 hover:underline underline-offset-2 cursor-pointer transition-colors"
-                  @click="goToAlbum"
-                >{{ player.currentTrack?.album }}</span>
-              </p>
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <h2 class="text-lg font-bold text-white leading-tight line-clamp-1">
+                    {{ player.currentTrack?.title }}
+                  </h2>
+                  <p class="text-sm text-white/50 mt-0.5 font-medium line-clamp-1">
+                    <ArtistLinks
+                      :artist="player.currentTrack?.artist ?? ''"
+                      :album-artist="player.currentTrack?.albumArtist"
+                      hover-class="hover:text-white/80"
+                    />
+                    <span v-if="player.currentTrack?.album" class="text-white/25"> · </span>
+                    <span
+                      v-if="player.currentTrack?.album"
+                      class="text-white/25 hover:text-white/60 hover:underline underline-offset-2 cursor-pointer transition-colors"
+                      @click="goToAlbum"
+                    >{{ player.currentTrack?.album }}</span>
+                  </p>
+                </div>
+                <!-- Plugin slot (modern controls, right of track info) -->
+                <div id="aurora-immersive-modern-right-slot" class="flex items-center shrink-0 gap-2" />
+              </div>
             </div>
             <!-- Mini info -->
             <div class="modern-header-mini">
@@ -430,7 +442,7 @@
 
               <button
                 @click="player.togglePlay()"
-                class="w-12 h-12 flex items-center justify-center rounded-full bg-white text-black hover:scale-105 active:scale-95 transition-transform shadow-xl"
+                class="w-12 h-12 flex items-center justify-center rounded-full bg-control text-control-fg hover:scale-105 active:scale-95 transition-transform shadow-xl"
               >
                 <svg v-if="player.isPlaying" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
@@ -633,7 +645,7 @@
                   :class="vibrantBackground ? 'bg-accent' : 'bg-white/15'"
                 >
                   <span
-                    class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200"
+                    class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-control shadow transition-transform duration-200"
                     :class="vibrantBackground ? 'translate-x-4' : ''"
                   />
                 </button>
@@ -655,7 +667,7 @@
                   :class="animatedBackground ? 'bg-accent' : 'bg-white/15'"
                 >
                   <span
-                    class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200"
+                    class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-control shadow transition-transform duration-200"
                     :class="animatedBackground ? 'translate-x-4' : ''"
                   />
                 </button>
@@ -718,7 +730,7 @@
                   :class="hideControls ? 'bg-accent' : 'bg-white/15'"
                 >
                   <span
-                    class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200"
+                    class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-control shadow transition-transform duration-200"
                     :class="hideControls ? 'translate-x-4' : ''"
                   />
                 </button>
@@ -736,12 +748,15 @@
                   :class="player.animatedCoversEnabled ? 'bg-accent' : 'bg-white/15'"
                 >
                   <span
-                    class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200"
+                    class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-control shadow transition-transform duration-200"
                     :class="player.animatedCoversEnabled ? 'translate-x-4' : ''"
                   />
                 </button>
               </label>
             </div>
+
+            <!-- Plugin settings slot -->
+            <div id="aurora-immersive-settings-slot" class="space-y-5" />
           </div>
         </div>
       </Transition>

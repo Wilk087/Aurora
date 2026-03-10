@@ -24,14 +24,44 @@ export interface AuroraTheme {
     textSecondary: string
     textTertiary: string
     border: string
+
+    /**
+     * Base RGB triplets (space-separated) used by Tailwind's white/black
+     * override. Controls every opacity-based text/bg/border class in one go.
+     *   appText  – "255 255 255" for dark themes, "0 0 0" for light
+     *   appOverlay – the inverse: heavy overlays / backdrops
+     */
+    appText?: string
+    appOverlay?: string
+
+    /** Solid-colour buttons & toggle knobs */
+    controlBg?: string
+    controlFg?: string
   }
 
   /** Override the glass panel styles */
   glass?: {
     background?: string
+    lightBackground?: string
+    heavyBackground?: string
     blur?: string
     saturate?: string
   }
+
+  /** Scrollbar colours (full CSS values) */
+  scrollbar?: {
+    thumb?: string
+    thumbHover?: string
+  }
+
+  /** Slider / range input overrides (full CSS values) */
+  slider?: {
+    thumb?: string
+    track?: string
+  }
+
+  /** Cover art box-shadow override (full CSS shorthand) */
+  coverShadow?: string
 
   /** Custom font families */
   fonts?: {
@@ -61,5 +91,24 @@ export const DEFAULT_THEME: AuroraTheme = {
     textSecondary: 'rgba(255, 255, 255, 0.6)',
     textTertiary: 'rgba(255, 255, 255, 0.4)',
     border: 'rgba(255, 255, 255, 0.08)',
+    appText: '255 255 255',
+    appOverlay: '0 0 0',
+    controlBg: '255 255 255',
+    controlFg: '0 0 0',
   },
+  glass: {
+    background: 'rgba(20, 20, 20, 0.75)',
+    lightBackground: 'rgba(35, 35, 35, 0.6)',
+    heavyBackground: 'rgba(12, 12, 12, 0.92)',
+    blur: 'blur(40px) saturate(180%)',
+  },
+  scrollbar: {
+    thumb: 'rgba(255, 255, 255, 0.15)',
+    thumbHover: 'rgba(255, 255, 255, 0.25)',
+  },
+  slider: {
+    thumb: 'rgb(255, 255, 255)',
+    track: 'rgba(255, 255, 255, 0.1)',
+  },
+  coverShadow: '0 8px 30px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3)',
 }

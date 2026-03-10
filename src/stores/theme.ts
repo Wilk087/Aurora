@@ -28,10 +28,29 @@ export const useThemeStore = defineStore('theme', () => {
     root.setProperty('--text-tertiary', theme.colors.textTertiary)
     root.setProperty('--border', theme.colors.border)
 
+    // Base colour axes (controls all Tailwind white/black usages)
+    if (theme.colors.appText) root.setProperty('--app-text', theme.colors.appText)
+    if (theme.colors.appOverlay) root.setProperty('--app-overlay', theme.colors.appOverlay)
+    if (theme.colors.controlBg) root.setProperty('--control-bg', theme.colors.controlBg)
+    if (theme.colors.controlFg) root.setProperty('--control-fg', theme.colors.controlFg)
+
     // Glass overrides
     if (theme.glass?.background) root.setProperty('--glass-bg', theme.glass.background)
+    if (theme.glass?.lightBackground) root.setProperty('--glass-light-bg', theme.glass.lightBackground)
+    if (theme.glass?.heavyBackground) root.setProperty('--glass-heavy-bg', theme.glass.heavyBackground)
     if (theme.glass?.blur) root.setProperty('--glass-blur', theme.glass.blur)
     if (theme.glass?.saturate) root.setProperty('--glass-saturate', theme.glass.saturate)
+
+    // Scrollbar
+    if (theme.scrollbar?.thumb) root.setProperty('--scrollbar-thumb', theme.scrollbar.thumb)
+    if (theme.scrollbar?.thumbHover) root.setProperty('--scrollbar-thumb-hover', theme.scrollbar.thumbHover)
+
+    // Slider
+    if (theme.slider?.thumb) root.setProperty('--slider-thumb', theme.slider.thumb)
+    if (theme.slider?.track) root.setProperty('--slider-track', theme.slider.track)
+
+    // Cover shadow
+    if (theme.coverShadow) root.setProperty('--cover-shadow', theme.coverShadow)
 
     // Font overrides
     if (theme.fonts?.primary) root.setProperty('--font-primary', theme.fonts.primary)

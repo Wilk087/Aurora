@@ -14,6 +14,25 @@
     "textPrimary": "#eceff4",
     "textSecondary": "rgba(216, 222, 233, 0.6)",
     "textTertiary": "rgba(216, 222, 233, 0.4)",
-    "border": "rgba(216, 222, 233, 0.08)"
-  }
+    "border": "rgba(216, 222, 233, 0.08)",
+    "appText": "216 222 233",
+    "appOverlay": "46 52 64",
+    "controlBg": "216 222 233",
+    "controlFg": "46 52 64"
+  },
+  "glass": {
+    "background": "rgba(46, 52, 64, 0.75)",
+    "lightBackground": "rgba(59, 66, 82, 0.6)",
+    "heavyBackground": "rgba(36, 40, 50, 0.92)",
+    "blur": "blur(40px) saturate(180%)"
+  },
+  "scrollbar": {
+    "thumb": "rgba(216, 222, 233, 0.15)",
+    "thumbHover": "rgba(216, 222, 233, 0.25)"
+  },
+  "slider": {
+    "thumb": "rgb(216, 222, 233)",
+    "track": "rgba(216, 222, 233, 0.1)"
+  },
+  "coverShadow": "0 8px 30px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3)"
 }

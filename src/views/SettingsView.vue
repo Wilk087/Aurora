@@ -118,7 +118,7 @@
             :class="discordEnabled ? 'bg-accent' : 'bg-white/15'"
           >
             <div
-              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
               :class="discordEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'"
             />
           </button>
@@ -209,7 +209,7 @@
             :class="exclusiveMode ? 'bg-accent' : 'bg-white/15'"
           >
             <div
-              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
               :class="exclusiveMode ? 'translate-x-[22px]' : 'translate-x-0.5'"
             />
           </button>
@@ -251,7 +251,7 @@
             :class="player.waveformEnabled ? 'bg-accent' : 'bg-white/15'"
           >
             <div
-              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
               :class="player.waveformEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'"
             />
           </button>
@@ -269,7 +269,7 @@
             :class="player.normalization ? 'bg-accent' : 'bg-white/15'"
           >
             <div
-              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
               :class="player.normalization ? 'translate-x-[22px]' : 'translate-x-0.5'"
             />
           </button>
@@ -317,7 +317,7 @@
             :class="player.adaptiveAccent ? 'bg-accent' : 'bg-white/15'"
           >
             <div
-              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
               :class="player.adaptiveAccent ? 'translate-x-[22px]' : 'translate-x-0.5'"
             />
           </button>
@@ -334,7 +334,7 @@
             :class="player.iosSliders ? 'bg-accent' : 'bg-white/15'"
           >
             <div
-              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
               :class="player.iosSliders ? 'translate-x-[22px]' : 'translate-x-0.5'"
             />
           </button>
@@ -351,7 +351,7 @@
             :class="player.transparencyEnabled ? 'bg-accent' : 'bg-white/15'"
           >
             <div
-              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
               :class="player.transparencyEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'"
             />
           </button>
@@ -374,7 +374,7 @@
             :class="player.animatedCoversEnabled ? 'bg-accent' : 'bg-white/15'"
           >
             <div
-              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
               :class="player.animatedCoversEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'"
             />
           </button>
@@ -391,7 +391,7 @@
             :class="player.pauseAnimatedOnBlur ? 'bg-accent' : 'bg-white/15'"
           >
             <div
-              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
               :class="player.pauseAnimatedOnBlur ? 'translate-x-[22px]' : 'translate-x-0.5'"
             />
           </button>
@@ -415,7 +415,7 @@
             :class="player.autoFullscreen ? 'bg-accent' : 'bg-white/15'"
           >
             <div
-              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
               :class="player.autoFullscreen ? 'translate-x-[22px]' : 'translate-x-0.5'"
             />
           </button>
@@ -463,7 +463,7 @@
             :class="scrobblingEnabled ? 'bg-accent' : 'bg-white/15'"
           >
             <div
-              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
               :class="scrobblingEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'"
             />
           </button>
@@ -568,7 +568,7 @@
             :class="subsonicLegacyAuth ? 'bg-accent' : 'bg-white/15'"
           >
             <div
-              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
               :class="subsonicLegacyAuth ? 'translate-x-[22px]' : 'translate-x-0.5'"
             />
           </button>
@@ -626,7 +626,7 @@
             :class="remoteEnabled ? 'bg-accent' : 'bg-white/15'"
           >
             <div
-              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
               :class="remoteEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'"
             />
           </button>
@@ -812,7 +812,7 @@
             :class="autoExport ? 'bg-accent' : 'bg-white/15'"
           >
             <div
-              class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
               :class="autoExport ? 'translate-x-[22px]' : 'translate-x-0.5'"
             />
           </button>
@@ -974,40 +974,122 @@
           <div
             v-for="manifest in pluginStore.manifests"
             :key="manifest.id"
-            class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05] group"
+            class="rounded-xl bg-white/[0.05] group overflow-hidden"
           >
-            <div class="min-w-0">
-              <div class="flex items-center gap-2">
-                <p class="text-sm font-medium text-white truncate">{{ manifest.name }}</p>
-                <span class="text-[10px] text-white/20 shrink-0">v{{ manifest.version }}</span>
+            <div class="flex items-center justify-between px-4 py-3">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2">
+                  <p class="text-sm font-medium text-white truncate">{{ manifest.name }}</p>
+                  <span class="text-[10px] text-white/20 shrink-0">v{{ manifest.version }}</span>
+                </div>
+                <p v-if="manifest.description" class="text-xs text-white/30 mt-0.5 truncate">{{ manifest.description }}</p>
+                <p class="text-[10px] text-white/20 mt-0.5">by {{ manifest.author }}</p>
               </div>
-              <p v-if="manifest.description" class="text-xs text-white/30 mt-0.5 truncate">{{ manifest.description }}</p>
-              <p class="text-[10px] text-white/20 mt-0.5">by {{ manifest.author }}</p>
+
+              <div class="flex items-center gap-2 shrink-0">
+                <!-- Settings button (only when enabled & has schema) -->
+                <button
+                  v-if="pluginStore.enabledIds.includes(manifest.id) && hasPluginSettings(manifest.id)"
+                  @click="togglePluginSettings(manifest.id)"
+                  class="w-7 h-7 flex items-center justify-center rounded-lg transition-colors"
+                  :class="expandedPluginSettings === manifest.id ? 'text-accent bg-accent/10' : 'text-white/30 hover:text-white/60 hover:bg-white/[0.06]'"
+                  title="Plugin settings"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 010-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </button>
+
+                <!-- Enable / disable toggle -->
+                <button
+                  @click="pluginStore.toggle(manifest.id)"
+                  class="relative w-11 h-6 rounded-full transition-colors duration-200"
+                  :class="pluginStore.enabledIds.includes(manifest.id) ? 'bg-accent' : 'bg-white/15'"
+                >
+                  <div
+                    class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
+                    :class="pluginStore.enabledIds.includes(manifest.id) ? 'translate-x-[22px]' : 'translate-x-0.5'"
+                  />
+                </button>
+
+                <!-- Remove -->
+                <button
+                  @click="removePlugin(manifest.id, manifest.name)"
+                  class="text-white/20 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                  title="Remove plugin"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
-            <div class="flex items-center gap-2 shrink-0">
-              <!-- Enable / disable toggle -->
-              <button
-                @click="pluginStore.toggle(manifest.id)"
-                class="relative w-11 h-6 rounded-full transition-colors duration-200"
-                :class="pluginStore.enabledIds.includes(manifest.id) ? 'bg-accent' : 'bg-white/15'"
+            <!-- Expanded plugin settings -->
+            <div
+              v-if="expandedPluginSettings === manifest.id && pluginSettingValues[manifest.id]"
+              class="px-4 pb-4 pt-1 border-t border-white/[0.06] space-y-3"
+            >
+              <div
+                v-for="(field, key) in getPluginSchema(manifest.id)"
+                :key="key"
               >
-                <div
-                  class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
-                  :class="pluginStore.enabledIds.includes(manifest.id) ? 'translate-x-[22px]' : 'translate-x-0.5'"
-                />
-              </button>
+                <!-- Boolean toggle -->
+                <label v-if="field.type === 'boolean'" class="flex items-center justify-between cursor-pointer">
+                  <div class="min-w-0">
+                    <span class="text-sm text-white/70">{{ field.label }}</span>
+                    <p v-if="field.description" class="text-[11px] text-white/30 mt-0.5">{{ field.description }}</p>
+                  </div>
+                  <button
+                    @click="updatePluginSetting(manifest.id, String(key), !pluginSettingValues[manifest.id]?.[key])"
+                    class="relative w-9 h-5 rounded-full transition-colors duration-200 shrink-0 ml-3"
+                    :class="pluginSettingValues[manifest.id]?.[key] ? 'bg-accent' : 'bg-white/15'"
+                  >
+                    <span
+                      class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-control shadow transition-transform duration-200"
+                      :class="pluginSettingValues[manifest.id]?.[key] ? 'translate-x-4' : ''"
+                    />
+                  </button>
+                </label>
 
-              <!-- Remove -->
-              <button
-                @click="removePlugin(manifest.id, manifest.name)"
-                class="text-white/20 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                title="Remove plugin"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+                <!-- Select dropdown -->
+                <div v-else-if="field.type === 'select'">
+                  <p class="text-sm text-white/70 mb-1">{{ field.label }}</p>
+                  <p v-if="field.description" class="text-[11px] text-white/30 mb-2">{{ field.description }}</p>
+                  <select
+                    :value="pluginSettingValues[manifest.id]?.[key]"
+                    @change="updatePluginSetting(manifest.id, String(key), ($event.target as HTMLSelectElement).value)"
+                    class="w-full px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white/70 outline-none focus:border-accent/40 transition-colors"
+                  >
+                    <option v-for="opt in field.options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                  </select>
+                </div>
+
+                <!-- String input -->
+                <div v-else-if="field.type === 'string'">
+                  <p class="text-sm text-white/70 mb-1">{{ field.label }}</p>
+                  <p v-if="field.description" class="text-[11px] text-white/30 mb-2">{{ field.description }}</p>
+                  <input
+                    type="text"
+                    :value="pluginSettingValues[manifest.id]?.[key]"
+                    @change="updatePluginSetting(manifest.id, String(key), ($event.target as HTMLInputElement).value)"
+                    class="w-full px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white/70 placeholder:text-white/20 outline-none focus:border-accent/40 transition-colors"
+                  />
+                </div>
+
+                <!-- Number input -->
+                <div v-else-if="field.type === 'number'">
+                  <p class="text-sm text-white/70 mb-1">{{ field.label }}</p>
+                  <p v-if="field.description" class="text-[11px] text-white/30 mb-2">{{ field.description }}</p>
+                  <input
+                    type="number"
+                    :value="pluginSettingValues[manifest.id]?.[key]"
+                    @change="updatePluginSetting(manifest.id, String(key), parseFloat(($event.target as HTMLInputElement).value))"
+                    class="w-full px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white/70 outline-none focus:border-accent/40 transition-colors"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1087,7 +1169,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, reactive } from 'vue'
 import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { usePlaylistStore } from '@/stores/playlist'
@@ -1095,6 +1177,8 @@ import { useFavoritesStore } from '@/stores/favorites'
 import { useThemeStore } from '@/stores/theme'
 import { usePluginStore } from '@/stores/plugins'
 import { useToast } from '@/composables/useToast'
+import { getPluginSettingsSchema, notifyPluginSettingChanged } from '@/plugins'
+import type { PluginSettingField } from '@/types/plugin'
 
 const library = useLibraryStore()
 const player = usePlayerStore()
@@ -1127,6 +1211,56 @@ async function removePlugin(pluginId: string, name: string) {
     await pluginStore.remove(pluginId)
     toast.success(`Plugin "${name}" removed`)
   }
+}
+
+// ── Plugin settings ────────────────────────────────────────────────────
+/** Which plugin has its settings panel expanded */
+const expandedPluginSettings = ref<string | null>(null)
+/** Loaded setting values per plugin: { pluginId: { key: value } } */
+const pluginSettingValues = reactive<Record<string, Record<string, any>>>({})
+
+function hasPluginSettings(pluginId: string): boolean {
+  const manifest = pluginStore.manifests.find(m => m.id === pluginId)
+  const manifestSchema = manifest?.settingsSchema
+  const runtimeSchema = getPluginSettingsSchema(pluginId)
+  return !!(manifestSchema && Object.keys(manifestSchema).length > 0) ||
+         !!(runtimeSchema && Object.keys(runtimeSchema).length > 0)
+}
+
+function getPluginSchema(pluginId: string): Record<string, PluginSettingField> {
+  const manifest = pluginStore.manifests.find(m => m.id === pluginId)
+  const manifestSchema = manifest?.settingsSchema ?? {}
+  const runtimeSchema = getPluginSettingsSchema(pluginId) ?? {}
+  return { ...manifestSchema, ...runtimeSchema }
+}
+
+async function togglePluginSettings(pluginId: string) {
+  if (expandedPluginSettings.value === pluginId) {
+    expandedPluginSettings.value = null
+    return
+  }
+  // Load current values
+  if (!pluginSettingValues[pluginId]) {
+    const saved = await window.api.pluginsGetSettings(pluginId) || {}
+    const schema = getPluginSchema(pluginId)
+    const merged: Record<string, any> = {}
+    for (const [key, field] of Object.entries(schema)) {
+      merged[key] = key in saved ? saved[key] : field.default
+    }
+    pluginSettingValues[pluginId] = merged
+  }
+  expandedPluginSettings.value = pluginId
+}
+
+async function updatePluginSetting(pluginId: string, key: string, value: any) {
+  if (!pluginSettingValues[pluginId]) pluginSettingValues[pluginId] = {}
+  pluginSettingValues[pluginId][key] = value
+  // Persist
+  const current = await window.api.pluginsGetSettings(pluginId) || {}
+  current[key] = value
+  await window.api.pluginsSaveSettings(pluginId, current)
+  // Notify plugin
+  notifyPluginSettingChanged(pluginId, key, value)
 }
 
 const discordEnabled = ref(true)

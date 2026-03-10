@@ -76,7 +76,7 @@
         <!-- Play / Pause -->
         <button
           @click="player.togglePlay()"
-          class="w-10 h-10 flex items-center justify-center rounded-full bg-white text-black hover:scale-105 active:scale-95 transition-all"
+          class="w-10 h-10 flex items-center justify-center rounded-full bg-control text-control-fg hover:scale-105 active:scale-95 transition-all"
         >
           <svg v-if="player.isPlaying" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
             <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />

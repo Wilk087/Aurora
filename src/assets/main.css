@@ -7,13 +7,38 @@
     --accent: 139 92 246;
     --accent-hover: 167 139 250;
     --accent-dark: 109 40 217;
+
+    /* ── Themeable color channels (space-separated RGB) ─────── */
+    --app-text: 255 255 255;       /* text & surface overlay base */
+    --app-overlay: 0 0 0;          /* heavy overlay / backdrop base */
+    --control-bg: 255 255 255;     /* play button, toggle knobs */
+    --control-fg: 0 0 0;           /* text on control surfaces */
+
+    /* ── Full-value CSS variables ──────────────────────────── */
     --bg-primary: rgba(10, 10, 10, 0.95);
     --bg-secondary: rgba(18, 18, 18, 0.85);
     --bg-tertiary: rgba(30, 30, 30, 0.9);
-    --text-primary: #ffffff;
-    --text-secondary: rgba(255, 255, 255, 0.6);
-    --text-tertiary: rgba(255, 255, 255, 0.4);
-    --border: rgba(255, 255, 255, 0.08);
+    --text-primary: rgb(var(--app-text));
+    --text-secondary: rgb(var(--app-text) / 0.6);
+    --text-tertiary: rgb(var(--app-text) / 0.4);
+    --border: rgb(var(--app-text) / 0.08);
+
+    /* ── Glass panels ──────────────────────────────────────── */
+    --glass-bg: rgba(20, 20, 20, 0.75);
+    --glass-light-bg: rgba(35, 35, 35, 0.6);
+    --glass-heavy-bg: rgba(12, 12, 12, 0.92);
+    --glass-blur: blur(40px) saturate(180%);
+
+    /* ── Scrollbar ─────────────────────────────────────────── */
+    --scrollbar-thumb: rgb(var(--app-text) / 0.15);
+    --scrollbar-thumb-hover: rgb(var(--app-text) / 0.25);
+
+    /* ── Slider thumbs ─────────────────────────────────────── */
+    --slider-thumb: rgb(var(--control-bg));
+    --slider-track: rgb(var(--app-text) / 0.1);
+
+    /* ── Shadows ───────────────────────────────────────────── */
+    --cover-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
   }
 
   * {
@@ -43,28 +68,28 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
+    background: var(--scrollbar-thumb);
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.25);
+    background: var(--scrollbar-thumb-hover);
   }
 }
 
 @layer components {
   /* ── Glass panels ─────────────────────────────────────────────── */
   .glass {
-    background: rgba(20, 20, 20, 0.75);
-    backdrop-filter: blur(40px) saturate(180%);
-    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
   }
   .glass-light {
-    background: rgba(35, 35, 35, 0.6);
+    background: var(--glass-light-bg);
     backdrop-filter: blur(30px) saturate(150%);
     -webkit-backdrop-filter: blur(30px) saturate(150%);
   }
   .glass-heavy {
-    background: rgba(12, 12, 12, 0.92);
+    background: var(--glass-heavy-bg);
     backdrop-filter: blur(60px) saturate(200%);
     -webkit-backdrop-filter: blur(60px) saturate(200%);
   }
@@ -86,7 +111,7 @@
       0 0 60px rgb(var(--accent) / 0.1);
   }
   .cover-shadow {
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--cover-shadow);
   }
   .text-glow {
     text-shadow: 0 0 30px rgb(var(--accent) / 0.5);
@@ -102,7 +127,7 @@
   input[type='range']::-webkit-slider-track {
     height: 4px;
     border-radius: 2px;
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--slider-track);
   }
   input[type='range']::-webkit-slider-thumb {
     -webkit-appearance: none;
@@ -110,7 +135,7 @@
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    background: #fff;
+    background: var(--slider-thumb);
     margin-top: -4px;
     opacity: 0;
     transition: opacity 0.15s ease;
@@ -145,5 +170,16 @@
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
+  }
+
+  /* ── Immersive scope ──────────────────────────────────────── */
+  /* Force light-on-dark in fullscreen/immersive contexts         */
+  /* regardless of the active theme. These overlay on album art   */
+  /* so text must remain white for readability.                  */
+  .immersive-scope {
+    --app-text: 255 255 255;
+    --app-overlay: 0 0 0;
+    --control-bg: 255 255 255;
+    --control-fg: 0 0 0;
   }
 }

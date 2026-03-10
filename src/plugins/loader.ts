@@ -7,7 +7,7 @@
  */
 
 import type { PluginManifest, PluginExports, LoadedPlugin } from '@/types/plugin'
-import { createPluginAPI } from './api'
+import { createPluginAPI, getPluginSettingsSchema } from './api'
 import { pluginBus } from './eventBus'
 
 /** All currently loaded plugins */
@@ -31,6 +31,11 @@ export async function loadPlugin(manifest: PluginManifest, settings: Record<stri
   // Read the plugin's JS source via IPC
   const code = await window.api.pluginsReadFile(manifest.id, manifest.main || 'main.js')
   const api = createPluginAPI(manifest.id)
+
+  // Seed settings schema from manifest (plugin code can extend via api.settings.register)
+  if (manifest.settingsSchema) {
+    api.settings.register(manifest.settingsSchema)
+  }
 
   // Execute the plugin code — full trust, no sandbox
   const exports: PluginExports = {}

@@ -13,13 +13,33 @@ import { usePlaylistStore } from '@/stores/playlist'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useThemeStore } from '@/stores/theme'
 import { useToast } from '@/composables/useToast'
-import type { PluginSidebarItem } from '@/types/plugin'
+import type { PluginSidebarItem, PluginSettingField } from '@/types/plugin'
 
 /** Registry of sidebar items added by plugins */
 const _sidebarItems = new Map<string, PluginSidebarItem[]>()
 
+/** Registry of settings schemas registered at runtime by plugins */
+const _settingsSchemas = new Map<string, Record<string, PluginSettingField>>()
+
+/** Settings change listeners per plugin */
+const _settingsListeners = new Map<string, Set<(key: string, value: any) => void>>()
+
 export function getPluginSidebarItems(): PluginSidebarItem[] {
   return Array.from(_sidebarItems.values()).flat()
+}
+
+export function getPluginSettingsSchema(pluginId: string): Record<string, PluginSettingField> | undefined {
+  return _settingsSchemas.get(pluginId)
+}
+
+/** Called from Settings UI when user changes a plugin setting */
+export function notifyPluginSettingChanged(pluginId: string, key: string, value: any) {
+  const listeners = _settingsListeners.get(pluginId)
+  if (listeners) {
+    for (const fn of listeners) {
+      try { fn(key, value) } catch {}
+    }
+  }
 }
 
 /**
@@ -124,6 +144,70 @@ export function createPluginAPI(pluginId: string) {
        */
       getPlayerBarSlot(position: 'left' | 'right' = 'right'): HTMLElement | null {
         return document.getElementById(`aurora-playerbar-${position}-slot`)
+      },
+      /**
+       * Get a plugin slot inside the immersive / fullscreen view.
+       * @param position 'right' (next to track info in default layout) or 'modern-right' (modern controls layout)
+       * @returns The DOM element, or null if the fullscreen view isn't mounted.
+       */
+      getImmersiveSlot(position: 'right' | 'modern-right' = 'right'): HTMLElement | null {
+        return document.getElementById(`aurora-immersive-${position}-slot`)
+      },
+      /**
+       * Get the settings slot inside the immersive settings panel.
+       * Plugins can append their own DOM controls here.
+       */
+      getImmersiveSettingsSlot(): HTMLElement | null {
+        return document.getElementById('aurora-immersive-settings-slot')
+      },
+    },
+
+    // ── Settings (declared schema, persisted per-plugin) ─────────────────
+    settings: {
+      /**
+       * Register a settings schema at runtime.
+       * This is an alternative to declaring `settingsSchema` in manifest.json.
+       * The schema is merged (runtime wins) and shown in the Settings UI.
+       */
+      register(schema: Record<string, PluginSettingField>) {
+        _settingsSchemas.set(pluginId, { ..._settingsSchemas.get(pluginId), ...schema })
+      },
+      /** Get the current value for a setting key (falls back to schema default) */
+      async get(key: string): Promise<any> {
+        const all = await window.api.pluginsGetSettings(pluginId) || {}
+        if (key in all) return all[key]
+        const schema = _settingsSchemas.get(pluginId)
+        return schema?.[key]?.default
+      },
+      /** Save a single setting */
+      async set(key: string, value: any): Promise<void> {
+        const current = await window.api.pluginsGetSettings(pluginId) || {}
+        current[key] = value
+        await window.api.pluginsSaveSettings(pluginId, current)
+        // Notify in-process listeners
+        notifyPluginSettingChanged(pluginId, key, value)
+      },
+      /** Get all saved settings (merged with schema defaults) */
+      async getAll(): Promise<Record<string, any>> {
+        const saved = await window.api.pluginsGetSettings(pluginId) || {}
+        const schema = _settingsSchemas.get(pluginId) ?? {}
+        const merged: Record<string, any> = {}
+        for (const [k, field] of Object.entries(schema)) {
+          merged[k] = k in saved ? saved[k] : field.default
+        }
+        // Include anything saved that's not in schema
+        for (const [k, v] of Object.entries(saved)) {
+          if (!(k in merged)) merged[k] = v
+        }
+        return merged
+      },
+      /** Listen for setting changes (from Settings UI or programmatic) */
+      onChange(handler: (key: string, value: any) => void) {
+        if (!_settingsListeners.has(pluginId)) _settingsListeners.set(pluginId, new Set())
+        _settingsListeners.get(pluginId)!.add(handler)
+      },
+      offChange(handler: (key: string, value: any) => void) {
+        _settingsListeners.get(pluginId)?.delete(handler)
       },
     },
 
