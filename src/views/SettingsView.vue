@@ -1,9 +1,24 @@
 <template>
   <div class="settings-view p-6 max-w-2xl mx-auto">
-    <h1 class="text-3xl font-bold text-white mb-8">Settings</h1>
+    <h1 class="text-3xl font-bold text-white mb-6">Settings</h1>
+
+    <!-- ── Tab bar ────────────────────────────────────────────────── -->
+    <nav class="flex items-center gap-1 mb-8 p-1 rounded-xl bg-white/[0.04] border border-white/[0.06] overflow-x-auto no-scrollbar">
+      <button
+        v-for="tab in tabs"
+        :key="tab.id"
+        @click="activeTab = tab.id"
+        class="relative px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200"
+        :class="activeTab === tab.id
+          ? 'bg-accent/15 text-accent shadow-sm'
+          : 'text-white/40 hover:text-white/70 hover:bg-white/[0.04]'"
+      >
+        {{ tab.label }}
+      </button>
+    </nav>
 
     <!-- ── Music Folders ──────────────────────────────────────────── -->
-    <section class="mb-8">
+    <section v-show="activeTab === 'general'" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Music Folders</h2>
 
       <div class="space-y-2 mb-4">
@@ -83,7 +98,7 @@
     </section>
 
     <!-- ── Library stats ──────────────────────────────────────────── -->
-    <section class="mb-8">
+    <section v-show="activeTab === 'general'" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Library</h2>
       <div class="grid grid-cols-3 gap-4">
         <div class="px-4 py-3 rounded-xl bg-white/[0.05]">
@@ -102,7 +117,7 @@
     </section>
 
     <!-- ── Discord Rich Presence ──────────────────────────────────── -->
-    <section class="mb-8">
+    <section v-show="activeTab === 'integrations'" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Discord Rich Presence</h2>
 
       <div class="space-y-4">
@@ -173,7 +188,7 @@
     </section>
 
     <!-- ── Audio Output ───────────────────────────────────────────── -->
-    <section class="mb-8">
+    <section v-show="activeTab === 'general'" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Audio Output</h2>
       <div class="space-y-4">
         <div class="px-4 py-3 rounded-xl bg-white/[0.05]">
@@ -236,7 +251,7 @@
     </section>
 
     <!-- ── Playback ───────────────────────────────────────────────── -->
-    <section class="mb-8">
+    <section v-show="activeTab === 'general'" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Playback</h2>
       <div class="space-y-4">
         <!-- Waveform progress bar -->
@@ -303,7 +318,7 @@
     </section>
 
     <!-- ── Appearance ─────────────────────────────────────────────── -->
-    <section class="mb-8">
+    <section v-show="activeTab === 'appearance'" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Appearance</h2>
       <div class="space-y-4">
         <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
@@ -359,7 +374,7 @@
     </section>
 
     <!-- ── Animated Covers ────────────────────────────────────────── -->
-    <section class="mb-8">
+    <section v-show="activeTab === 'appearance'" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Animated Covers</h2>
       <div class="space-y-4">
         <!-- Toggle -->
@@ -400,7 +415,7 @@
     </section>
 
     <!-- ── Behavior ───────────────────────────────────────────────── -->
-    <section class="mb-8">
+    <section v-show="activeTab === 'general'" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Behavior</h2>
       <div class="space-y-4">
         <!-- Auto-fullscreen toggle -->
@@ -445,7 +460,7 @@
     </section>
 
     <!-- ── Scrobbling ─────────────────────────────────────────────── -->
-    <section class="mb-8">
+    <section v-show="activeTab === 'integrations'" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">
         Scrobbling
         <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/15 text-amber-500 uppercase tracking-wider align-middle">WIP</span>
@@ -524,7 +539,7 @@
     </section>
 
     <!-- ── Navidrome / Subsonic ─────────────────────────────────── -->
-    <section class="mb-8">
+    <section v-show="activeTab === 'integrations'" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">
         Navidrome / Subsonic
         <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/15 text-amber-500 uppercase tracking-wider align-middle">WIP</span>
@@ -608,7 +623,7 @@
     </section>
 
     <!-- ── Remote Control ───────────────────────────────────────── -->
-    <section class="mb-8">
+    <section v-show="activeTab === 'integrations'" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Remote Control</h2>
 
       <div class="px-4 py-4 rounded-xl bg-white/[0.05] space-y-4">
@@ -702,7 +717,7 @@
     </section>
 
     <!-- ── Cache Management ─────────────────────────────────────── -->
-    <section class="mb-8">
+    <section v-show="activeTab === 'system'" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Cache</h2>
 
       <div class="px-4 py-4 rounded-xl bg-white/[0.05] space-y-3">
@@ -791,7 +806,7 @@
     </section>
 
     <!-- ── Export / Import ──────────────────────────────────────── -->
-    <section class="mb-8">
+    <section v-show="activeTab === 'system'" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">
         Export / Import
         <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/15 text-amber-500 uppercase tracking-wider align-middle">WIP</span>
@@ -871,7 +886,7 @@
     </section>
 
     <!-- ── Troubleshooting ────────────────────────────────────── -->
-    <section class="mb-8">
+    <section v-show="activeTab === 'system'" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Troubleshooting</h2>
       <div class="px-4 py-4 rounded-xl bg-white/[0.05] space-y-3">
         <p class="text-xs text-white/40">Aurora writes diagnostic logs to help troubleshoot issues. Share the log file when reporting bugs.</p>
@@ -891,7 +906,7 @@
     </section>
 
     <!-- ── Themes ──────────────────────────────────────────────────── -->
-    <section class="mb-8">
+    <section v-show="activeTab === 'appearance'" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">
         Themes
         <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/15 text-amber-500 uppercase tracking-wider align-middle">WIP</span>
@@ -968,7 +983,7 @@
     </section>
 
     <!-- ── Plugins ──────────────────────────────────────────────────── -->
-    <section class="mb-8">
+    <section v-show="activeTab === 'plugins'" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">
         Plugins
         <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/15 text-amber-500 uppercase tracking-wider align-middle">WIP</span>
@@ -1131,7 +1146,7 @@
     </section>
 
     <!-- ── About ──────────────────────────────────────────────────── -->
-    <section>
+    <section v-show="activeTab === 'system'">
       <h2 class="text-lg font-semibold text-white mb-4">About</h2>
       <div class="px-4 py-4 rounded-xl bg-white/[0.05]">
         <div class="flex items-center gap-3 mb-3">
@@ -1208,6 +1223,16 @@ const pluginStore = usePluginStore()
 const toast = useToast()
 
 const appVersion = __APP_VERSION__
+
+// ── Tab navigation ─────────────────────────────────────────────────────
+const activeTab = ref('general')
+const tabs = [
+  { id: 'general', label: 'General' },
+  { id: 'appearance', label: 'Appearance' },
+  { id: 'integrations', label: 'Integrations' },
+  { id: 'plugins', label: 'Plugins' },
+  { id: 'system', label: 'System' },
+]
 
 // ── Theme / Plugin helpers ─────────────────────────────────────────────
 const themeCustomCSS = ref('')
