@@ -1,4 +1,5 @@
 <template>
+  <Teleport to="body">
   <Transition name="fade">
     <div
       v-if="visible"
@@ -159,6 +160,7 @@
       </div>
     </div>
   </Transition>
+  </Teleport>
 </template>
 
 <script setup lang="ts">

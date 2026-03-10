@@ -23,23 +23,27 @@ Aurora Player is a local music player for Linux and Windows, built with Electron
 ### Library and browsing
 
 - Scan local folders for audio files (MP3, FLAC, OGG, WAV, M4A, AAC, OPUS, WMA)
-- Browse by songs, albums, artists, or folder structure
+- Browse by songs, albums, artists, years, or folder structure
+- Detailed artist pages with bio, images, tags, active years, and country info
 - Real-time search across songs and albums
-- Sort by title, artist, album, date added, duration, and year
+- Sort songs by title, artist, album, year, and duration
+- Sort albums by name, artist, year, and track count
 - Virtual scrolling for large libraries
 
 ### Playback
 
-- Gapless queue with play next, play later, shuffle, and repeat modes
+- Queue with play next, play later, shuffle, and repeat modes (off, all, one)
 - Waveform progress bar
 - Audio output device selection
 - Volume normalization (dynamics compressor)
 - Drag-and-drop queue reordering
+- Sleep timer (after song, after album, 15/30/45/60/90 minutes, or custom)
+- Error auto-skip with notification
 
 ### Playlists and favorites
 
 - Create, rename, delete, and reorder playlists
-- Smart playlists with rule-based auto-population (genre, year, artist, BPM, etc.)
+- Smart playlists with rule-based auto-population (genre, year, artist, album, title, BPM, etc.)
 - Mark songs as favorites with inline heart buttons
 - Multi-select with Ctrl+Click, Shift+Click, and Ctrl+A for bulk actions
 
@@ -47,8 +51,10 @@ Aurora Player is a local music player for Linux and Windows, built with Electron
 
 - Now playing view with synced lyrics, album art, and waveform bar
 - Adaptive accent colors extracted from album art
-- Fullscreen mode with background blur and lyrics
-- Auto-fullscreen on idle (configurable delay)
+- Three fullscreen layouts: Default, Modern, and Artwork
+- Animated fullscreen backgrounds (Lava Lamp, Sonar Ripple, Cinematic Grain)
+- Animated album covers via Apple Music motion artwork
+- Queue panel in fullscreen
 
 ### Lyrics
 
@@ -59,18 +65,41 @@ Aurora Player is a local music player for Linux and Windows, built with Electron
 
 ### Integrations
 
-- Discord Rich Presence (customizable format, custom client ID support)
+- Discord Rich Presence (5 format options, custom client ID support)
 - Last.fm and ListenBrainz scrobbling
 - Navidrome / Subsonic server streaming
 - MPRIS D-Bus integration on Linux (media keys, desktop controls)
+- Remote control via LAN (mobile access with PIN-based authentication)
+
+### Theming
+
+- JSON-based theme system with full colour, glass, scrollbar, slider, and font overrides
+- Light and dark theme support via base colour axis inversion
+- Custom CSS injection on top of any theme
+- Hot-reload — themes are detected automatically when dropped into the themes folder
+- See [docs/themes.md](docs/themes.md) for the full format reference
+
+### Plugins
+
+- JavaScript plugin system with lifecycle hooks (track change, play, pause, queue, seek, etc.)
+- Plugin API for controlling playback, library, playlists, favorites, themes, and UI
+- Settings schema — plugins declare typed settings and Aurora auto-renders the UI controls
+- Sidebar items, player bar slots, and fullscreen slots for injecting custom UI
+- Per-plugin persistent key-value storage
+- Optional CSS injection for plugin-specific styles
+- See [docs/plugins.md](docs/plugins.md) for the full API reference
 
 ### Other
 
+- First-time setup wizard
 - Export and import settings, favorites, and playlists as a backup file
 - Context menus for songs, albums, and playlists
+- Cache management (covers, artist images, waveform data, animated covers)
+- Window transparency toggle
 - Toast notifications for user actions
 - Automatic update checker (notifies once per new release)
 - Custom iOS-style slider option
+- Troubleshooting log viewer
 
 ## Installation
 
@@ -160,6 +189,14 @@ npm run dist:all          # All platforms at once
 
 Built packages are written to the `release/` directory.
 
+## Documentation
+
+- [Themes](docs/themes.md) — theme format, CSS variable reference, and light/dark theme guide
+- [Plugins](docs/plugins.md) — plugin structure, manifest format, lifecycle hooks, and full API reference
+- [Example theme (Nord Dark)](docs/example-theme.json) — dark theme example
+- [Example theme (Aurora Light)](docs/example-light-theme.json) — light theme example
+- [Example plugin](docs/example-plugin/) — a working plugin with sidebar items, toasts, and settings
+
 ## Project structure
 
 ```
@@ -171,10 +208,13 @@ electron/
 src/
   components/      Reusable Vue components
   composables/     Vue composables (useSelection, useToast, etc.)
+  plugins/         Plugin loader, API factory, and event bus
   router/          Vue Router configuration
-  stores/          Pinia stores (library, player, playlist, favorites)
+  stores/          Pinia stores (library, player, playlist, favorites, theme, plugins)
+  types/           TypeScript interfaces (theme, plugin, etc.)
   views/           Page-level view components
   utils/           Utility functions
+docs/              Theme and plugin documentation, examples
 build/             App icons (PNG, ICO)
 ```
 

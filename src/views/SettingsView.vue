@@ -1121,9 +1121,9 @@
         </div>
 
         <!-- Warning notice -->
-        <div class="px-4 py-3 rounded-xl bg-yellow-500/[0.06] border border-yellow-500/10">
-          <p class="text-xs text-yellow-200/60 leading-relaxed">
-            <strong class="text-yellow-200/80">Use at your own risk.</strong>
+        <div class="px-4 py-3 rounded-xl bg-amber-500/[0.06] border border-amber-500/10">
+          <p class="text-xs text-amber-500/70 leading-relaxed">
+            <strong class="text-amber-500/90">Use at your own risk.</strong>
             Plugins run with full access and are not sandboxed. Only install plugins from sources you trust.
           </p>
         </div>
