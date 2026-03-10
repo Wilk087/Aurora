@@ -13,6 +13,7 @@ import { usePlaylistStore } from '@/stores/playlist'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useThemeStore } from '@/stores/theme'
 import { useToast } from '@/composables/useToast'
+import { parseLRC, findCurrentLine } from '@/utils/lrcParser'
 import type { PluginSidebarItem, PluginSettingField } from '@/types/plugin'
 
 /** Registry of sidebar items added by plugins */
@@ -113,6 +114,76 @@ export function createPluginAPI(pluginId: string) {
       apply: theme.applyTheme.bind(theme),
       reset: theme.resetTheme.bind(theme),
       injectCSS: theme.loadCustomCSS.bind(theme),
+    },
+
+    // ── Lyrics ──────────────────────────────────────────────────────────
+    lyrics: {
+      /**
+       * Get locally saved lyrics (raw LRC/text content) for a track.
+       * @param trackPath — file path (or subsonic:// URI) of the track
+       * @returns The raw LRC string, or null if no local lyrics file exists.
+       */
+      async get(trackPath: string): Promise<string | null> {
+        return window.api.getLyrics(trackPath)
+      },
+      /**
+       * Fetch lyrics from the online LRCLIB database.
+       * The result is also auto-saved as a local .lrc file for non-subsonic tracks.
+       * @returns The raw LRC string, or null if nothing was found.
+       */
+      async fetchOnline(trackInfo: { path: string; title: string; artist: string; album: string; duration: number }): Promise<string | null> {
+        return window.api.fetchOnlineLyrics(trackInfo)
+      },
+      /**
+       * Save an LRC string to disk next to the audio file.
+       * @param trackPath — file path of the track
+       * @param lrcContent — the full LRC content to write
+       */
+      async save(trackPath: string, lrcContent: string): Promise<void> {
+        return window.api.saveLyrics(trackPath, lrcContent)
+      },
+      /**
+       * Parse raw LRC content into an array of { time, text } objects.
+       * Supports [mm:ss.xx], [mm:ss:xx], and [mm:ss] timestamps.
+       */
+      parse: parseLRC,
+      /**
+       * Given parsed lyrics and a time (in seconds), return the index of the
+       * currently active line. Returns -1 if before the first line.
+       */
+      findCurrentLine,
+      /** Current lyrics timing offset in seconds (positive = lyrics earlier). */
+      get offset() { return player.lyricsOffset },
+      /** Set the lyrics timing offset (persisted to settings). */
+      setOffset(offset: number) { player.setLyricsOffset(offset) },
+      /**
+       * Convenience: get parsed & synced lyrics for the currently playing track.
+       * Returns { synced: boolean, lines: LyricLine[], raw: string } or null.
+       */
+      async getCurrentTrackLyrics(): Promise<{ synced: boolean; lines: { time: number; text: string }[]; raw: string } | null> {
+        const track = player.currentTrack
+        if (!track) return null
+
+        // Try local first
+        let raw = await window.api.getLyrics(track.path)
+
+        // Fall back to online
+        if (!raw) {
+          raw = await window.api.fetchOnlineLyrics({
+            path: track.path,
+            title: track.title,
+            artist: track.artist,
+            album: track.album,
+            duration: track.duration,
+          })
+        }
+
+        if (!raw) return null
+
+        const lines = parseLRC(raw)
+        const synced = lines.length > 0
+        return { synced, lines: synced ? lines : [], raw }
+      },
     },
 
     // ── Events ───────────────────────────────────────────────────────────

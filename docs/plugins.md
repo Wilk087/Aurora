@@ -221,6 +221,74 @@ Access and modify the app theme.
 | `reset()` | `void` | Reset to the default theme |
 | `injectCSS(css)` | `void` | Inject custom CSS |
 
+### aurora.lyrics
+
+Access, fetch, parse, and save lyrics for any track.
+
+| Property / Method | Type | Description |
+|---|---|---|
+| `get(trackPath)` | `Promise<string \| null>` | Get raw LRC/text content from the local `.lrc` file next to the track |
+| `fetchOnline(trackInfo)` | `Promise<string \| null>` | Fetch lyrics from the LRCLIB online database (auto-saves locally) |
+| `save(trackPath, lrcContent)` | `Promise<void>` | Save an LRC string to disk next to the audio file |
+| `parse(lrcContent)` | `LyricLine[]` | Parse raw LRC content into `[{ time, text }, ...]` (sorted by time) |
+| `findCurrentLine(lyrics, time)` | `number` | Given parsed lyrics and a time in seconds, return the index of the active line (−1 if before the first line) |
+| `offset` | `number` | Current lyrics timing offset in seconds (positive = lyrics appear earlier) |
+| `setOffset(seconds)` | `void` | Set the lyrics timing offset (persisted to settings) |
+| `getCurrentTrackLyrics()` | `Promise<object \| null>` | Convenience method — returns `{ synced, lines, raw }` for the playing track, or `null` |
+
+#### trackInfo object (for `fetchOnline`)
+
+```javascript
+{
+  path: '/path/to/song.mp3',
+  title: 'Song Title',
+  artist: 'Artist Name',
+  album: 'Album Name',
+  duration: 240  // seconds
+}
+```
+
+#### Example — display synced lyrics
+
+```javascript
+exports.onTrackChange = async function (track) {
+  var result = await aurora.lyrics.getCurrentTrackLyrics()
+  if (!result) return console.log('No lyrics available')
+
+  if (result.synced) {
+    // result.lines is an array of { time: number, text: string }
+    result.lines.forEach(function (line) {
+      console.log('[' + line.time.toFixed(2) + '] ' + line.text)
+    })
+  } else {
+    // Unsynced — result.raw contains the plain text
+    console.log(result.raw)
+  }
+}
+```
+
+#### Example — fetch and save lyrics manually
+
+```javascript
+var raw = await aurora.lyrics.get(track.path)
+
+if (!raw) {
+  raw = await aurora.lyrics.fetchOnline({
+    path: track.path,
+    title: track.title,
+    artist: track.artist,
+    album: track.album,
+    duration: track.duration
+  })
+}
+
+if (raw) {
+  var lines = aurora.lyrics.parse(raw)
+  var idx = aurora.lyrics.findCurrentLine(lines, aurora.player.currentTime + aurora.lyrics.offset)
+  console.log('Active line:', lines[idx]?.text)
+}
+```
+
 ### aurora.ui
 
 Interact with the UI.
