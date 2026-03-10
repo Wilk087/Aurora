@@ -54,6 +54,22 @@
       </router-link>
     </div>
 
+    <!-- Plugin sidebar items -->
+    <div v-if="pluginSidebarItems.length > 0" class="px-2 mt-4 space-y-0.5">
+      <p class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">
+        Plugins
+      </p>
+      <button
+        v-for="(item, idx) in pluginSidebarItems"
+        :key="'plugin-' + idx"
+        @click="item.onClick()"
+        class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all no-drag text-white/60 hover:text-white/80 hover:bg-white/[0.05]"
+      >
+        <span class="w-5 h-5 flex items-center justify-center" v-html="item.icon" />
+        <span>{{ item.label }}</span>
+      </button>
+    </div>
+
     <!-- Now Playing shortcut -->
     <div v-if="player.currentTrack" class="px-2 mt-4 space-y-0.5">
       <p class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">
@@ -257,12 +273,15 @@ import { useRouter, useRoute } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { usePlaylistStore, type PlaylistSortOrder } from '@/stores/playlist'
+import { getPluginSidebarItems } from '@/plugins/api'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 const router = useRouter()
 const route = useRoute()
 const player = usePlayerStore()
 const library = useLibraryStore()
 const playlistStore = usePlaylistStore()
+
+const pluginSidebarItems = computed(() => getPluginSidebarItems())
 
 // ── Delete confirmation dialog ─────────────────────────────────────────
 const deleteDialog = reactive({ show: false, playlistName: '', playlistId: '' })

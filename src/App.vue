@@ -50,6 +50,8 @@ import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { usePlaylistStore } from '@/stores/playlist'
 import { useFavoritesStore } from '@/stores/favorites'
+import { useThemeStore } from '@/stores/theme'
+import { usePluginStore } from '@/stores/plugins'
 import Titlebar from '@/components/Titlebar.vue'
 import Sidebar from '@/components/Sidebar.vue'
 import PlayerBar from '@/components/PlayerBar.vue'
@@ -63,6 +65,8 @@ const player = usePlayerStore()
 const library = useLibraryStore()
 const playlistStore = usePlaylistStore()
 const favoritesStore = useFavoritesStore()
+const themeStore = useThemeStore()
+const pluginStore = usePluginStore()
 
 // Expose stores globally for cross-store lazy access (avoids circular require issues)
 ;(window as any).__auroraLibStore = library
@@ -111,6 +115,11 @@ onMounted(async () => {
   await library.loadLibrary()
   await playlistStore.loadPlaylists()
   await favoritesStore.load()
+
+  // Restore user theme and load plugins
+  await themeStore.restoreTheme()
+  themeStore.watchThemesDirectory()
+  await pluginStore.init()
 })
 
 // Extract a dominant colour from the current track's cover art
@@ -335,6 +344,7 @@ onUnmounted(() => {
   document.removeEventListener('keydown', onGlobalKeydown)
   if (idleTimer) clearTimeout(idleTimer)
   window.api.removeWindowStateChangeListener()
+  themeStore.unwatchThemesDirectory()
 })
 
 // Re-evaluate idle timer when playback state or setting changes

@@ -215,4 +215,27 @@ contextBridge.exposeInMainWorld('api', {
   remoteRemoveAllDevices: () => ipcRenderer.invoke('remote:remove-all-devices'),
   remoteStartServer: () => ipcRenderer.invoke('remote:start-server'),
   remoteStopServer: () => ipcRenderer.invoke('remote:stop-server'),
+
+  // Themes
+  themesGetAll: (): Promise<any[]> => ipcRenderer.invoke('themes:get-all'),
+  themesInstall: (theme: any): Promise<void> => ipcRenderer.invoke('themes:install', theme),
+  themesRemove: (themeId: string): Promise<void> => ipcRenderer.invoke('themes:remove', themeId),
+  themesOpenFolder: (): Promise<void> => ipcRenderer.invoke('themes:open-folder'),
+  onThemesDirectoryChanged: (callback: () => void) => {
+    ipcRenderer.on('themes:directory-changed', callback)
+  },
+  removeThemesDirectoryChangedListener: () => {
+    ipcRenderer.removeAllListeners('themes:directory-changed')
+  },
+
+  // Plugins
+  pluginsGetAll: (): Promise<any[]> => ipcRenderer.invoke('plugins:get-all'),
+  pluginsReadFile: (pluginId: string, fileName: string): Promise<string> => ipcRenderer.invoke('plugins:read-file', pluginId, fileName),
+  pluginsInstall: (sourcePath: string): Promise<void> => ipcRenderer.invoke('plugins:install', sourcePath),
+  pluginsRemove: (pluginId: string): Promise<void> => ipcRenderer.invoke('plugins:remove', pluginId),
+  pluginsGetSettings: (pluginId: string): Promise<any> => ipcRenderer.invoke('plugins:get-settings', pluginId),
+  pluginsSaveSettings: (pluginId: string, data: any): Promise<void> => ipcRenderer.invoke('plugins:save-settings', pluginId, data),
+  pluginsOpenFolder: (): Promise<void> => ipcRenderer.invoke('plugins:open-folder'),
+  pluginsIpcInvoke: (channel: string, ...args: any[]): Promise<any> => ipcRenderer.invoke(channel, ...args),
+  pluginsIpcSend: (channel: string, ...args: any[]) => ipcRenderer.send(channel, ...args),
 })

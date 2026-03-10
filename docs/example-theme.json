@@ -1,0 +1,19 @@
+{
+  "id": "nord-dark",
+  "name": "Nord Dark",
+  "author": "Aurora",
+  "version": "1.0.0",
+  "description": "A theme inspired by the Nord colour palette",
+  "colors": {
+    "accent": "136 192 208",
+    "accentHover": "143 188 187",
+    "accentDark": "94 129 172",
+    "bgPrimary": "rgba(46, 52, 64, 0.95)",
+    "bgSecondary": "rgba(59, 66, 82, 0.85)",
+    "bgTertiary": "rgba(67, 76, 94, 0.9)",
+    "textPrimary": "#eceff4",
+    "textSecondary": "rgba(216, 222, 233, 0.6)",
+    "textTertiary": "rgba(216, 222, 233, 0.4)",
+    "border": "rgba(216, 222, 233, 0.08)"
+  }
+}

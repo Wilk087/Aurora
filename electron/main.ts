@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, protocol, net, shell, screen } from 'electron'
 import { join, extname, basename, dirname } from 'path'
 import { readdir, readFile, writeFile, mkdir, stat, rm, copyFile, unlink } from 'fs/promises'
-import { existsSync, createReadStream, readFileSync } from 'fs'
+import { existsSync, createReadStream, readFileSync, watch as fsWatch } from 'fs'
 import { createHash } from 'crypto'
 import { request as httpsRequest, get as httpsGet } from 'https'
 import { execFile } from 'child_process'
@@ -1979,6 +1979,153 @@ app.whenReady().then(async () => {
       await savePlaylists()
     }
     return pl || null
+  })
+
+  // ── IPC: Themes ──
+  const themesDir = join(userDataPath, 'themes')
+
+  ipcMain.handle('themes:get-all', async () => {
+    try {
+      await mkdir(themesDir, { recursive: true })
+      const files = await readdir(themesDir)
+      const themes: any[] = []
+      for (const f of files) {
+        if (!f.endsWith('.json')) continue
+        try {
+          const raw = await readFile(join(themesDir, f), 'utf-8')
+          themes.push(JSON.parse(raw))
+        } catch {}
+      }
+      return themes
+    } catch {
+      return []
+    }
+  })
+
+  ipcMain.handle('themes:install', async (_, theme: any) => {
+    await mkdir(themesDir, { recursive: true })
+    const filePath = join(themesDir, `${theme.id}.json`)
+    await writeFile(filePath, JSON.stringify(theme, null, 2))
+  })
+
+  ipcMain.handle('themes:remove', async (_, themeId: string) => {
+    const filePath = join(themesDir, `${themeId}.json`)
+    try { await rm(filePath) } catch {}
+  })
+
+  ipcMain.handle('themes:open-folder', async () => {
+    await mkdir(themesDir, { recursive: true })
+    shell.openPath(themesDir)
+  })
+
+  // Watch themes directory for changes and notify the renderer
+  ;(async () => {
+    await mkdir(themesDir, { recursive: true })
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null
+    fsWatch(themesDir, (_eventType, filename) => {
+      if (filename && !filename.endsWith('.json')) return
+      if (debounceTimer) clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(() => {
+        mainWindow?.webContents.send('themes:directory-changed')
+      }, 300)
+    })
+  })()
+
+  // ── IPC: Plugins ──
+  const pluginsDir = join(userDataPath, 'plugins')
+  const pluginSettingsDir = join(userDataPath, 'plugin-settings')
+
+  // Map from manifest id → actual folder name on disk
+  const pluginFolderMap = new Map<string, string>()
+
+  ipcMain.handle('plugins:get-all', async () => {
+    try {
+      await mkdir(pluginsDir, { recursive: true })
+      const entries = await readdir(pluginsDir, { withFileTypes: true })
+      const manifests: any[] = []
+      pluginFolderMap.clear()
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue
+        const manifestPath = join(pluginsDir, entry.name, 'manifest.json')
+        try {
+          if (existsSync(manifestPath)) {
+            const raw = await readFile(manifestPath, 'utf-8')
+            const manifest = JSON.parse(raw)
+            // Store the mapping so read-file / remove can find the folder
+            pluginFolderMap.set(manifest.id, entry.name)
+            manifest._folderName = entry.name
+            manifests.push(manifest)
+          }
+        } catch {}
+      }
+      return manifests
+    } catch {
+      return []
+    }
+  })
+
+  ipcMain.handle('plugins:read-file', async (_, pluginId: string, fileName: string) => {
+    // Prevent directory traversal
+    const safeName = basename(fileName)
+    // Resolve actual folder name from the map (falls back to pluginId)
+    const folderName = pluginFolderMap.get(pluginId) || pluginId
+    const filePath = join(pluginsDir, folderName, safeName)
+    return await readFile(filePath, 'utf-8')
+  })
+
+  ipcMain.handle('plugins:install', async (_, sourcePath: string) => {
+    // Copy a plugin folder to the plugins directory
+    const folderName = basename(sourcePath)
+    const destDir = join(pluginsDir, folderName)
+    await mkdir(destDir, { recursive: true })
+    const files = await readdir(sourcePath)
+    for (const f of files) {
+      const srcFile = join(sourcePath, f)
+      const destFile = join(destDir, f)
+      const s = await stat(srcFile)
+      if (s.isFile()) {
+        await copyFile(srcFile, destFile)
+      }
+    }
+  })
+
+  ipcMain.handle('plugins:remove', async (_, pluginId: string) => {
+    // Resolve actual folder name from the map (falls back to pluginId)
+    const folderName = pluginFolderMap.get(pluginId) || pluginId
+    const pluginDir = join(pluginsDir, folderName)
+    try { await rm(pluginDir, { recursive: true, force: true }) } catch {}
+    pluginFolderMap.delete(pluginId)
+    // Also remove settings
+    const settingsFile = join(pluginSettingsDir, `${pluginId}.json`)
+    try { await rm(settingsFile) } catch {}
+  })
+
+  ipcMain.handle('plugins:get-settings', async (_, pluginId: string) => {
+    await mkdir(pluginSettingsDir, { recursive: true })
+    const settingsFile = join(pluginSettingsDir, `${pluginId}.json`)
+    try {
+      if (existsSync(settingsFile)) {
+        return JSON.parse(await readFile(settingsFile, 'utf-8'))
+      }
+    } catch {}
+    return {}
+  })
+
+  ipcMain.handle('plugins:save-settings', async (_, pluginId: string, data: any) => {
+    await mkdir(pluginSettingsDir, { recursive: true })
+    const settingsFile = join(pluginSettingsDir, `${pluginId}.json`)
+    await writeFile(settingsFile, JSON.stringify(data, null, 2))
+  })
+
+  ipcMain.handle('plugins:open-folder', async () => {
+    await mkdir(pluginsDir, { recursive: true })
+    shell.openPath(pluginsDir)
+  })
+
+  // Passthrough IPC for plugins (full trust — plugins can invoke any IPC channel)
+  ipcMain.handle('plugins:ipc-invoke', async (_, channel: string, ...args: any[]) => {
+    // This is intentionally unrestricted — plugins run at the user's own risk
+    return await ipcMain.emit(channel, ...args)
   })
 
   app.on('activate', () => {

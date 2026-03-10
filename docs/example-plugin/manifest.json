@@ -1,0 +1,17 @@
+{
+  "id": "example-now-playing-log",
+  "name": "Now Playing Logger",
+  "version": "1.0.0",
+  "author": "Aurora",
+  "description": "Logs track changes to the console — a starting point for your own plugins.",
+  "main": "main.js",
+  "hooks": ["onTrackChange", "onPlay", "onPause"],
+  "settingsSchema": {
+    "logToConsole": {
+      "type": "boolean",
+      "label": "Log to console",
+      "description": "Print track info to DevTools console",
+      "default": true
+    }
+  }
+}

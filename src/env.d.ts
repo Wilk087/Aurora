@@ -217,5 +217,22 @@ interface Window {
     remoteRemoveAllDevices: () => Promise<[]>
     remoteStartServer: () => Promise<void>
     remoteStopServer: () => Promise<void>
+    // Themes
+    themesGetAll: () => Promise<any[]>
+    themesInstall: (theme: any) => Promise<void>
+    themesRemove: (themeId: string) => Promise<void>
+    themesOpenFolder: () => Promise<void>
+    onThemesDirectoryChanged: (callback: () => void) => void
+    removeThemesDirectoryChangedListener: () => void
+    // Plugins
+    pluginsGetAll: () => Promise<any[]>
+    pluginsReadFile: (pluginId: string, fileName: string) => Promise<string>
+    pluginsInstall: (sourcePath: string) => Promise<void>
+    pluginsRemove: (pluginId: string) => Promise<void>
+    pluginsGetSettings: (pluginId: string) => Promise<any>
+    pluginsSaveSettings: (pluginId: string, data: any) => Promise<void>
+    pluginsOpenFolder: () => Promise<void>
+    pluginsIpcInvoke: (channel: string, ...args: any[]) => Promise<any>
+    pluginsIpcSend: (channel: string, ...args: any[]) => void
   }
 }

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
+import { pluginBus } from '@/plugins/eventBus'
 
 // Lazy accessor for library store to avoid circular dependency
 // Must not use require() — Vite doesn't resolve @/ aliases in require() calls
@@ -402,9 +403,11 @@ export const usePlayerStore = defineStore('player', () => {
   audio.addEventListener('playing', () => {
     isPlaying.value = true
     isLoading.value = false
+    pluginBus.emit('play')
   })
   audio.addEventListener('pause', () => {
     isPlaying.value = false
+    pluginBus.emit('pause')
   })
   audio.addEventListener('waiting', () => {
     isLoading.value = true
@@ -643,6 +646,9 @@ export const usePlayerStore = defineStore('player', () => {
     duration.value = track.duration || 0
     isLoading.value = true
 
+    // Notify plugins of track change
+    pluginBus.emit('trackChange', { ...track })
+
     // Resolve audio source
     if (track.source === 'subsonic' && track.path.startsWith('subsonic://')) {
       // Try the URL cache first (instant), fall back to live IPC resolve
@@ -843,6 +849,7 @@ export const usePlayerStore = defineStore('player', () => {
   function seek(time: number) {
     audio.currentTime = time
     currentTime.value = time
+    pluginBus.emit('seek', time)
     sendDiscordUpdate()
   }
 
@@ -852,6 +859,7 @@ export const usePlayerStore = defineStore('player', () => {
 
   function setVolume(val: number) {
     volume.value = Math.max(0, Math.min(1, val))
+    pluginBus.emit('volumeChange', volume.value)
   }
 
   function toggleMute() {
@@ -897,10 +905,12 @@ export const usePlayerStore = defineStore('player', () => {
       }
       queue.value = [startTrack, ...rest]
       currentIndex.value = 0
+      pluginBus.emit('queueChange', queue.value)
       await loadTrack(startTrack)
     } else {
       queue.value = [...tracks]
       currentIndex.value = startIndex
+      pluginBus.emit('queueChange', queue.value)
       await loadTrack(tracks[startIndex])
     }
     play()
@@ -909,6 +919,7 @@ export const usePlayerStore = defineStore('player', () => {
   async function addToQueue(tracks: Track[]) {
     queue.value.push(...tracks)
     originalQueue.value.push(...tracks)
+    pluginBus.emit('queueChange', queue.value)
     // If nothing is playing, start from the first added track
     if (!currentTrack.value && tracks.length > 0) {
       currentIndex.value = queue.value.length - tracks.length
@@ -926,6 +937,7 @@ export const usePlayerStore = defineStore('player', () => {
     currentTrack.value = null
     audio.src = ''
     isPlaying.value = false
+    pluginBus.emit('queueChange', queue.value)
     _disposePreloadCache()
   }
 

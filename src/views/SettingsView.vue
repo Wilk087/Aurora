@@ -890,6 +890,158 @@
       </div>
     </section>
 
+    <!-- ── Themes ──────────────────────────────────────────────────── -->
+    <section class="mb-8">
+      <h2 class="text-lg font-semibold text-white mb-4">Themes</h2>
+
+      <div class="space-y-4">
+        <!-- Theme picker -->
+        <div class="px-4 py-3 rounded-xl bg-white/[0.05]">
+          <p class="text-sm text-white/80 mb-3">Active Theme</p>
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              v-for="t in themeStore.themes"
+              :key="t.id"
+              @click="themeStore.applyTheme(t)"
+              class="px-3 py-2.5 rounded-lg text-left transition-all border"
+              :class="themeStore.currentTheme.id === t.id
+                ? 'bg-accent/10 border-accent/30 text-white'
+                : 'bg-white/[0.03] border-transparent hover:bg-white/[0.06] text-white/60 hover:text-white/80'"
+            >
+              <p class="text-sm font-medium truncate">{{ t.name }}</p>
+              <p class="text-[10px] text-white/30 truncate">{{ t.author }}</p>
+            </button>
+          </div>
+        </div>
+
+        <!-- Custom CSS -->
+        <div class="px-4 py-3 rounded-xl bg-white/[0.05]">
+          <p class="text-sm text-white/80 mb-1">Custom CSS</p>
+          <p class="text-xs text-white/30 mb-3">Override any styles — paste raw CSS that targets Aurora's variables or elements.</p>
+          <textarea
+            v-model="themeCustomCSS"
+            rows="5"
+            placeholder=":root { --accent: 236 72 153; }"
+            class="w-full px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-xs text-white/80 placeholder:text-white/20 outline-none focus:border-accent/40 transition-colors font-mono resize-y select-text"
+          />
+          <div class="flex items-center gap-2 mt-2">
+            <button
+              @click="applyCustomCSS"
+              class="px-4 py-1.5 rounded-full text-xs font-medium bg-accent hover:bg-accent-hover text-white transition-colors"
+            >
+              Apply
+            </button>
+            <button
+              @click="clearCustomCSS"
+              class="px-4 py-1.5 rounded-full text-xs font-medium bg-white/[0.08] hover:bg-white/[0.12] text-white/70 hover:text-white/90 transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+
+        <!-- Reset -->
+        <div class="flex items-center gap-3">
+          <button
+            @click="themeStore.resetTheme()"
+            class="px-4 py-2 rounded-full text-xs font-medium bg-white/[0.08] hover:bg-white/[0.12] text-white/70 hover:text-white/90 transition-colors"
+          >
+            Reset to Default Theme
+          </button>
+          <button
+            @click="themeStore.openThemesFolder()"
+            class="px-4 py-2 rounded-full text-xs font-medium bg-white/[0.08] hover:bg-white/[0.12] text-white/70 hover:text-white/90 transition-colors"
+          >
+            Open Themes Folder
+          </button>
+          <button
+            @click="themeStore.loadThemes()"
+            class="px-4 py-2 rounded-full text-xs font-medium bg-white/[0.08] hover:bg-white/[0.12] text-white/70 hover:text-white/90 transition-colors"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Plugins ──────────────────────────────────────────────────── -->
+    <section class="mb-8">
+      <h2 class="text-lg font-semibold text-white mb-4">Plugins</h2>
+
+      <div class="space-y-4">
+        <!-- Installed plugins -->
+        <div v-if="pluginStore.manifests.length > 0" class="space-y-2">
+          <div
+            v-for="manifest in pluginStore.manifests"
+            :key="manifest.id"
+            class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05] group"
+          >
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <p class="text-sm font-medium text-white truncate">{{ manifest.name }}</p>
+                <span class="text-[10px] text-white/20 shrink-0">v{{ manifest.version }}</span>
+              </div>
+              <p v-if="manifest.description" class="text-xs text-white/30 mt-0.5 truncate">{{ manifest.description }}</p>
+              <p class="text-[10px] text-white/20 mt-0.5">by {{ manifest.author }}</p>
+            </div>
+
+            <div class="flex items-center gap-2 shrink-0">
+              <!-- Enable / disable toggle -->
+              <button
+                @click="pluginStore.toggle(manifest.id)"
+                class="relative w-11 h-6 rounded-full transition-colors duration-200"
+                :class="pluginStore.enabledIds.includes(manifest.id) ? 'bg-accent' : 'bg-white/15'"
+              >
+                <div
+                  class="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200"
+                  :class="pluginStore.enabledIds.includes(manifest.id) ? 'translate-x-[22px]' : 'translate-x-0.5'"
+                />
+              </button>
+
+              <!-- Remove -->
+              <button
+                @click="removePlugin(manifest.id, manifest.name)"
+                class="text-white/20 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                title="Remove plugin"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div v-else class="px-4 py-6 rounded-xl bg-white/[0.03] text-center">
+          <p class="text-sm text-white/30">No plugins installed</p>
+          <p class="text-xs text-white/20 mt-1">Drop plugin folders into the plugins directory to get started</p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button
+            @click="pluginStore.openPluginsFolder()"
+            class="px-5 py-2 bg-white/[0.08] hover:bg-white/[0.12] rounded-full text-sm font-medium text-white/80 transition-colors"
+          >
+            Open Plugins Folder
+          </button>
+          <button
+            @click="pluginStore.refreshManifests()"
+            class="px-5 py-2 bg-white/[0.08] hover:bg-white/[0.12] rounded-full text-sm font-medium text-white/80 transition-colors"
+          >
+            Refresh
+          </button>
+        </div>
+
+        <!-- Warning notice -->
+        <div class="px-4 py-3 rounded-xl bg-yellow-500/[0.06] border border-yellow-500/10">
+          <p class="text-xs text-yellow-200/60 leading-relaxed">
+            <strong class="text-yellow-200/80">Use at your own risk.</strong>
+            Plugins run with full access and are not sandboxed. Only install plugins from sources you trust.
+          </p>
+        </div>
+      </div>
+    </section>
+
     <!-- ── About ──────────────────────────────────────────────────── -->
     <section>
       <h2 class="text-lg font-semibold text-white mb-4">About</h2>
@@ -940,15 +1092,42 @@ import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { usePlaylistStore } from '@/stores/playlist'
 import { useFavoritesStore } from '@/stores/favorites'
+import { useThemeStore } from '@/stores/theme'
+import { usePluginStore } from '@/stores/plugins'
 import { useToast } from '@/composables/useToast'
 
 const library = useLibraryStore()
 const player = usePlayerStore()
 const playlistStore = usePlaylistStore()
 const favoritesStore = useFavoritesStore()
+const themeStore = useThemeStore()
+const pluginStore = usePluginStore()
 const toast = useToast()
 
 const appVersion = __APP_VERSION__
+
+// ── Theme / Plugin helpers ─────────────────────────────────────────────
+const themeCustomCSS = ref('')
+
+function applyCustomCSS() {
+  if (themeCustomCSS.value.trim()) {
+    themeStore.loadCustomCSS(themeCustomCSS.value)
+    toast.success('Custom CSS applied')
+  }
+}
+
+function clearCustomCSS() {
+  themeCustomCSS.value = ''
+  themeStore.unloadCustomCSS()
+  toast.success('Custom CSS cleared')
+}
+
+async function removePlugin(pluginId: string, name: string) {
+  if (confirm(`Remove plugin "${name}"? This will delete the plugin files.`)) {
+    await pluginStore.remove(pluginId)
+    toast.success(`Plugin "${name}" removed`)
+  }
+}
 
 const discordEnabled = ref(true)
 const discordFormat = ref('title-artist')
@@ -1117,6 +1296,9 @@ onMounted(async () => {
   window.api.onRemotePinChanged((pin: string) => {
     remotePin.value = pin
   })
+
+  // Restore custom CSS value for editing
+  themeCustomCSS.value = themeStore.customCSS
 })
 
 /* ---------- Remote Control ---------- */
