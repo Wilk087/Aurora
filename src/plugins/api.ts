@@ -117,6 +117,14 @@ export function createPluginAPI(pluginId: string) {
       removeSidebarItems() {
         _sidebarItems.delete(pluginId)
       },
+      /**
+       * Get a dedicated plugin slot container inside the PlayerBar.
+       * @param position 'left' (between track info & transport) or 'right' (between transport & volume)
+       * @returns The DOM element, or null if the playerbar isn't mounted yet.
+       */
+      getPlayerBarSlot(position: 'left' | 'right' = 'right'): HTMLElement | null {
+        return document.getElementById(`aurora-playerbar-${position}-slot`)
+      },
     },
 
     // ── Storage (per-plugin, persisted via IPC) ──────────────────────────

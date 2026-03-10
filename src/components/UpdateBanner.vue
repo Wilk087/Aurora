@@ -65,9 +65,7 @@ async function dismiss() {
   visible.value = false
   // Persist that we dismissed this specific version
   try {
-    const settings = await window.api.getSettings()
-    settings.dismissedUpdateVersion = latestVersion.value
-    await window.api.saveSettings(settings)
+    await window.api.mergeSettings({ dismissedUpdateVersion: latestVersion.value })
   } catch {}
 }
 

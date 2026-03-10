@@ -116,9 +116,7 @@ export const usePluginStore = defineStore('plugins', () => {
 
   async function _persistEnabledIds() {
     try {
-      const settings = await window.api.getSettings()
-      settings.enabledPlugins = enabledIds.value
-      await window.api.saveSettings(settings)
+      await window.api.mergeSettings({ enabledPlugins: [...enabledIds.value] })
     } catch {}
   }
 

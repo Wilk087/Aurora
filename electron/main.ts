@@ -1176,6 +1176,19 @@ app.whenReady().then(async () => {
   // ── IPC: Settings ──
   ipcMain.handle('settings:get', async () => await loadSettings())
   ipcMain.handle('settings:set', async (_, settings: any) => await saveSettings(settings))
+  // Atomic merge — reads current settings, merges partial on top, writes back.
+  // Keys set to null are deleted. This avoids race conditions between concurrent callers.
+  ipcMain.handle('settings:merge', async (_, partial: Record<string, any>) => {
+    const current = await loadSettings()
+    for (const [key, value] of Object.entries(partial)) {
+      if (value === null || value === undefined) {
+        delete current[key]
+      } else {
+        current[key] = value
+      }
+    }
+    await saveSettings(current)
+  })
 
   // ── IPC: Logging ──
   ipcMain.handle('logger:get-path', () => getLogPath())

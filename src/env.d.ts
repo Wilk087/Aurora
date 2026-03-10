@@ -127,6 +127,7 @@ interface Window {
     listAlsaDevices: () => Promise<{ id: string; name: string; label: string }[]>
     getSettings: () => Promise<any>
     saveSettings: (settings: any) => Promise<void>
+    mergeSettings: (partial: Record<string, any>) => Promise<void>
     // Favorites
     getFavorites: () => Promise<{ ids: string[]; meta: Record<string, TrackMetaSnapshot> }>
     toggleFavorite: (trackId: string, meta?: TrackMetaSnapshot) => Promise<{ ids: string[]; meta: Record<string, TrackMetaSnapshot> }>

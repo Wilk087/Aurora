@@ -831,13 +831,13 @@ const effectiveAnimated = computed(() => animatedBackground.value && effectiveVi
 // Persist immersive settings to Electron settings.json (included in backups)
 async function saveImmersiveSettings() {
   try {
-    const settings = await window.api.getSettings()
-    settings.immersiveStyle = immersiveStyle.value
-    settings.immersiveVibrant = { ...vibrantPerStyle.value }
-    settings.immersiveAnimated = { ...animatedPerStyle.value }
-    settings.immersiveAnimStyle = { ...animStylePerStyle.value }
-    settings.immersiveHideControls = { ...hideControlsPerStyle.value }
-    await window.api.saveSettings(settings)
+    await window.api.mergeSettings({
+      immersiveStyle: immersiveStyle.value,
+      immersiveVibrant: { ...vibrantPerStyle.value },
+      immersiveAnimated: { ...animatedPerStyle.value },
+      immersiveAnimStyle: { ...animStylePerStyle.value },
+      immersiveHideControls: { ...hideControlsPerStyle.value },
+    })
   } catch { /* ignore */ }
 }
 

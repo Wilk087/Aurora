@@ -44,6 +44,9 @@
       </div>
     </div>
 
+    <!-- ── Plugin slot (left of transport) ─────────────────────────── -->
+    <div id="aurora-playerbar-left-slot" class="flex items-center shrink-0" />
+
     <!-- ── Transport controls (centre) ──────────────────────────────── -->
     <div class="flex-1 flex flex-col items-center gap-1">
       <div class="flex items-center gap-3">
@@ -162,8 +165,11 @@
       </div>
     </div>
 
+    <!-- ── Plugin slot (right of transport) ────────────────────────── -->
+    <div id="aurora-playerbar-right-slot" class="flex items-center shrink-0 gap-3" />
+
     <!-- ── Volume & fullscreen (right) ───────────────────────────────────── -->
-    <div class="flex items-center gap-2 w-60 justify-end" @wheel.prevent="onVolumeWheel">
+    <div class="flex items-center gap-2 w-60 shrink-0 justify-end" @wheel.prevent="onVolumeWheel">
       <!-- Queue toggle -->
       <button
         @click="showQueue = !showQueue"

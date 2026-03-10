@@ -248,9 +248,7 @@ export const usePlayerStore = defineStore('player', () => {
       if ((audio as any).setSinkId) {
         await (audio as any).setSinkId(deviceId)
         outputDeviceId.value = deviceId
-        const s = await window.api.getSettings()
-        s.outputDeviceId = deviceId
-        await window.api.saveSettings(s)
+        await window.api.mergeSettings({ outputDeviceId: deviceId })
       }
     } catch (err) {
       console.error('Failed to set output device:', err)
@@ -454,10 +452,7 @@ export const usePlayerStore = defineStore('player', () => {
     audio.volume = val * val
     if (val > 0 && isMuted.value) isMuted.value = false
     // Persist volume
-    window.api.getSettings().then((s: any) => {
-      s.volume = val
-      window.api.saveSettings(s)
-    })
+    window.api.mergeSettings({ volume: val })
   })
 
   watch(isMuted, (val) => {
@@ -579,13 +574,13 @@ export const usePlayerStore = defineStore('player', () => {
 
   // Persist shuffle / repeat / mute when they change
   watch(isShuffle, (val) => {
-    window.api.getSettings().then((s: any) => { s.shuffle = val; window.api.saveSettings(s) })
+    window.api.mergeSettings({ shuffle: val })
   })
   watch(repeatMode, (val) => {
-    window.api.getSettings().then((s: any) => { s.repeatMode = val; window.api.saveSettings(s) })
+    window.api.mergeSettings({ repeatMode: val })
   })
   watch(isMuted, (val) => {
-    window.api.getSettings().then((s: any) => { s.muted = val; window.api.saveSettings(s) })
+    window.api.mergeSettings({ muted: val })
   })
 
   // ── Discord Rich Presence sync ───────────────────────────────────────────
@@ -1029,18 +1024,12 @@ export const usePlayerStore = defineStore('player', () => {
 
   function setLyricsOffset(offset: number) {
     lyricsOffset.value = offset
-    window.api.getSettings().then((s: any) => {
-      s.lyricsOffset = offset
-      window.api.saveSettings(s)
-    })
+    window.api.mergeSettings({ lyricsOffset: offset })
   }
 
   function setWaveformEnabled(enabled: boolean) {
     waveformEnabled.value = enabled
-    window.api.getSettings().then((s: any) => {
-      s.waveformEnabled = enabled
-      window.api.saveSettings(s)
-    })
+    window.api.mergeSettings({ waveformEnabled: enabled })
     if (enabled && currentTrack.value) {
       const t = currentTrack.value
       if (t.source === 'subsonic' && t.path.startsWith('subsonic://')) {
@@ -1060,26 +1049,17 @@ export const usePlayerStore = defineStore('player', () => {
 
   function setAnimatedCoversEnabled(enabled: boolean) {
     animatedCoversEnabled.value = enabled
-    window.api.getSettings().then((s: any) => {
-      s.animatedCoversEnabled = enabled
-      window.api.saveSettings(s)
-    })
+    window.api.mergeSettings({ animatedCoversEnabled: enabled })
   }
 
   function setPauseAnimatedOnBlur(enabled: boolean) {
     pauseAnimatedOnBlur.value = enabled
-    window.api.getSettings().then((s: any) => {
-      s.pauseAnimatedOnBlur = enabled
-      window.api.saveSettings(s)
-    })
+    window.api.mergeSettings({ pauseAnimatedOnBlur: enabled })
   }
 
   function setAdaptiveAccent(enabled: boolean) {
     adaptiveAccent.value = enabled
-    window.api.getSettings().then((s: any) => {
-      s.adaptiveAccent = enabled
-      window.api.saveSettings(s)
-    })
+    window.api.mergeSettings({ adaptiveAccent: enabled })
     if (!enabled) {
       currentAccentColor.value = null
       document.documentElement.style.removeProperty('--accent')
@@ -1089,52 +1069,34 @@ export const usePlayerStore = defineStore('player', () => {
 
   function setIOSSliders(enabled: boolean) {
     iosSliders.value = enabled
-    window.api.getSettings().then((s: any) => {
-      s.iosSliders = enabled
-      window.api.saveSettings(s)
-    })
+    window.api.mergeSettings({ iosSliders: enabled })
   }
 
   function setTransparencyEnabled(enabled: boolean) {
     transparencyEnabled.value = enabled
-    window.api.getSettings().then((s: any) => {
-      s.transparencyEnabled = enabled
-      window.api.saveSettings(s)
-    })
+    window.api.mergeSettings({ transparencyEnabled: enabled })
   }
 
   function setAutoFullscreen(enabled: boolean) {
     autoFullscreen.value = enabled
-    window.api.getSettings().then((s: any) => {
-      s.autoFullscreen = enabled
-      window.api.saveSettings(s)
-    })
+    window.api.mergeSettings({ autoFullscreen: enabled })
   }
 
   function setAutoFullscreenDelay(seconds: number) {
     autoFullscreenDelay.value = seconds
-    window.api.getSettings().then((s: any) => {
-      s.autoFullscreenDelay = seconds
-      window.api.saveSettings(s)
-    })
+    window.api.mergeSettings({ autoFullscreenDelay: seconds })
   }
 
   function setNormalization(enabled: boolean) {
     normalization.value = enabled
-    window.api.getSettings().then((s: any) => {
-      s.normalization = enabled
-      window.api.saveSettings(s)
-    })
+    window.api.mergeSettings({ normalization: enabled })
     // Normalization requires a page reload since the AudioContext source can only be connected once
     // We'll show a toast from the UI side prompting a restart
   }
 
   function setScrobblingEnabled(enabled: boolean) {
     scrobblingEnabled = enabled
-    window.api.getSettings().then((s: any) => {
-      s.scrobblingEnabled = enabled
-      window.api.saveSettings(s)
-    })
+    window.api.mergeSettings({ scrobblingEnabled: enabled })
   }
 
   // ── Remote control integration ──────────────────────────────────────────

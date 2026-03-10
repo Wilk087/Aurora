@@ -1355,26 +1355,20 @@ function formatDeviceTime(timestamp: number): string {
 
 async function toggleDiscord() {
   discordEnabled.value = !discordEnabled.value
-  const settings = await window.api.getSettings()
-  settings.discordRPC = discordEnabled.value
-  await window.api.saveSettings(settings)
+  await window.api.mergeSettings({ discordRPC: discordEnabled.value })
   await window.api.toggleDiscordRPC(discordEnabled.value, discordClientId.value || undefined)
   player.setDiscordEnabled(discordEnabled.value)
   toast.success(`Discord RPC ${discordEnabled.value ? 'enabled' : 'disabled'}`)
 }
 
 async function onFormatChange() {
-  const settings = await window.api.getSettings()
-  settings.discordRPCFormat = discordFormat.value
-  await window.api.saveSettings(settings)
+  await window.api.mergeSettings({ discordRPCFormat: discordFormat.value })
   player.setDiscordFormat(discordFormat.value)
   toast.success('Discord format updated')
 }
 
 async function saveClientId() {
-  const settings = await window.api.getSettings()
-  settings.discordClientId = discordClientId.value || undefined
-  await window.api.saveSettings(settings)
+  await window.api.mergeSettings({ discordClientId: discordClientId.value || null })
   // Reconnect with new client ID
   if (discordEnabled.value) {
     await window.api.toggleDiscordRPC(false)
@@ -1396,14 +1390,13 @@ async function onDeviceChange() {
 
 async function toggleExclusive() {
   exclusiveMode.value = !exclusiveMode.value
-  const settings = await window.api.getSettings()
-  settings.exclusiveMode = exclusiveMode.value
+  const partial: Record<string, any> = { exclusiveMode: exclusiveMode.value }
   // Clear ALSA device when disabling
   if (!exclusiveMode.value) {
-    settings.exclusiveAlsaDevice = ''
+    partial.exclusiveAlsaDevice = ''
     exclusiveAlsaDevice.value = ''
   }
-  await window.api.saveSettings(settings)
+  await window.api.mergeSettings(partial)
   if (exclusiveNeedsRestart.value) {
     showRestart(
       'Restart Required',
@@ -1428,9 +1421,7 @@ async function loadAlsaDevices() {
 }
 
 async function onAlsaDeviceChange() {
-  const settings = await window.api.getSettings()
-  settings.exclusiveAlsaDevice = exclusiveAlsaDevice.value
-  await window.api.saveSettings(settings)
+  await window.api.mergeSettings({ exclusiveAlsaDevice: exclusiveAlsaDevice.value })
   // Always needs restart to change ALSA device
   if (exclusiveModeActiveAtStartup.value) {
     showRestart(
@@ -1529,18 +1520,16 @@ async function toggleScrobbling() {
 }
 
 async function saveLastfm() {
-  const settings = await window.api.getSettings()
-  settings.lastfmApiKey = lastfmApiKey.value
-  settings.lastfmApiSecret = lastfmApiSecret.value
-  settings.lastfmSessionKey = lastfmSessionKey.value
-  await window.api.saveSettings(settings)
+  await window.api.mergeSettings({
+    lastfmApiKey: lastfmApiKey.value,
+    lastfmApiSecret: lastfmApiSecret.value,
+    lastfmSessionKey: lastfmSessionKey.value,
+  })
   toast.success('Last.fm settings saved')
 }
 
 async function saveListenbrainz() {
-  const settings = await window.api.getSettings()
-  settings.listenbrainzToken = listenbrainzToken.value
-  await window.api.saveSettings(settings)
+  await window.api.mergeSettings({ listenbrainzToken: listenbrainzToken.value })
   toast.success('ListenBrainz token saved')
 }
 
@@ -1556,13 +1545,13 @@ async function testSubsonic() {
     })
     if (ok) {
       subsonicConnected.value = true
-      const settings = await window.api.getSettings()
-      settings.subsonicUrl = subsonicUrl.value.replace(/\/+$/, '')
-      settings.subsonicUsername = subsonicUsername.value
-      settings.subsonicPassword = subsonicPassword.value
-      settings.subsonicLegacyAuth = subsonicLegacyAuth.value
-      settings.subsonicConnected = true
-      await window.api.saveSettings(settings)
+      await window.api.mergeSettings({
+        subsonicUrl: subsonicUrl.value.replace(/\/+$/, ''),
+        subsonicUsername: subsonicUsername.value,
+        subsonicPassword: subsonicPassword.value,
+        subsonicLegacyAuth: subsonicLegacyAuth.value,
+        subsonicConnected: true,
+      })
       toast.success('Connected to server')
     } else {
       subsonicConnected.value = false
@@ -1590,13 +1579,13 @@ async function syncSubsonicLibrary() {
 }
 
 async function disconnectSubsonic() {
-  const settings = await window.api.getSettings()
-  settings.subsonicUrl = ''
-  settings.subsonicUsername = ''
-  settings.subsonicPassword = ''
-  settings.subsonicLegacyAuth = false
-  settings.subsonicConnected = false
-  await window.api.saveSettings(settings)
+  await window.api.mergeSettings({
+    subsonicUrl: '',
+    subsonicUsername: '',
+    subsonicPassword: '',
+    subsonicLegacyAuth: false,
+    subsonicConnected: false,
+  })
 
   subsonicUrl.value = ''
   subsonicUsername.value = ''
@@ -1611,9 +1600,7 @@ async function disconnectSubsonic() {
 // ── Export / Import ───────────────────────
 async function toggleAutoExport() {
   autoExport.value = !autoExport.value
-  const settings = await window.api.getSettings()
-  settings.autoExport = autoExport.value
-  await window.api.saveSettings(settings)
+  await window.api.mergeSettings({ autoExport: autoExport.value })
   toast.success(`Auto-export ${autoExport.value ? 'enabled' : 'disabled'}`)
 }
 
@@ -1621,17 +1608,13 @@ async function chooseExportPath() {
   const dir = await window.api.exportChooseDir()
   if (!dir) return
   exportPath.value = dir
-  const settings = await window.api.getSettings()
-  settings.exportPath = dir
-  await window.api.saveSettings(settings)
+  await window.api.mergeSettings({ exportPath: dir })
   toast.success('Export location updated')
 }
 
 async function resetExportPath() {
   exportPath.value = ''
-  const settings = await window.api.getSettings()
-  delete settings.exportPath
-  await window.api.saveSettings(settings)
+  await window.api.mergeSettings({ exportPath: null })
   toast.success('Export location reset to default')
 }
 

@@ -71,10 +71,7 @@ const router = createRouter({
 // Persist tab on navigation & scroll to top for detail views
 router.afterEach((to) => {
   if (PERSIST_ROUTES.includes(to.path)) {
-    window.api.getSettings().then((s: any) => {
-      s.lastTab = to.path
-      window.api.saveSettings(s)
-    })
+    window.api.mergeSettings({ lastTab: to.path })
   } else {
     // Detail views (album, artist, playlist, now-playing): scroll main to top
     const main = document.querySelector('main')

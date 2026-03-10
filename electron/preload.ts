@@ -41,6 +41,7 @@ contextBridge.exposeInMainWorld('api', {
   // Settings
   getSettings: () => ipcRenderer.invoke('settings:get'),
   saveSettings: (settings: any) => ipcRenderer.invoke('settings:set', settings),
+  mergeSettings: (partial: Record<string, any>) => ipcRenderer.invoke('settings:merge', partial),
 
   // Favorites
   getFavorites: (): Promise<{ ids: string[]; meta: Record<string, { title: string; artist: string; album: string }> }> => ipcRenderer.invoke('favorites:get'),

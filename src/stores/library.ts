@@ -161,18 +161,12 @@ export const useLibraryStore = defineStore('library', () => {
 
   function setSortOrder(order: SortOrder) {
     sortOrder.value = order
-    window.api.getSettings().then((s: any) => {
-      s.sortOrder = order
-      window.api.saveSettings(s)
-    })
+    window.api.mergeSettings({ sortOrder: order })
   }
 
   function setAlbumSortOrder(order: AlbumSortOrder) {
     albumSortOrder.value = order
-    window.api.getSettings().then((s: any) => {
-      s.albumSortOrder = order
-      window.api.saveSettings(s)
-    })
+    window.api.mergeSettings({ albumSortOrder: order })
   }
 
   // ── Actions ──────────────────────────────────────────────────────────────

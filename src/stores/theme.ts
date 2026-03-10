@@ -129,11 +129,10 @@ export const useThemeStore = defineStore('theme', () => {
   // ── Persist the selected theme id to settings ───────────────────────────
   async function _persistThemeChoice(themeId: string) {
     try {
-      const settings = await window.api.getSettings()
-      settings.themeId = themeId
-      if (customCSS.value) settings.themeCustomCSS = customCSS.value
-      else delete settings.themeCustomCSS
-      await window.api.saveSettings(settings)
+      await window.api.mergeSettings({
+        themeId,
+        themeCustomCSS: customCSS.value || null, // null = delete the key
+      })
     } catch {}
   }
 
