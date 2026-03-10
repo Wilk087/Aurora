@@ -195,7 +195,8 @@ Built packages are written to the `release/` directory.
 - [Plugins](docs/plugins.md) — plugin structure, manifest format, lifecycle hooks, and full API reference
 - [Example theme (Nord Dark)](docs/example-theme.json) — dark theme example
 - [Example theme (Aurora Light)](docs/example-light-theme.json) — light theme example
-- [Example plugin](docs/example-plugin/) — a working plugin with sidebar items, toasts, and settings
+- [Example plugin (Now Playing Logger)](docs/example-plugin/) — beginner plugin with sidebar items, toasts, and settings
+- [Example plugin (Quality Badge)](docs/example-quality-badge-plugin/) — intermediate plugin with IPC calls, player-bar/immersive slots, and DOM observers
 
 ## Project structure
 

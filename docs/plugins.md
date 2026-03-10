@@ -10,7 +10,10 @@ Aurora supports JavaScript plugins that can react to playback events, inject UI 
 2. Drop the folder into **Settings → Plugins → Open Plugins Folder** (or manually place it in `~/.config/aurora-player/plugins/` on Linux, `%APPDATA%/aurora-player/plugins/` on Windows).
 3. Restart Aurora (or go to Settings → Plugins and click Refresh). Enable the plugin with the toggle.
 
-A complete example plugin is included in the repository at [`docs/example-plugin/`](example-plugin/).
+Two example plugins are included in the repository:
+
+- [`docs/example-plugin/`](example-plugin/) — a simple "Now Playing Logger" that adds a sidebar button and logs track changes (great starting point)
+- [`docs/example-quality-badge-plugin/`](example-quality-badge-plugin/) — an intermediate example that fetches audio metadata via IPC, injects badges into player-bar and immersive slots, uses a MutationObserver, and reacts to settings changes
 
 ## Plugin structure
 

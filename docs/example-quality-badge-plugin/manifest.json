@@ -1,0 +1,23 @@
+{
+  "id": "playbar-quality-badge",
+  "name": "Playbar Quality Badge",
+  "version": "1.1.0",
+  "author": "Wilk087",
+  "description": "Adds audio format information and Hi-Res badges to the playbar and immersive mode.",
+  "main": "main.js",
+  "hooks": ["onTrackChange", "onPlay"],
+  "settingsSchema": {
+    "showInPlayerBar": {
+      "type": "boolean",
+      "label": "Show in player bar",
+      "description": "Display the quality badge next to the transport controls",
+      "default": true
+    },
+    "showInImmersive": {
+      "type": "boolean",
+      "label": "Show in immersive mode",
+      "description": "Display the quality badge in the fullscreen/immersive view",
+      "default": true
+    }
+  }
+}

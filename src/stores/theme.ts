@@ -83,12 +83,20 @@ export const useThemeStore = defineStore('theme', () => {
     }
     el.textContent = css
     customCSS.value = css
+    _persistCustomCSS()
   }
 
   function unloadCustomCSS() {
     const el = document.getElementById('aurora-user-theme')
     if (el) el.remove()
     customCSS.value = ''
+    _persistCustomCSS()
+  }
+
+  async function _persistCustomCSS() {
+    try {
+      await window.api.mergeSettings({ themeCustomCSS: customCSS.value || null })
+    } catch {}
   }
 
   // ── Load available themes from disk via IPC ─────────────────────────────

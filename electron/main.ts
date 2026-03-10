@@ -1434,6 +1434,7 @@ app.whenReady().then(async () => {
         bpm: c.bpm || null,
         bitrate: f.bitrate ? Math.round(f.bitrate / 1000) : null,
         sampleRate: f.sampleRate || null,
+        bitsPerSample: f.bitsPerSample || null,
         codec: f.codec || '',
         lossless: f.lossless || false,
       }
@@ -1443,7 +1444,7 @@ app.whenReady().then(async () => {
         composer: [], lyricist: [], conductor: [], producer: [],
         engineer: [], mixer: [], remixer: [], writer: [], label: [],
         copyright: '', encodedBy: '', comment: '',
-        bpm: null, bitrate: null, sampleRate: null, codec: '', lossless: false,
+        bpm: null, bitrate: null, sampleRate: null, bitsPerSample: null, codec: '', lossless: false,
       }
     }
   })

@@ -53,6 +53,7 @@ interface TrackCredits {
   bpm: number | null
   bitrate: number | null
   sampleRate: number | null
+  bitsPerSample: number | null
   codec: string
   lossless: boolean
 }

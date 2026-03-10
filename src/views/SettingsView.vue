@@ -924,7 +924,7 @@
           <textarea
             v-model="themeCustomCSS"
             rows="5"
-            placeholder=":root { --accent: 236 72 153; }"
+            placeholder=":root { --accent: 139 92 246 !important; }"
             class="w-full px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-xs text-white/80 placeholder:text-white/20 outline-none focus:border-accent/40 transition-colors font-mono resize-y select-text"
           />
           <div class="flex items-center gap-2 mt-2">
@@ -1172,6 +1172,18 @@
       </div>
     </Transition>
   </Teleport>
+
+  <!-- Plugin delete confirmation dialog -->
+  <ConfirmDialog
+    :show="deletePluginDialog.show"
+    title="Remove Plugin"
+    :message="`Are you sure you want to remove &quot;${deletePluginDialog.pluginName}&quot;? This will delete the plugin files and cannot be undone.`"
+    confirm-label="Remove"
+    cancel-label="Cancel"
+    variant="danger"
+    @confirm="onDeletePluginConfirm"
+    @cancel="deletePluginDialog.show = false"
+  />
 </template>
 
 <script setup lang="ts">
@@ -1185,6 +1197,7 @@ import { usePluginStore } from '@/stores/plugins'
 import { useToast } from '@/composables/useToast'
 import { getPluginSettingsSchema, notifyPluginSettingChanged } from '@/plugins'
 import type { PluginSettingField } from '@/types/plugin'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const library = useLibraryStore()
 const player = usePlayerStore()
@@ -1212,11 +1225,18 @@ function clearCustomCSS() {
   toast.success('Custom CSS cleared')
 }
 
-async function removePlugin(pluginId: string, name: string) {
-  if (confirm(`Remove plugin "${name}"? This will delete the plugin files.`)) {
-    await pluginStore.remove(pluginId)
-    toast.success(`Plugin "${name}" removed`)
-  }
+const deletePluginDialog = reactive({ show: false, pluginId: '', pluginName: '' })
+
+function removePlugin(pluginId: string, name: string) {
+  deletePluginDialog.pluginId = pluginId
+  deletePluginDialog.pluginName = name
+  deletePluginDialog.show = true
+}
+
+async function onDeletePluginConfirm() {
+  deletePluginDialog.show = false
+  await pluginStore.remove(deletePluginDialog.pluginId)
+  toast.success(`Plugin "${deletePluginDialog.pluginName}" removed`)
 }
 
 // ── Plugin settings ────────────────────────────────────────────────────
