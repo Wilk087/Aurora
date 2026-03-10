@@ -1553,7 +1553,7 @@ async function onFormatChange() {
 }
 
 async function saveClientId() {
-  await window.api.mergeSettings({ discordClientId: discordClientId.value || null })
+  await window.api.mergeSettings({ discordClientId: discordClientId.value || '' })
   // Reconnect with new client ID
   if (discordEnabled.value) {
     await window.api.toggleDiscordRPC(false)

@@ -779,6 +779,7 @@ import WaveformBar from '@/components/WaveformBar.vue'
 import IOSSlider from '@/components/IOSSlider.vue'
 import ArtistLinks from '@/components/ArtistLinks.vue'
 import Hls from 'hls.js'
+import { setImmersiveActive, updateImmersiveSettings, immersiveState } from '@/plugins/immersiveState'
 
 const router = useRouter()
 const player = usePlayerStore()
@@ -845,6 +846,8 @@ const effectiveAnimated = computed(() => animatedBackground.value && effectiveVi
 
 // Persist immersive settings to Electron settings.json (included in backups)
 async function saveImmersiveSettings() {
+  // Sync to shared plugin state
+  syncImmersiveState()
   try {
     await window.api.mergeSettings({
       immersiveStyle: immersiveStyle.value,
@@ -855,6 +858,20 @@ async function saveImmersiveSettings() {
     })
   } catch { /* ignore */ }
 }
+
+/** Push current immersive settings to the shared plugin-readable state */
+function syncImmersiveState() {
+  _syncingFromLocal = true
+  updateImmersiveSettings({
+    style: immersiveStyle.value as any,
+    vibrant: { ...vibrantPerStyle.value },
+    animated: { ...animatedPerStyle.value },
+    animStyle: { ...animStylePerStyle.value },
+    hideControls: { ...hideControlsPerStyle.value },
+  })
+  nextTick(() => { _syncingFromLocal = false })
+}
+let _syncingFromLocal = false
 
 // Load persisted immersive settings on mount
 async function loadImmersiveSettings() {
@@ -902,6 +919,25 @@ async function loadImmersiveSettings() {
 }
 
 watch(immersiveStyle, () => saveImmersiveSettings())
+
+// ── Sync plugin-driven changes back to local refs ──────────────────────
+// When a plugin changes immersive settings via the API, the shared state
+// updates first. This watcher applies those changes to the local component refs.
+watch(
+  () => immersiveState.settings,
+  (s) => {
+    // Skip if this change originated from our own syncImmersiveState call
+    if (_syncingFromLocal) return
+    if (s.style !== immersiveStyle.value) immersiveStyle.value = s.style
+    vibrantPerStyle.value = { ...s.vibrant }
+    animatedPerStyle.value = { ...s.animated }
+    animStylePerStyle.value = { ...s.animStyle }
+    hideControlsPerStyle.value = { ...s.hideControls }
+    // Persist plugin-driven changes to disk (saveImmersiveSettings will set _syncingFromLocal)
+    saveImmersiveSettings()
+  },
+  { deep: true },
+)
 
 // Luminance of the cover art (0 = black, 255 = white)
 const coverLuminance = ref(50)
@@ -1452,11 +1488,15 @@ onMounted(async () => {
   idleTimer = setTimeout(() => { idle.value = true }, IDLE_DELAY)
   // Load persisted immersive settings from settings.json
   await loadImmersiveSettings()
+  // Notify plugins that immersive mode is active
+  setImmersiveActive(true)
+  syncImmersiveState()
   // Start animated background if enabled
   nextTick(() => startAnimLoop())
 })
 
 onUnmounted(() => {
+  setImmersiveActive(false)
   document.removeEventListener('keydown', onKeydown)
   document.removeEventListener('visibilitychange', onVisibilityChange)
   window.removeEventListener('blur', pauseAnimatedCover)

@@ -68,6 +68,9 @@ export async function loadPlugin(manifest: PluginManifest, settings: Record<stri
   if (exports.onVolumeChange) pluginBus.on('volumeChange', exports.onVolumeChange)
   if (exports.onSeek) pluginBus.on('seek', exports.onSeek)
   if (exports.onLibraryUpdate) pluginBus.on('libraryUpdate', exports.onLibraryUpdate)
+  if (exports.onImmersiveEnter) pluginBus.on('immersiveEnter', exports.onImmersiveEnter)
+  if (exports.onImmersiveExit) pluginBus.on('immersiveExit', exports.onImmersiveExit)
+  if (exports.onImmersiveSettingsChanged) pluginBus.on('immersiveSettingsChanged', exports.onImmersiveSettingsChanged)
 
   // Call the activate hook
   if (exports.onActivate) {
@@ -107,6 +110,9 @@ export function unloadPlugin(pluginId: string) {
   if (plugin.exports.onVolumeChange) pluginBus.off('volumeChange', plugin.exports.onVolumeChange)
   if (plugin.exports.onSeek) pluginBus.off('seek', plugin.exports.onSeek)
   if (plugin.exports.onLibraryUpdate) pluginBus.off('libraryUpdate', plugin.exports.onLibraryUpdate)
+  if (plugin.exports.onImmersiveEnter) pluginBus.off('immersiveEnter', plugin.exports.onImmersiveEnter)
+  if (plugin.exports.onImmersiveExit) pluginBus.off('immersiveExit', plugin.exports.onImmersiveExit)
+  if (plugin.exports.onImmersiveSettingsChanged) pluginBus.off('immersiveSettingsChanged', plugin.exports.onImmersiveSettingsChanged)
 
   // Remove injected CSS
   const styleEl = document.querySelector(`style[data-aurora-plugin="${pluginId}"]`)

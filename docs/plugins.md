@@ -47,7 +47,10 @@ my-plugin/
     "onQueueChange",
     "onVolumeChange",
     "onSeek",
-    "onLibraryUpdate"
+    "onLibraryUpdate",
+    "onImmersiveEnter",
+    "onImmersiveExit",
+    "onImmersiveSettingsChanged"
   ],
 
   // Settings schema — Aurora auto-renders UI controls in Settings → Plugins
@@ -144,6 +147,21 @@ exports.onSeek = function (time) {
 exports.onLibraryUpdate = function (tracks) {
   console.log('Library updated, tracks:', tracks.length)
 }
+
+// Called when immersive (fullscreen) mode is entered
+exports.onImmersiveEnter = function () {
+  console.log('Immersive mode entered')
+}
+
+// Called when immersive mode is exited
+exports.onImmersiveExit = function () {
+  console.log('Immersive mode exited')
+}
+
+// Called when immersive settings change (style, vibrant, animated, etc.)
+exports.onImmersiveSettingsChanged = function (settings) {
+  console.log('Immersive style:', settings.style)
+}
 ```
 
 ## Plugin API reference
@@ -220,6 +238,62 @@ Access and modify the app theme.
 | `apply(theme)` | `void` | Apply a theme |
 | `reset()` | `void` | Reset to the default theme |
 | `injectCSS(css)` | `void` | Inject custom CSS |
+
+### aurora.immersive
+
+Read and control immersive (fullscreen) mode settings.
+
+| Property / Method | Type | Description |
+|---|---|---|
+| `isActive` | `boolean` | Whether immersive mode is currently active |
+| `style` | `string` | Current layout style (`'default'`, `'modern'`, or `'artwork'`) |
+| `vibrant` | `object` | Per-style vibrant background state (`{ default, modern, artwork }`) |
+| `animated` | `object` | Per-style animated background state |
+| `animStyle` | `object` | Per-style animation style (`'lava-lamp'`, `'sonar-ripple'`, `'cinematic-grain'`) |
+| `hideControls` | `object` | Per-style hide controls state |
+| `getSettings()` | `object` | Full snapshot of all immersive settings |
+| `setStyle(style)` | `void` | Change the layout style |
+| `setVibrant(style, value)` | `void` | Toggle vibrant background for a layout style |
+| `setAnimated(style, value)` | `void` | Toggle animated background for a layout style |
+| `setAnimStyle(style, animStyle)` | `void` | Set animation type for a layout style |
+| `setHideControls(style, value)` | `void` | Toggle hide controls for a layout style |
+
+Write methods take effect immediately if immersive mode is active, and are persisted to settings.
+
+#### Example — add an immersive toggle to the settings panel
+
+```javascript
+exports.onActivate = function () {
+  // Add a custom toggle to the immersive settings drawer
+  var slot = aurora.ui.getImmersiveSettingsSlot()
+  if (slot) {
+    var label = document.createElement('label')
+    label.className = 'flex items-center justify-between cursor-pointer'
+    label.innerHTML = '<span class="text-sm text-white/70">My Feature</span>'
+    var btn = document.createElement('button')
+    btn.className = 'relative w-9 h-5 rounded-full bg-white/15'
+    btn.onclick = function () { /* toggle your feature */ }
+    label.appendChild(btn)
+    slot.appendChild(label)
+  }
+}
+
+// React to immersive style changes
+exports.onImmersiveSettingsChanged = function (settings) {
+  console.log('Layout:', settings.style, 'Vibrant:', settings.vibrant[settings.style])
+}
+```
+
+#### Example — switch to modern layout from a plugin
+
+```javascript
+if (aurora.immersive.isActive) {
+  aurora.immersive.setStyle('modern')
+  aurora.immersive.setVibrant('modern', true)
+  aurora.immersive.setAnimated('modern', true)
+  aurora.immersive.setAnimStyle('modern', 'cinematic-grain')
+}
+```
 
 ### aurora.lyrics
 
@@ -377,7 +451,7 @@ aurora.on('trackChange', handler)
 aurora.off('trackChange', handler)
 ```
 
-Available events: `trackChange`, `play`, `pause`, `queueChange`, `volumeChange`, `seek`, `libraryUpdate`.
+Available events: `trackChange`, `play`, `pause`, `queueChange`, `volumeChange`, `seek`, `libraryUpdate`, `immersiveEnter`, `immersiveExit`, `immersiveSettingsChanged`.
 
 ### aurora.ipc
 

@@ -7,6 +7,16 @@
  */
 
 import { pluginBus } from './eventBus'
+import {
+  immersiveState,
+  setImmersiveStyle,
+  setImmersiveVibrant,
+  setImmersiveAnimated,
+  setImmersiveAnimStyle,
+  setImmersiveHideControls,
+  type ImmersiveStyleId,
+  type ImmersiveAnimStyleId,
+} from './immersiveState'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { usePlaylistStore } from '@/stores/playlist'
@@ -298,6 +308,35 @@ export function createPluginAPI(pluginId: string) {
       async setAll(data: Record<string, any>): Promise<void> {
         await window.api.pluginsSaveSettings(pluginId, data)
       },
+    },
+
+    // ── Immersive mode ──────────────────────────────────────────────────
+    immersive: {
+      /** Whether immersive / fullscreen mode is currently active */
+      get isActive() { return immersiveState.active },
+      /** Current immersive layout style */
+      get style() { return immersiveState.settings.style },
+      /** Per-style vibrant background state */
+      get vibrant() { return { ...immersiveState.settings.vibrant } },
+      /** Per-style animated background state */
+      get animated() { return { ...immersiveState.settings.animated } },
+      /** Per-style animation style */
+      get animStyle() { return { ...immersiveState.settings.animStyle } },
+      /** Per-style hide controls state */
+      get hideControls() { return { ...immersiveState.settings.hideControls } },
+      /** Full snapshot of all immersive settings */
+      getSettings() { return JSON.parse(JSON.stringify(immersiveState.settings)) },
+
+      /** Change the immersive layout style */
+      setStyle(style: ImmersiveStyleId) { setImmersiveStyle(style) },
+      /** Toggle vibrant background for a specific layout style */
+      setVibrant(style: ImmersiveStyleId, value: boolean) { setImmersiveVibrant(style, value) },
+      /** Toggle animated background for a specific layout style */
+      setAnimated(style: ImmersiveStyleId, value: boolean) { setImmersiveAnimated(style, value) },
+      /** Set the animation style for a specific layout style */
+      setAnimStyle(style: ImmersiveStyleId, animStyle: ImmersiveAnimStyleId) { setImmersiveAnimStyle(style, animStyle) },
+      /** Toggle hide controls for a specific layout style */
+      setHideControls(style: ImmersiveStyleId, value: boolean) { setImmersiveHideControls(style, value) },
     },
 
     // ── Electron / Node access (full trust, use at own risk) ─────────────

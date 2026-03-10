@@ -28,6 +28,9 @@ export type PluginHook =
   | 'onVolumeChange'
   | 'onSeek'
   | 'onLibraryUpdate'
+  | 'onImmersiveEnter'
+  | 'onImmersiveExit'
+  | 'onImmersiveSettingsChanged'
 
 export interface PluginSettingField {
   type: 'string' | 'number' | 'boolean' | 'select'
@@ -57,6 +60,9 @@ export interface PluginExports {
   onVolumeChange?: (volume: number) => void
   onSeek?: (time: number) => void
   onLibraryUpdate?: (tracks: any[]) => void
+  onImmersiveEnter?: () => void
+  onImmersiveExit?: () => void
+  onImmersiveSettingsChanged?: (settings: any) => void
   onActivate?: () => void
   onDeactivate?: () => void
   /** Plugin can return sidebar items to add */
