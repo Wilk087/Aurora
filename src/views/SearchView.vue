@@ -1,0 +1,214 @@
+<template>
+  <div class="p-6 h-full overflow-y-auto">
+    <div class="max-w-5xl space-y-8 pb-4">
+
+      <!-- No results -->
+      <div v-if="hasNoResults" class="flex flex-col items-center justify-center py-24">
+        <svg class="w-16 h-16 text-white/[0.06] mb-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8" />
+          <path d="M21 21l-4.35-4.35" />
+        </svg>
+        <h2 class="text-lg font-semibold text-white/60 mb-1">Nothing found</h2>
+        <p class="text-sm text-white/30">No results for "{{ library.searchQuery }}"</p>
+      </div>
+
+      <!-- Songs -->
+      <section v-if="topSongs.length">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xs font-semibold uppercase tracking-widest text-white/40">Songs</h2>
+          <button
+            v-if="library.filteredTracks.length > MAX_SONGS"
+            @click="router.push('/')"
+            class="text-xs text-accent hover:underline transition-colors"
+          >
+            See all {{ library.filteredTracks.length }} →
+          </button>
+        </div>
+        <div class="flex flex-col">
+          <SongRow
+            v-for="(track, i) in topSongs"
+            :key="track.id"
+            :track="track"
+            :index="i"
+            @play="playTrack(track)"
+          />
+        </div>
+      </section>
+
+      <!-- Albums -->
+      <section v-if="topAlbums.length">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xs font-semibold uppercase tracking-widest text-white/40">Albums</h2>
+          <button
+            v-if="library.filteredAlbums.length > MAX_ALBUMS"
+            @click="router.push('/albums')"
+            class="text-xs text-accent hover:underline transition-colors"
+          >
+            See all {{ library.filteredAlbums.length }} →
+          </button>
+        </div>
+        <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
+          <AlbumCard
+            v-for="album in topAlbums"
+            :key="album.id"
+            :album="album"
+            @click="router.push(`/album/${album.id}`)"
+          />
+        </div>
+      </section>
+
+      <!-- Artists -->
+      <section v-if="topArtists.length">
+        <h2 class="text-xs font-semibold uppercase tracking-widest text-white/40 mb-3">Artists</h2>
+        <div class="flex flex-wrap gap-2.5">
+          <button
+            v-for="artist in topArtists"
+            :key="artist.name"
+            @click="router.push(`/artist/${encodeURIComponent(artist.name)}`)"
+            class="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.10] border border-white/[0.06] hover:border-white/[0.12] transition-all"
+          >
+            <div class="w-10 h-10 rounded-full overflow-hidden shrink-0 bg-accent/20 border border-accent/20">
+              <img
+                v-if="artistImages[artist.name]"
+                :src="artistImages[artist.name]!"
+                class="w-full h-full object-cover"
+              />
+              <div v-else class="w-full h-full flex items-center justify-center">
+                <span class="text-sm font-bold text-accent">{{ artist.name[0]?.toUpperCase() ?? '?' }}</span>
+              </div>
+            </div>
+            <div class="text-left min-w-0">
+              <p class="text-sm font-medium text-white truncate">{{ artist.name }}</p>
+              <p class="text-xs text-white/40">{{ artist.trackCount }} {{ artist.trackCount === 1 ? 'song' : 'songs' }}</p>
+            </div>
+          </button>
+        </div>
+      </section>
+
+      <!-- Playlists -->
+      <section v-if="topPlaylists.length">
+        <h2 class="text-xs font-semibold uppercase tracking-widest text-white/40 mb-3">Playlists</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          <div
+            v-for="pl in topPlaylists"
+            :key="pl.id"
+            @click="router.push(`/playlist/${pl.id}`)"
+            class="group cursor-pointer bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] hover:border-white/[0.10] rounded-xl p-3.5 transition-all"
+          >
+            <!-- Cover mosaic -->
+            <div class="aspect-square rounded-lg overflow-hidden mb-3 bg-white/[0.06]">
+              <div
+                v-if="getPlaylistCovers(pl).length >= 4"
+                class="grid grid-cols-2 h-full"
+              >
+                <img
+                  v-for="(url, ci) in getPlaylistCovers(pl).slice(0, 4)"
+                  :key="ci"
+                  :src="url"
+                  class="w-full h-full object-cover"
+                />
+              </div>
+              <img
+                v-else-if="getPlaylistCovers(pl).length > 0"
+                :src="getPlaylistCovers(pl)[0]"
+                class="w-full h-full object-cover"
+              />
+              <div v-else class="w-full h-full flex items-center justify-center">
+                <svg class="w-8 h-8 text-white/10" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
+                </svg>
+              </div>
+            </div>
+            <p class="text-sm font-medium text-white truncate">{{ pl.name }}</p>
+            <p class="text-xs text-white/40 mt-0.5">{{ pl.trackIds.length }} {{ pl.trackIds.length === 1 ? 'song' : 'songs' }}</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, reactive, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { useLibraryStore } from '@/stores/library'
+import { usePlayerStore } from '@/stores/player'
+import { usePlaylistStore } from '@/stores/playlist'
+import SongRow from '@/components/SongRow.vue'
+import AlbumCard from '@/components/AlbumCard.vue'
+
+const router = useRouter()
+const library = useLibraryStore()
+const player = usePlayerStore()
+const playlistStore = usePlaylistStore()
+
+const MAX_SONGS = 5
+const MAX_ALBUMS = 6
+const MAX_ARTISTS = 8
+const MAX_PLAYLISTS = 4
+
+function normalizeStr(s: string) {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
+const filteredArtists = computed(() => {
+  if (!library.searchQuery) return []
+  const q = normalizeStr(library.searchQuery)
+  return library.artists.filter(a => normalizeStr(a.name).includes(q))
+})
+
+const filteredPlaylists = computed(() => {
+  if (!library.searchQuery) return []
+  const q = normalizeStr(library.searchQuery)
+  return playlistStore.playlists.filter(p => normalizeStr(p.name).includes(q))
+})
+
+const topSongs = computed(() => library.filteredTracks.slice(0, MAX_SONGS))
+const topAlbums = computed(() => library.filteredAlbums.slice(0, MAX_ALBUMS))
+const topArtists = computed(() => filteredArtists.value.slice(0, MAX_ARTISTS))
+const topPlaylists = computed(() => filteredPlaylists.value.slice(0, MAX_PLAYLISTS))
+
+// Artist images — fetched on demand, disk-cached for 7 days by the main process
+const artistImages = reactive<Record<string, string | null>>({})
+
+async function fetchArtistImage(name: string) {
+  if (name in artistImages) return // already fetched or in-flight
+  artistImages[name] = null // sentinel: prevents duplicate requests
+  try {
+    const info = await window.api.getArtistInfo(name)
+    artistImages[name] = info?.imageUrl ?? null
+  } catch {
+    artistImages[name] = null
+  }
+}
+
+watch(topArtists, (artists) => {
+  for (const artist of artists) fetchArtistImage(artist.name)
+}, { immediate: true })
+
+const hasNoResults = computed(() =>
+  !topSongs.value.length &&
+  !topAlbums.value.length &&
+  !topArtists.value.length &&
+  !topPlaylists.value.length,
+)
+
+function playTrack(track: Track) {
+  const idx = library.filteredTracks.indexOf(track)
+  player.playAll(library.filteredTracks, idx >= 0 ? idx : 0)
+}
+
+function getPlaylistCovers(pl: Playlist): string[] {
+  const covers: string[] = []
+  for (const id of pl.trackIds) {
+    const track = library.tracks.find(t => t.id === id)
+    if (track?.coverArt) {
+      const url = window.api.getMediaUrl(track.coverArt)
+      if (!covers.includes(url)) covers.push(url)
+    }
+    if (covers.length >= 4) break
+  }
+  return covers
+}
+</script>

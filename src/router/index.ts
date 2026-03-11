@@ -61,6 +61,11 @@ const router = createRouter({
       component: () => import('@/views/SettingsView.vue'),
     },
     {
+      path: '/search',
+      name: 'search',
+      component: () => import('@/views/SearchView.vue'),
+    },
+    {
       path: '/fullscreen',
       name: 'fullscreen',
       component: () => import('@/views/FullscreenView.vue'),

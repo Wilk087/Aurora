@@ -4,7 +4,8 @@
     <div class="px-3 mb-4">
       <div class="relative">
         <svg
-          class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30"
+          class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors"
+          :class="library.searchQuery ? 'text-accent/70' : 'text-white/30'"
           fill="none"
           stroke="currentColor"
           stroke-width="2"
@@ -14,15 +15,17 @@
           <path d="M21 21l-4.35-4.35" />
         </svg>
         <input
+          ref="searchInputRef"
           v-model="library.searchQuery"
           type="text"
           placeholder="Search"
-          @keydown.escape="library.searchQuery = ''"
-          class="w-full bg-white/[0.06] rounded-lg pl-9 pr-8 py-2 text-sm text-white placeholder-white/30 outline-none focus:bg-white/[0.1] focus:ring-1 focus:ring-white/10 transition-all no-drag"
+          @keydown.escape="onSearchEscape"
+          class="w-full bg-white/[0.06] rounded-lg pl-9 pr-8 py-2 text-sm text-white placeholder-white/30 outline-none focus:bg-white/[0.1] focus:ring-1 transition-all no-drag"
+          :class="library.searchQuery ? 'ring-1 ring-accent/20 bg-white/[0.08]' : 'ring-white/10'"
         />
         <button
           v-if="library.searchQuery"
-          @click="library.searchQuery = ''"
+          @click="clearSearch"
           class="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-white/30 hover:text-white/60 transition-colors"
         >
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -274,9 +277,11 @@ import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { usePlaylistStore, type PlaylistSortOrder } from '@/stores/playlist'
 import { getPluginSidebarItems } from '@/plugins/api'
+import { useSearchFocus } from '@/composables/useSearchFocus'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 const router = useRouter()
 const route = useRoute()
+const { searchInputRef } = useSearchFocus()
 const player = usePlayerStore()
 const library = useLibraryStore()
 const playlistStore = usePlaylistStore()
@@ -364,20 +369,36 @@ function cycleSort() {
   playlistStore.playlistSortOrder = sortOrders[(idx + 1) % sortOrders.length]
 }
 
-// Debounced search navigation: when user types, auto-switch to the best tab
+function onSearchEscape() {
+  if (library.searchQuery) {
+    library.searchQuery = ''
+  } else {
+    searchInputRef.value?.blur()
+  }
+}
+
+function clearSearch() {
+  library.searchQuery = ''
+  searchInputRef.value?.blur()
+}
+
+// Navigate to the dedicated search view when the user types, and back when they clear.
 let searchNavTimer: ReturnType<typeof setTimeout> | null = null
 watch(() => library.searchQuery, (q) => {
   if (searchNavTimer) clearTimeout(searchNavTimer)
-  if (!q) return
+  // Clearing the query while on the search page → go back to songs
+  if (!q) {
+    if (route.path === '/search') router.push('/')
+    return
+  }
+  // Already on the search page — results update reactively
+  if (route.path === '/search') return
+  // Don't navigate from fullscreen
+  if (route.path === '/fullscreen') return
+  // Navigate to search view after a short debounce
   searchNavTimer = setTimeout(() => {
-    const best = library.bestSearchTab
-    if (!best) return
-    const targetPath = best === 'albums' ? '/albums' : '/'
-    // Navigate to the best tab from any page (except fullscreen)
-    if (route.path !== '/fullscreen' && route.path !== targetPath) {
-      router.push(targetPath)
-    }
-  }, 300)
+    if (route.path !== '/search') router.push('/search')
+  }, 200)
 })
 
 const navItems = [

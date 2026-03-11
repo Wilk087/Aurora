@@ -48,6 +48,7 @@ import { ref, computed, watch, watchEffect, onMounted, onUnmounted, nextTick } f
 import { useRouter, useRoute } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
+import { useSearchFocus } from '@/composables/useSearchFocus'
 import { usePlaylistStore } from '@/stores/playlist'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useThemeStore } from '@/stores/theme'
@@ -67,6 +68,7 @@ const playlistStore = usePlaylistStore()
 const favoritesStore = useFavoritesStore()
 const themeStore = useThemeStore()
 const pluginStore = usePluginStore()
+const { focusSearch } = useSearchFocus()
 
 // Expose stores globally for cross-store lazy access (avoids circular require issues)
 ;(window as any).__auroraLibStore = library
@@ -301,12 +303,28 @@ function onMouseMove() {
 
 // ── Global keyboard shortcuts ──────────────────────────────────────────
 function onGlobalKeydown(e: KeyboardEvent) {
-  // Don't intercept when typing in inputs
   const tag = (e.target as HTMLElement)?.tagName
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
+  const inInput = tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable
+
+  // Ctrl+F / Cmd+F always focuses search (even from fullscreen)
+  if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+    e.preventDefault()
+    focusSearch()
+    return
+  }
+
+  // Don't intercept when typing in inputs
+  if (inInput) return
 
   // Don't intercept when LrcSyncer overlay is visible
   if (document.querySelector('[data-lrc-syncer-active]')) return
+
+  // '/' focuses search (when not in fullscreen)
+  if (e.key === '/' && route.path !== '/fullscreen') {
+    e.preventDefault()
+    focusSearch()
+    return
+  }
 
   // Don't intercept in fullscreen view (it has its own handler)
   if (route.path === '/fullscreen') return
