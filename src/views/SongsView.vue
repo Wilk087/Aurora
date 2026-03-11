@@ -240,12 +240,15 @@ function rescan() {
   library.rescanAll()
 }
 
-// Clear selection on Escape
+// Clear selection on Escape / Ctrl+A to select all
+// Guard: don't intercept when the user is typing in an input field
 function onKeyDown(e: KeyboardEvent) {
+  const tag = (e.target as HTMLElement)?.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
+
   if (e.key === 'Escape' && selection.hasSelection.value) {
     selection.clearSelection()
   }
-  // Ctrl/Cmd+A to select all
   if ((e.ctrlKey || e.metaKey) && e.key === 'a' && library.sortedTracks.length > 0) {
     e.preventDefault()
     selection.selectAll()

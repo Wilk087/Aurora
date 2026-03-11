@@ -24,8 +24,23 @@ function smartCommaSplit(str: string): string[] {
     if (!trimmed) continue
     const firstWord = trimmed.split(/\s+/)[0]?.toLowerCase()
 
-    // If the segment starts with a continuation word, merge with previous
-    if (result.length > 0 && CONTINUATION_WORDS.has(firstWord)) {
+    // Merge into previous only if:
+    //   1. The segment starts with a continuation word ("The", "and", etc.)
+    //   2. AND the previous segment is a bare single word (looks like a first
+    //      name, e.g. "Tyler") — not a complete multi-word name like "Kanye West".
+    //
+    // This preserves "Tyler, The Creator" while correctly splitting
+    // "Kanye West, The Game" into two separate artists.
+    const prevWordCount = result.length > 0
+      ? result[result.length - 1].split(/\s+/).length
+      : 0
+
+    // Also require the continuation segment itself to be short (≤ 2 words).
+    // Long segments like "The Boys Choir of Harlem" or "A Boogie Wit da Hoodie"
+    // are clearly standalone artist names, not continuations.
+    const segWordCount = trimmed.split(/\s+/).length
+
+    if (result.length > 0 && CONTINUATION_WORDS.has(firstWord) && prevWordCount === 1 && segWordCount <= 2) {
       result[result.length - 1] += ', ' + trimmed
     } else {
       result.push(trimmed)

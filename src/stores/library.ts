@@ -109,12 +109,18 @@ export const useLibraryStore = defineStore('library', () => {
       }
     }
 
-    // Also scan track-level artists for featured appearances
+    // Recompute trackCount from actual tracks so that featured-only artists
+    // (who appear in track.artist but not as albumArtist) get a correct count.
+    for (const artist of map.values()) artist.trackCount = 0
+
     for (const track of tracks.value) {
-      const trackArtists = splitArtists(track.artist)
-      for (const name of trackArtists) {
-        // Just ensure the artist exists so featured-only artists have a page
-        ensureArtist(name)
+      // Collect every artist credited on this track (both artist and albumArtist fields)
+      const names = new Set([
+        ...splitArtists(track.artist),
+        ...splitArtists(track.albumArtist || ''),
+      ])
+      for (const name of names) {
+        ensureArtist(name).trackCount++
       }
     }
 
