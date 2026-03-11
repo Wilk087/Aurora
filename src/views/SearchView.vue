@@ -30,7 +30,11 @@
             :key="track.id"
             :track="track"
             :index="i"
-            @play="playTrack(track)"
+            :selected="selection.isSelected(track.id)"
+            :selectable="selection.hasSelection.value"
+            :selected-tracks="selection.selectedItems.value"
+            @play="selection.hasSelection.value ? selection.handleSelect(i, $event ?? { ctrlKey: true, metaKey: false, shiftKey: false }) : playTrack(track)"
+            @select="selection.handleSelect(i, $event)"
           />
         </div>
       </section>
@@ -126,17 +130,29 @@
       </section>
 
     </div>
+
+    <!-- Selection action bar -->
+    <SelectionBar
+      :count="selection.selectedCount.value"
+      :track-ids="selection.selectedItems.value.map(t => t.id)"
+      @play-next="onPlayNextSelected"
+      @add-to-queue="onAddToQueueSelected"
+      @select-all="selection.selectAll()"
+      @clear="selection.clearSelection()"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { usePlaylistStore } from '@/stores/playlist'
+import { useSelection } from '@/composables/useSelection'
 import SongRow from '@/components/SongRow.vue'
 import AlbumCard from '@/components/AlbumCard.vue'
+import SelectionBar from '@/components/SelectionBar.vue'
 
 const router = useRouter()
 const library = useLibraryStore()
@@ -168,6 +184,34 @@ const topSongs = computed(() => library.filteredTracks.slice(0, MAX_SONGS))
 const topAlbums = computed(() => library.filteredAlbums.slice(0, MAX_ALBUMS))
 const topArtists = computed(() => filteredArtists.value.slice(0, MAX_ARTISTS))
 const topPlaylists = computed(() => filteredPlaylists.value.slice(0, MAX_PLAYLISTS))
+
+// Selection — scoped to the displayed songs
+const selection = useSelection(() => topSongs.value)
+
+function onPlayNextSelected() {
+  player.playNext(selection.selectedItems.value)
+  selection.clearSelection()
+}
+
+function onAddToQueueSelected() {
+  player.addToQueue(selection.selectedItems.value)
+  selection.clearSelection()
+}
+
+function onKeyDown(e: KeyboardEvent) {
+  const tag = (e.target as HTMLElement)?.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
+  if (e.key === 'Escape' && selection.hasSelection.value) {
+    selection.clearSelection()
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'a' && topSongs.value.length > 0) {
+    e.preventDefault()
+    selection.selectAll()
+  }
+}
+
+onMounted(() => document.addEventListener('keydown', onKeyDown))
+onUnmounted(() => document.removeEventListener('keydown', onKeyDown))
 
 // Artist images — fetched on demand, disk-cached for 7 days by the main process
 const artistImages = reactive<Record<string, string | null>>({})
