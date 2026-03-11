@@ -54,27 +54,27 @@ function toastClass(type: string) {
 </script>
 
 <style scoped>
-/* Toast variants — use solid accent-safe colors for readable contrast
-   on both dark and light themes. Background is a solid tinted surface. */
+/* Toast variants — always use a dark base so light text remains readable
+   on both dark and light themes. */
 .toast-success {
-  background: color-mix(in srgb, #10b981 18%, var(--glass-heavy-bg));
-  border-color: rgba(16, 185, 129, 0.35);
-  color: #6ee7b7; /* always light green — readable on the tinted dark bg */
+  background: color-mix(in srgb, #10b981 25%, rgba(10, 10, 10, 0.92));
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #6ee7b7;
 }
 .toast-warning {
-  background: color-mix(in srgb, #f59e0b 18%, var(--glass-heavy-bg));
-  border-color: rgba(245, 158, 11, 0.35);
+  background: color-mix(in srgb, #f59e0b 25%, rgba(10, 10, 10, 0.92));
+  border-color: rgba(245, 158, 11, 0.4);
   color: #fcd34d;
 }
 .toast-error {
-  background: color-mix(in srgb, #ef4444 18%, var(--glass-heavy-bg));
-  border-color: rgba(239, 68, 68, 0.35);
+  background: color-mix(in srgb, #ef4444 25%, rgba(10, 10, 10, 0.92));
+  border-color: rgba(239, 68, 68, 0.4);
   color: #fca5a5;
 }
 .toast-info {
-  background: var(--glass-heavy-bg);
-  border-color: var(--border);
-  color: rgb(var(--app-text) / 0.85);
+  background: rgba(15, 15, 15, 0.92);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .toast-enter-active { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
