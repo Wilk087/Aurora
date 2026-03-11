@@ -45,15 +45,38 @@ const { toasts, dismiss } = useToast()
 
 function toastClass(type: string) {
   switch (type) {
-    case 'success': return 'bg-emerald-500/15 border-emerald-500/20 text-emerald-300'
-    case 'warning': return 'bg-amber-500/15 border-amber-500/20 text-amber-500'
-    case 'error':   return 'bg-red-500/15 border-red-500/20 text-red-300'
-    default:        return 'bg-white/[0.08] border-white/10 text-white/80'
+    case 'success': return 'toast-success'
+    case 'warning': return 'toast-warning'
+    case 'error':   return 'toast-error'
+    default:        return 'toast-info'
   }
 }
 </script>
 
 <style scoped>
+/* Toast variants — use solid accent-safe colors for readable contrast
+   on both dark and light themes. Background is a solid tinted surface. */
+.toast-success {
+  background: color-mix(in srgb, #10b981 18%, var(--glass-heavy-bg));
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #6ee7b7; /* always light green — readable on the tinted dark bg */
+}
+.toast-warning {
+  background: color-mix(in srgb, #f59e0b 18%, var(--glass-heavy-bg));
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #fcd34d;
+}
+.toast-error {
+  background: color-mix(in srgb, #ef4444 18%, var(--glass-heavy-bg));
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+}
+.toast-info {
+  background: var(--glass-heavy-bg);
+  border-color: var(--border);
+  color: rgb(var(--app-text) / 0.85);
+}
+
 .toast-enter-active { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
 .toast-leave-active { transition: all 0.2s ease-in; }
 .toast-enter-from { opacity: 0; transform: translateX(40px) scale(0.95); }

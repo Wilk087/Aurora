@@ -44,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, watchEffect, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
@@ -87,6 +87,12 @@ const appContainerClasses = computed(() => {
   const border = 'border border-white/[0.06]'
   const rounding = noRounding ? '' : 'rounded-xl'
   return `${glass} ${rounding} ${border}`
+})
+
+// Expose --win-radius on :root so teleported panels (QueuePanel, etc.) can inherit it
+watchEffect(() => {
+  const noRounding = isWindowMaximized.value || isWindowFullscreen.value || isFullscreen.value
+  document.documentElement.style.setProperty('--win-radius', noRounding ? '0px' : '0.75rem')
 })
 
 onMounted(async () => {
@@ -240,6 +246,20 @@ watch(
         player.currentTrack = { ...saved!, coverArt: null }
         nextTick(() => { player.currentTrack = saved })
       }
+    }
+  },
+)
+
+// Re-extract adaptive accent when the theme changes (new base colors may change the palette)
+watch(
+  () => themeStore.currentTheme,
+  () => {
+    if (!player.adaptiveAccent) return
+    const coverArt = player.currentTrack?.coverArt
+    if (coverArt) {
+      const saved = player.currentTrack
+      player.currentTrack = { ...saved!, coverArt: null }
+      nextTick(() => { player.currentTrack = saved })
     }
   },
 )

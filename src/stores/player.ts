@@ -1124,6 +1124,10 @@ export const usePlayerStore = defineStore('player', () => {
         id: t.id, title: t.title, artist: t.artist,
         album: t.album, coverArt: t.coverArt,
       })),
+      accent: (() => {
+        const raw = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
+        return raw ? `rgb(${raw})` : undefined
+      })(),
     })
   }
 

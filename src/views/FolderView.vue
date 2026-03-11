@@ -176,7 +176,7 @@
       <div v-if="folderCtx.show" class="fixed inset-0 z-[90]" @click="folderCtx.show = false" @contextmenu.prevent="folderCtx.show = false" />
       <div
         v-if="folderCtx.show"
-        class="fixed z-[100] w-56 rounded-xl bg-[#1a1a2e]/95 backdrop-blur-lg border border-white/10 py-1.5 shadow-2xl"
+        class="fixed z-[100] w-56 rounded-xl menu-panel py-1.5 shadow-2xl"
         :style="{ top: folderCtx.y + 'px', left: folderCtx.x + 'px' }"
         @click.stop
       >

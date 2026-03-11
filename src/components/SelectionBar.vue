@@ -2,18 +2,18 @@
   <Transition name="slide-up">
     <div
       v-if="count > 0"
-      class="selection-bar fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl bg-[#1a1a2e]/95 backdrop-blur-xl border border-white/10 shadow-2xl"
+      class="selection-bar fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-5 py-3 rounded-2xl menu-panel shadow-2xl"
     >
-      <span class="text-sm font-medium text-white/80 tabular-nums whitespace-nowrap">
+      <span class="text-sm font-medium tabular-nums whitespace-nowrap" style="color: rgb(var(--app-text) / 0.80)">
         {{ count }} selected
       </span>
 
-      <div class="w-px h-5 bg-white/10" />
+      <div class="w-px h-5 bg-[var(--border)]" />
 
       <!-- Play Next -->
       <button
         @click="$emit('play-next')"
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white/70 hover:text-white hover:bg-white/[0.08] transition-all"
+        class="sel-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
         title="Play Next"
       >
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -25,7 +25,7 @@
       <!-- Add to Queue -->
       <button
         @click="$emit('add-to-queue')"
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white/70 hover:text-white hover:bg-white/[0.08] transition-all"
+        class="sel-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
         title="Add to Queue"
       >
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -37,8 +37,8 @@
       <!-- Toggle Favorites -->
       <button
         @click="toggleFavorites"
-        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
-        :class="majorityFavorited ? 'text-red-400 hover:text-white/70 hover:bg-white/[0.08]' : 'text-white/70 hover:text-red-400 hover:bg-white/[0.08]'"
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all fav-btn"
+        :class="majorityFavorited ? 'fav-active' : 'sel-btn'"
         :title="majorityFavorited ? 'Remove from Favorites' : 'Add to Favorites'"
       >
         <svg v-if="majorityFavorited" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
@@ -54,7 +54,7 @@
       <div class="relative" ref="playlistBtnRef">
         <button
           @click.stop="showPlaylistMenu = !showPlaylistMenu"
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-white/70 hover:text-white hover:bg-white/[0.08] transition-all"
+          class="sel-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
           title="Add to Playlist"
         >
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -68,10 +68,10 @@
           <div v-if="showPlaylistMenu" class="fixed inset-0 z-[90]" @click="showPlaylistMenu = false" />
           <div
             v-if="showPlaylistMenu"
-            class="fixed z-[100] w-56 max-h-64 overflow-y-auto rounded-xl bg-[#1a1a2e]/95 backdrop-blur-lg border border-white/10 py-1.5 shadow-2xl"
+            class="fixed z-[100] w-56 max-h-64 overflow-y-auto rounded-xl menu-panel py-1.5 shadow-2xl"
             :style="playlistMenuStyle"
           >
-            <p class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/30">Add to playlist</p>
+            <p class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider" style="color: rgb(var(--app-text) / 0.35)">Add to playlist</p>
             <div v-if="showNewInput" class="px-3 py-1.5 flex items-center gap-2">
               <input
                 ref="newInputRef"
@@ -80,26 +80,26 @@
                 @keydown.escape.stop="showNewInput = false"
                 @click.stop
                 placeholder="Name…"
-                class="flex-1 px-2 py-1 rounded bg-white/[0.08] border border-white/10 text-xs text-white placeholder-white/30 outline-none focus:border-accent"
+                class="ctx-input flex-1 px-2 py-1 rounded text-xs outline-none"
               />
               <button @click.stop="createAndAdd" class="text-accent text-xs font-medium hover:underline shrink-0">Add</button>
             </div>
             <button
               v-else
               @click.stop="beginCreate"
-              class="w-full px-3 py-2 text-left text-sm text-accent hover:bg-white/[0.06] transition-colors flex items-center gap-2"
+              class="ctx-item-accent w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
               </svg>
               New Playlist
             </button>
-            <div v-if="playlistStore.playlists.length > 0" class="border-t border-white/[0.06] my-1" />
+            <div v-if="playlistStore.playlists.length > 0" class="border-t border-[var(--border)] my-1" />
             <button
               v-for="pl in playlistStore.sortedPlaylists"
               :key="pl.id"
               @click.stop="addToPlaylist(pl.id)"
-              class="w-full px-3 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors truncate"
+              class="ctx-item w-full px-3 py-2 text-left text-sm transition-colors truncate"
             >
               {{ pl.name }}
             </button>
@@ -107,12 +107,12 @@
         </Teleport>
       </div>
 
-      <div class="w-px h-5 bg-white/10" />
+      <div class="w-px h-5 bg-[var(--border)]" />
 
       <!-- Select All -->
       <button
         @click="$emit('select-all')"
-        class="px-3 py-1.5 rounded-lg text-xs font-medium text-white/50 hover:text-white hover:bg-white/[0.08] transition-all"
+        class="sel-btn px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
       >
         Select All
       </button>
@@ -120,7 +120,7 @@
       <!-- Clear -->
       <button
         @click="$emit('clear')"
-        class="w-7 h-7 rounded-lg text-white/40 hover:text-white hover:bg-white/[0.08] flex items-center justify-center transition-all"
+        class="sel-btn w-7 h-7 rounded-lg flex items-center justify-center transition-all"
         title="Clear selection"
       >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -224,6 +224,23 @@ async function addToPlaylist(playlistId: string) {
 </script>
 
 <style scoped>
+/* Themed button/item classes */
+.sel-btn { color: rgb(var(--app-text) / 0.65); }
+.sel-btn:hover { color: rgb(var(--app-text) / 0.90); background: rgb(var(--app-text) / 0.08); }
+.ctx-item { color: rgb(var(--app-text) / 0.70); }
+.ctx-item:hover { color: rgb(var(--app-text) / 0.90); background: rgb(var(--app-text) / 0.06); }
+.ctx-item-accent { color: rgb(var(--accent)); }
+.ctx-item-accent:hover { background: rgb(var(--app-text) / 0.06); }
+.ctx-input {
+  background: rgb(var(--app-text) / 0.08);
+  border: 1px solid var(--border);
+  color: rgb(var(--app-text) / 0.85);
+}
+.ctx-input::placeholder { color: rgb(var(--app-text) / 0.30); }
+.ctx-input:focus { border-color: rgb(var(--accent)); }
+.fav-active { color: rgb(var(--accent)); }
+.fav-active:hover { color: rgb(var(--app-text) / 0.65); background: rgb(var(--app-text) / 0.08); }
+
 .slide-up-enter-active { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
 .slide-up-leave-active { transition: all 0.2s ease-in; }
 .slide-up-enter-from, .slide-up-leave-to { opacity: 0; transform: translate(-50%, 20px); }

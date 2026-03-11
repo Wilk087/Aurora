@@ -48,7 +48,7 @@
       <div v-if="showCtx" class="fixed inset-0 z-[90]" @click="showCtx = false" @contextmenu.prevent="showCtx = false" />
       <div
         v-if="showCtx"
-        class="fixed z-[100] w-48 rounded-xl bg-[#1a1a2e]/95 backdrop-blur-lg border border-white/10 py-1.5 shadow-2xl"
+        class="fixed z-[100] w-48 rounded-xl menu-panel py-1.5 shadow-2xl"
         :style="ctxStyle"
       >
         <button
@@ -102,7 +102,7 @@
           </button>
           <div
             v-if="showPlaylistSub"
-            class="absolute left-full top-0 ml-1 w-48 rounded-xl bg-[#1a1a2e]/95 backdrop-blur-lg border border-white/10 py-1.5 shadow-2xl max-h-64 overflow-y-auto z-[110]"
+            class="absolute left-full top-0 ml-1 w-48 rounded-xl menu-panel py-1.5 shadow-2xl max-h-64 overflow-y-auto z-[110]"
           >
             <p class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/30">Add to playlist</p>
             <button

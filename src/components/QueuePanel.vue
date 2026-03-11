@@ -9,25 +9,25 @@
     <Transition name="slide">
       <div
         v-if="show"
-        class="fixed top-0 right-0 bottom-0 z-[85] w-[380px] max-w-[85vw] flex flex-col bg-[#0e0e1c]/95 backdrop-blur-2xl border-l border-white/[0.08] shadow-2xl"
+        class="queue-panel fixed top-0 right-0 bottom-0 z-[85] w-[380px] max-w-[85vw] flex flex-col shadow-2xl"
       >
         <!-- Header -->
         <div class="flex items-center justify-between px-5 pt-5 pb-4 shrink-0">
           <div>
-            <h2 class="text-base font-bold text-white">Queue</h2>
-            <p class="text-[11px] text-white/30 mt-0.5">{{ player.queue.length }} tracks</p>
+            <h2 class="text-base font-bold" style="color: rgb(var(--app-text) / 0.95)">Queue</h2>
+            <p class="text-[11px] mt-0.5" style="color: rgb(var(--app-text) / 0.30)">{{ player.queue.length }} tracks</p>
           </div>
           <div class="flex items-center gap-1.5">
             <button
               v-if="player.queue.length > 0"
               @click="player.clearQueue()"
-              class="px-3 py-1.5 text-[11px] text-white/30 hover:text-red-400 hover:bg-white/[0.06] rounded-lg transition-colors font-medium"
+              class="q-clear-btn px-3 py-1.5 text-[11px] rounded-lg transition-colors font-medium"
             >
               Clear
             </button>
             <button
               @click="$emit('close')"
-              class="w-8 h-8 flex items-center justify-center rounded-lg text-white/30 hover:text-white hover:bg-white/[0.08] transition-colors"
+              class="q-close-btn w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -40,13 +40,14 @@
         <div v-if="player.queue.length > 0" class="flex-1 overflow-y-auto px-3 pb-3">
           <!-- Now Playing -->
           <div v-if="currentTrack" class="mb-3">
-            <p class="px-2 pt-2 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/25">
+            <p class="px-2 pt-2 pb-1.5 text-[10px] font-semibold uppercase tracking-wider" style="color: rgb(var(--app-text) / 0.25)">
               Now Playing
             </p>
             <div
-              class="flex items-center gap-3 px-3 py-3 rounded-xl bg-white/[0.06] border border-white/[0.06]"
+              class="flex items-center gap-3 px-3 py-3 rounded-xl"
+              style="background: rgb(var(--app-text) / 0.06); border: 1px solid rgb(var(--app-text) / 0.06)"
             >
-              <div class="w-11 h-11 rounded-lg overflow-hidden bg-white/10 shrink-0 ring-1 ring-white/[0.06]">
+              <div class="w-11 h-11 rounded-lg overflow-hidden shrink-0" style="background: rgb(var(--app-text) / 0.10); box-shadow: 0 0 0 1px rgb(var(--app-text) / 0.06)">
                 <img v-if="currentTrack.coverArt" :src="getCoverUrl(currentTrack.coverArt)" class="w-full h-full object-cover" />
                 <div v-else class="w-full h-full flex items-center justify-center">
                   <svg class="w-4 h-4 text-white/20" fill="currentColor" viewBox="0 0 24 24">
@@ -81,7 +82,7 @@
 
           <!-- Up Next -->
           <div v-if="upNext.length > 0">
-            <p class="px-2 pt-2 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/25">
+            <p class="px-2 pt-2 pb-1.5 text-[10px] font-semibold uppercase tracking-wider" style="color: rgb(var(--app-text) / 0.25)">
               Up Next &middot; {{ upNext.length }}
             </p>
 
@@ -93,7 +94,7 @@
                 class="queue-item group flex items-center gap-2 pl-1.5 pr-3 py-2 rounded-lg transition-colors"
                 :class="[
                   dragOverIndex === item.queueIndex ? 'ring-1 ring-accent/40 bg-accent/[0.05]' : '',
-                  draggedIndex === item.queueIndex ? 'opacity-30 bg-white/[0.02]' : 'hover:bg-white/[0.05]',
+                  draggedIndex === item.queueIndex ? 'opacity-30' : 'q-item-hover',
                 ]"
                 @click="player.playFromQueue(item.queueIndex)"
                 draggable="true"
@@ -105,7 +106,7 @@
               >
                 <!-- Drag handle -->
                 <div
-                  class="w-5 h-8 flex items-center justify-center cursor-grab active:cursor-grabbing text-white/0 group-hover:text-white/15 hover:!text-white/30 transition-colors shrink-0"
+                  class="q-drag-handle w-5 h-8 flex items-center justify-center cursor-grab active:cursor-grabbing transition-colors shrink-0"
                   @mousedown.stop
                 >
                   <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
@@ -143,7 +144,7 @@
                 <span class="text-[10px] text-white/20 tabular-nums shrink-0 font-mono">{{ formatTime(item.track.duration) }}</span>
                 <button
                   @click.stop="player.removeFromQueue(item.queueIndex)"
-                  class="w-6 h-6 flex items-center justify-center rounded-full text-white/0 group-hover:text-white/20 hover:!text-red-400 transition-colors shrink-0"
+                  class="q-remove-btn w-6 h-6 flex items-center justify-center rounded-full transition-colors shrink-0"
                 >
                   <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -157,7 +158,7 @@
           <div v-if="previousTracks.length > 0" class="mt-3">
             <button
               @click="showPrevious = !showPrevious"
-              class="w-full px-2 pt-2 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/20 hover:text-white/35 transition-colors flex items-center gap-1"
+              class="q-prev-btn w-full px-2 pt-2 pb-1.5 text-[10px] font-semibold uppercase tracking-wider transition-colors flex items-center gap-1"
             >
               Previously Played &middot; {{ previousTracks.length }}
               <svg class="w-3 h-3 transition-transform" :class="showPrevious ? 'rotate-180' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -203,7 +204,7 @@
         </div>
 
         <!-- Empty state -->
-        <div v-else class="flex-1 flex flex-col items-center justify-center text-white/20 px-6">
+        <div v-else class="flex-1 flex flex-col items-center justify-center px-6" style="color: rgb(var(--app-text) / 0.20)">
           <svg class="w-14 h-14 mb-4 opacity-20" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z" />
           </svg>
@@ -328,6 +329,31 @@ function goToAlbum(track: Track) {
 </script>
 
 <style scoped>
+/* Themed panel background + border */
+.queue-panel {
+  background: var(--glass-heavy-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-left: 1px solid var(--border);
+  border-radius: var(--win-radius, 0);
+  overflow: hidden;
+}
+
+/* Themed interactive elements */
+.q-clear-btn { color: rgb(var(--app-text) / 0.30); }
+.q-clear-btn:hover { color: #f87171; background: rgb(var(--app-text) / 0.06); }
+.q-close-btn { color: rgb(var(--app-text) / 0.30); }
+.q-close-btn:hover { color: rgb(var(--app-text) / 0.90); background: rgb(var(--app-text) / 0.08); }
+.q-prev-btn { color: rgb(var(--app-text) / 0.20); }
+.q-prev-btn:hover { color: rgb(var(--app-text) / 0.40); }
+.q-item-hover:hover { background: rgb(var(--app-text) / 0.05); }
+.q-drag-handle { color: transparent; }
+.queue-item:hover .q-drag-handle { color: rgb(var(--app-text) / 0.15); }
+.q-drag-handle:hover { color: rgb(var(--app-text) / 0.30) !important; }
+.q-remove-btn { color: transparent; }
+.queue-item:hover .q-remove-btn { color: rgb(var(--app-text) / 0.20); }
+.q-remove-btn:hover { color: #f87171 !important; }
+
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 

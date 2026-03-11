@@ -126,38 +126,38 @@
           {{ formatTime(player.currentTime) }}
         </span>
 
-        <!-- Standard progress bar -->
-        <div v-if="!player.iosSliders" class="flex-1 relative group">
-          <input
-            type="range"
-            min="0"
-            max="100"
-            step="0.1"
+        <!-- Progress bar (fixed-height wrapper keeps layout stable between modes) -->
+        <div class="flex-1 flex items-center h-3">
+          <div v-if="!player.iosSliders" class="flex-1 relative group">
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="0.1"
+              :value="player.progress"
+              @input="onProgressInput"
+              class="progress-bar w-full h-1 rounded-full cursor-pointer relative z-10"
+            />
+            <div
+              class="absolute top-1/2 left-0 -translate-y-1/2 h-1 rounded-full bg-white/15 w-full pointer-events-none"
+            />
+            <div
+              class="absolute top-1/2 left-0 -translate-y-1/2 h-1 rounded-full bg-white/80 pointer-events-none transition-all"
+              :style="{ width: player.progress + '%' }"
+            />
+          </div>
+          <IOSSlider
+            v-else
             :value="player.progress"
-            @input="onProgressInput"
-            class="progress-bar w-full h-1 rounded-full cursor-pointer relative z-10"
-          />
-          <div
-            class="absolute top-1/2 left-0 -translate-y-1/2 h-1 rounded-full bg-white/15 w-full pointer-events-none"
-          />
-          <div
-            class="absolute top-1/2 left-0 -translate-y-1/2 h-1 rounded-full bg-white/80 pointer-events-none transition-all"
-            :style="{ width: player.progress + '%' }"
+            :min="0"
+            :max="100"
+            :step="0.1"
+            size="sm"
+            fill-color="bg-white/80"
+            class="flex-1"
+            @update="(v: number) => player.seekPercent(v)"
           />
         </div>
-
-        <!-- iOS-style progress bar -->
-        <IOSSlider
-          v-else
-          :value="player.progress"
-          :min="0"
-          :max="100"
-          :step="0.1"
-          size="sm"
-          fill-color="bg-white/80"
-          class="flex-1"
-          @update="(v: number) => player.seekPercent(v)"
-        />
 
         <span class="text-[10px] text-white/40 w-10 tabular-nums">
           {{ formatTime(player.duration) }}
@@ -230,34 +230,37 @@
         </svg>
       </button>
 
-      <div v-if="!player.iosSliders" class="w-24 relative group">
-        <input
-          type="range"
-          min="0"
-          max="1"
-          step="0.01"
+      <!-- Volume slider (fixed-height wrapper keeps layout stable between modes) -->
+      <div class="w-24 flex items-center h-3">
+        <div v-if="!player.iosSliders" class="flex-1 relative group">
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            :value="player.volume"
+            @input="onVolumeInput"
+            class="volume-slider w-full cursor-pointer relative z-10"
+          />
+          <div
+            class="absolute top-1/2 left-0 -translate-y-1/2 h-[3px] rounded-full bg-white/15 w-full pointer-events-none"
+          />
+          <div
+            class="absolute top-1/2 left-0 -translate-y-1/2 h-[3px] rounded-full bg-white/70 pointer-events-none"
+            :style="{ width: player.volume * 100 + '%' }"
+          />
+        </div>
+        <IOSSlider
+          v-else
           :value="player.volume"
-          @input="onVolumeInput"
-          class="volume-slider w-full cursor-pointer relative z-10"
-        />
-        <div
-          class="absolute top-1/2 left-0 -translate-y-1/2 h-[3px] rounded-full bg-white/15 w-full pointer-events-none"
-        />
-        <div
-          class="absolute top-1/2 left-0 -translate-y-1/2 h-[3px] rounded-full bg-white/70 pointer-events-none"
-          :style="{ width: player.volume * 100 + '%' }"
+          :min="0"
+          :max="1"
+          :step="0.01"
+          size="sm"
+          class="flex-1"
+          @update="(v: number) => player.setVolume(v)"
         />
       </div>
-      <IOSSlider
-        v-else
-        :value="player.volume"
-        :min="0"
-        :max="1"
-        :step="0.01"
-        size="sm"
-        class="w-24"
-        @update="(v: number) => player.setVolume(v)"
-      />
     </div>
 
     <!-- Queue Panel -->

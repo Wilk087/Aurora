@@ -98,6 +98,7 @@ A theme is a single JSON file containing the following structure. Only `id`, `na
   "custom": {
     "sidebar-width": "280px",
     "my-highlight": "255 200 0"
+
   }
 }
 ```

@@ -45,6 +45,7 @@ export interface RemoteState {
   repeatMode: string
   queue: any[]
   currentIndex: number
+  accent?: string
 }
 
 // ── Security: PIN + trusted device tokens ──────────────────────────────────
@@ -231,6 +232,9 @@ export function startRemoteServer(win: BrowserWindow, getDataPath: () => string)
   mainWindow = win
   userDataPath = getDataPath()
   config = loadConfig()
+  // Always generate a fresh PIN each time the server (re)starts
+  config.pin = generatePin()
+  saveConfig(config)
 
   const app = express()
   app.use(express.json())
@@ -846,6 +850,7 @@ function updateUI(s){
   document.getElementById('shuffleBtn').classList.toggle('active',s.isShuffle);
   document.getElementById('repeatBtn').classList.toggle('active',s.repeatMode!=='off');
   document.getElementById('volSlider').value=Math.round(s.volume*100);
+  if(s.accent)document.documentElement.style.setProperty('--accent',s.accent);
   updateQueue();
 }
 

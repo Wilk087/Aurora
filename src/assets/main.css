@@ -175,6 +175,16 @@
     -webkit-line-clamp: 2;
   }
 
+  /* ── Themed dropdown / menu panels ───────────────────────── */
+  /* Use .menu-panel on Teleport-ed dropdowns instead of         */
+  /* hardcoded background colours, so themes apply correctly.    */
+  .menu-panel {
+    background: var(--glass-heavy-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--border);
+  }
+
   /* ── Immersive scope ──────────────────────────────────────── */
   /* Force light-on-dark in fullscreen/immersive contexts         */
   /* regardless of the active theme. These overlay on album art   */

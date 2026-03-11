@@ -89,8 +89,8 @@
         @click.stop="toggleFavoriteInline"
         class="w-7 h-7 rounded-full flex items-center justify-center transition-all"
         :class="favoritesStore.isFavorite(track.id)
-          ? 'text-red-400 hover:text-red-300'
-          : 'text-white/20 hover:text-red-400 hover:bg-white/[0.06] opacity-0 group-hover:opacity-100'"
+          ? 'fav-active'
+          : 'fav-inactive opacity-0 group-hover:opacity-100'"
         :title="favoritesStore.isFavorite(track.id) ? 'Remove from Favorites' : 'Add to Favorites'"
       >
         <svg v-if="favoritesStore.isFavorite(track.id)" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -121,10 +121,10 @@
       <div v-if="showMenu" class="fixed inset-0 z-[90]" @click="showMenu = false" />
       <div
         v-if="showMenu"
-        class="fixed z-[100] w-56 max-h-64 overflow-y-auto rounded-xl bg-[#1a1a2e]/95 backdrop-blur-lg border border-white/10 py-1.5 shadow-2xl"
+        class="fixed z-[100] w-56 max-h-64 overflow-y-auto rounded-xl menu-panel py-1.5 shadow-2xl"
         :style="menuStyle"
       >
-        <p class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-white/30">Add to playlist</p>
+        <p class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider" style="color: rgb(var(--app-text) / 0.35)">Add to playlist</p>
         <div v-if="showNewInput" class="px-3 py-1.5 flex items-center gap-2">
           <input
             ref="newInputRef"
@@ -133,26 +133,26 @@
             @keydown.escape.stop="showNewInput = false"
             @click.stop
             placeholder="Name…"
-            class="flex-1 px-2 py-1 rounded bg-white/[0.08] border border-white/10 text-xs text-white placeholder-white/30 outline-none focus:border-accent"
+            class="ctx-input flex-1 px-2 py-1 rounded text-xs outline-none focus:border-accent"
           />
           <button @click.stop="createAndAdd" class="text-accent text-xs font-medium hover:underline shrink-0">Add</button>
         </div>
         <button
           v-else
           @click.stop="beginCreate"
-          class="w-full px-3 py-2 text-left text-sm text-accent hover:bg-white/[0.06] transition-colors flex items-center gap-2"
+          class="ctx-item-accent w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
           New Playlist
         </button>
-        <div v-if="playlistStore.playlists.length > 0" class="border-t border-white/[0.06] my-1" />
+        <div v-if="playlistStore.playlists.length > 0" class="border-t border-[var(--border)] my-1" />
         <button
           v-for="pl in playlistStore.sortedPlaylists"
           :key="pl.id"
           @click.stop="addTo(pl.id)"
-          class="w-full px-3 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors truncate flex items-center justify-between"
+          class="ctx-item w-full px-3 py-2 text-left text-sm transition-colors truncate flex items-center justify-between"
         >
           <span class="truncate">{{ pl.name }}</span>
           <svg v-if="pl.trackIds.includes(track.id)" class="w-3.5 h-3.5 text-accent shrink-0" fill="currentColor" viewBox="0 0 24 24">
@@ -167,97 +167,97 @@
       <div v-if="showCtx" class="fixed inset-0 z-[90]" @click="showCtx = false" @contextmenu.prevent="showCtx = false" />
       <div
         v-if="showCtx"
-        class="fixed z-[100] w-52 rounded-xl bg-[#1a1a2e]/95 backdrop-blur-lg border border-white/10 py-1.5 shadow-2xl overflow-y-auto"
+        class="fixed z-[100] w-52 rounded-xl menu-panel py-1.5 shadow-2xl overflow-y-auto"
         :style="{ ...ctxStyle, maxHeight: 'calc(100vh - 20px)' }"
         @click.stop
       >
         <button
           @click.stop="doPlayNext"
-          class="w-full px-3.5 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2.5"
+          class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5"
         >
-          <svg class="w-4 h-4 shrink-0 text-white/40" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <svg class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
           </svg>
           Play Next
         </button>
         <button
           @click.stop="doPlayLater"
-          class="w-full px-3.5 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2.5"
+          class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5"
         >
-          <svg class="w-4 h-4 shrink-0 text-white/40" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <svg class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
           </svg>
           Play Later
         </button>
         <button
           @click.stop="toggleFavorite"
-          class="w-full px-3.5 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2.5"
+          class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5"
         >
-          <svg v-if="favoritesStore.isFavorite(track.id)" class="w-4 h-4 shrink-0 text-red-400" fill="currentColor" viewBox="0 0 24 24">
+          <svg v-if="favoritesStore.isFavorite(track.id)" class="w-4 h-4 shrink-0 fav-active" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
           </svg>
-          <svg v-else class="w-4 h-4 shrink-0 text-white/40" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <svg v-else class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
           </svg>
           {{ favoritesStore.isFavorite(track.id) ? 'Remove from Favorites' : 'Add to Favorites' }}
         </button>
-        <div class="border-t border-white/[0.06] my-1" />
+        <div class="border-t border-[var(--border)] my-1" />
         <button
           @click.stop="goToArtist"
-          class="w-full px-3.5 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2.5"
+          class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5"
         >
-          <svg class="w-4 h-4 shrink-0 text-white/40" fill="currentColor" viewBox="0 0 24 24">
+          <svg class="w-4 h-4 shrink-0 opacity-50" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
           </svg>
           Go to Artist
         </button>
         <button
           @click.stop="goToAlbum"
-          class="w-full px-3.5 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2.5"
+          class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5"
         >
-          <svg class="w-4 h-4 shrink-0 text-white/40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <svg class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6z" />
           </svg>
           Go to Album
         </button>
         <button
           @click.stop="showCredits"
-          class="w-full px-3.5 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2.5"
+          class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5"
         >
-          <svg class="w-4 h-4 shrink-0 text-white/40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <svg class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
           </svg>
           Credits &amp; Info
         </button>
         <button
           @click.stop="showInExplorer"
-          class="w-full px-3.5 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2.5"
+          class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5"
         >
-          <svg class="w-4 h-4 shrink-0 text-white/40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <svg class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
           </svg>
           Show in File Explorer
         </button>
-        <div class="border-t border-white/[0.06] my-1" />
+        <div class="border-t border-[var(--border)] my-1" />
         <button
           @click.stop="ctxToPlaylist"
-          class="w-full px-3.5 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2.5"
+          class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5"
         >
-          <svg class="w-4 h-4 shrink-0 text-white/40" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <svg class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
           Add to Playlist…
         </button>
         <!-- Plugin-injected context menu items -->
         <template v-if="pluginContextMenuItems.length">
-          <div class="border-t border-white/[0.06] my-1" />
+          <div class="border-t border-[var(--border)] my-1" />
           <button
             v-for="item in pluginContextMenuItems"
             :key="item.label"
             @click.stop="runPluginCtxItem(item)"
-            class="w-full px-3.5 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2.5"
+            class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5"
           >
-            <svg v-if="item.icon" class="w-4 h-4 shrink-0 text-white/40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <svg v-if="item.icon" class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" />
             </svg>
             {{ item.label }}
@@ -274,7 +274,7 @@
       <Transition name="credits-slide">
         <div
           v-if="showCreditsPanel"
-          class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[90] w-[480px] max-w-[90vw] max-h-[80vh] overflow-y-auto rounded-2xl bg-[#12121f]/95 backdrop-blur-2xl border border-white/[0.08] shadow-2xl"
+          class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[90] w-[480px] max-w-[90vw] max-h-[80vh] overflow-y-auto rounded-2xl menu-panel shadow-2xl"
         >
           <div class="p-6">
             <!-- Header -->
@@ -588,6 +588,25 @@ const noCredits = computed(() => {
 </script>
 
 <style scoped>
+/* Favorite heart theming */
+.fav-active { color: rgb(var(--accent)); }
+.fav-active:hover { color: rgb(var(--accent) / 0.70); background: rgb(var(--app-text) / 0.06); }
+.fav-inactive { color: rgb(var(--app-text) / 0.20); }
+.fav-inactive:hover { color: rgb(var(--accent)); background: rgb(var(--app-text) / 0.06); }
+
+/* Context menu item theming */
+.ctx-item { color: rgb(var(--app-text) / 0.70); }
+.ctx-item:hover { color: rgb(var(--app-text) / 0.90); background: rgb(var(--app-text) / 0.06); }
+.ctx-item-accent { color: rgb(var(--accent)); }
+.ctx-item-accent:hover { background: rgb(var(--app-text) / 0.06); }
+.ctx-input {
+  background: rgb(var(--app-text) / 0.08);
+  border: 1px solid var(--border);
+  color: rgb(var(--app-text) / 0.85);
+}
+.ctx-input::placeholder { color: rgb(var(--app-text) / 0.30); }
+.ctx-input:focus { border-color: rgb(var(--accent)); }
+
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 .credits-slide-enter-active { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }

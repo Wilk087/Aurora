@@ -36,7 +36,7 @@
 
         <div
           v-show="showSortMenu"
-          class="absolute right-0 top-full mt-1.5 w-44 py-1.5 rounded-xl glass border border-white/[0.1] shadow-2xl z-50"
+          class="absolute right-0 top-full mt-1.5 w-44 py-1.5 rounded-xl menu-panel shadow-2xl z-50"
         >
           <button
             v-for="option in albumSortOptions"

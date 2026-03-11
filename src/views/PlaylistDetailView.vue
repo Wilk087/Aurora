@@ -135,7 +135,7 @@
     <Teleport to="body">
       <div v-if="ctxTrack" class="fixed inset-0 z-[100]" @click="ctxTrack = null">
         <div
-          class="fixed z-[101] w-52 rounded-xl bg-[#1a1a2e]/95 backdrop-blur-lg border border-white/10 py-1.5 shadow-2xl"
+          class="fixed z-[101] w-52 rounded-xl menu-panel py-1.5 shadow-2xl"
           :style="{ top: ctxY + 'px', left: ctxX + 'px' }"
           @click.stop
         >

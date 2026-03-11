@@ -961,6 +961,15 @@ async function createWindow() {
     mainWindow.loadFile(join(__dirname, '../dist/index.html'))
   }
 
+  // Forward renderer console logs to the log file
+  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    const src = sourceId ? ` (${sourceId}:${line})` : ''
+    const msg = `[renderer]${src} ${message}`
+    if (level === 3) logger.error(msg)
+    else if (level === 2) logger.warn(msg)
+    else logger.info(msg)
+  })
+
   // Initialize custom MPRIS service (Linux only)
   initMpris(mainWindow)
   logger.info('Window created')

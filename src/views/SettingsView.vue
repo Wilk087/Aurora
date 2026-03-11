@@ -3,7 +3,7 @@
     <h1 class="text-3xl font-bold text-white mb-6">Settings</h1>
 
     <!-- ── Tab bar ────────────────────────────────────────────────── -->
-    <nav class="flex items-center gap-1 mb-8 p-1 rounded-xl bg-white/[0.04] border border-white/[0.06] overflow-x-auto no-scrollbar">
+    <nav class="flex items-center justify-center gap-1 mb-8 p-1 rounded-xl bg-white/[0.04] border border-white/[0.06] overflow-x-auto no-scrollbar">
       <button
         v-for="tab in tabs"
         :key="tab.id"
@@ -193,16 +193,47 @@
       <div class="space-y-4">
         <div class="px-4 py-3 rounded-xl bg-white/[0.05]">
           <p class="text-sm text-white/80 mb-2">Output Device</p>
-          <select
-            v-model="selectedDevice"
-            @change="onDeviceChange"
-            class="w-full px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white/70 outline-none focus:border-accent/40 transition-colors"
-          >
-            <option value="">System Default</option>
-            <option v-for="d in player.audioDevices" :key="d.deviceId" :value="d.deviceId">
-              {{ d.label || `Device ${d.deviceId.slice(0, 8)}` }}
-            </option>
-          </select>
+          <div class="relative" ref="deviceDropdownRef">
+            <button
+              @click.stop="showDeviceDropdown = !showDeviceDropdown"
+              class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm outline-none transition-colors"
+              style="background: rgb(var(--app-text) / 0.06); border: 1px solid var(--border); color: rgb(var(--app-text) / 0.70)"
+            >
+              <span class="truncate">{{ selectedDeviceLabel }}</span>
+              <svg class="w-4 h-4 shrink-0 ml-2 transition-transform" :class="showDeviceDropdown ? 'rotate-180' : ''" style="color: rgb(var(--app-text) / 0.30)" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <Transition name="dropdown">
+              <div
+                v-if="showDeviceDropdown"
+                class="absolute top-full left-0 right-0 mt-1.5 rounded-xl menu-panel shadow-2xl py-1 z-50 max-h-60 overflow-y-auto"
+              >
+                <button
+                  @click="selectDevice('')"
+                  class="w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center justify-between"
+                  :class="selectedDevice === '' ? 'text-accent bg-white/[0.08]' : 'text-white/60 hover:text-white hover:bg-white/[0.06]'"
+                >
+                  System Default
+                  <svg v-if="selectedDevice === ''" class="w-3.5 h-3.5 text-accent" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+                  </svg>
+                </button>
+                <button
+                  v-for="d in player.audioDevices"
+                  :key="d.deviceId"
+                  @click="selectDevice(d.deviceId)"
+                  class="w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center justify-between"
+                  :class="selectedDevice === d.deviceId ? 'text-accent bg-white/[0.08]' : 'text-white/60 hover:text-white hover:bg-white/[0.06]'"
+                >
+                  <span class="truncate mr-2">{{ d.label || `Device ${d.deviceId.slice(0, 8)}` }}</span>
+                  <svg v-if="selectedDevice === d.deviceId" class="w-3.5 h-3.5 text-accent shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+                  </svg>
+                </button>
+              </div>
+            </Transition>
+          </div>
         </div>
         <!-- Exclusive Mode — disabled for 2.6.0, will revisit later
         <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
@@ -254,24 +285,6 @@
     <section v-show="activeTab === 'general'" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Playback</h2>
       <div class="space-y-4">
-        <!-- Waveform progress bar -->
-        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
-          <div>
-            <p class="text-sm text-white/80">Waveform Progress Bar</p>
-            <p class="text-xs text-white/30 mt-0.5">Replace the standard progress bar with an audio waveform visualization</p>
-          </div>
-          <button
-            @click="toggleWaveform"
-            class="relative w-11 h-6 rounded-full transition-colors duration-200"
-            :class="player.waveformEnabled ? 'bg-accent' : 'bg-white/15'"
-          >
-            <div
-              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
-              :class="player.waveformEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'"
-            />
-          </button>
-        </div>
-
         <!-- Audio normalization -->
         <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
           <div>
@@ -370,7 +383,25 @@
               :class="player.transparencyEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'"
             />
           </button>
-        </div>      </div>
+        </div>
+        <!-- Waveform progress bar -->
+        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">Waveform Progress Bar</p>
+            <p class="text-xs text-white/30 mt-0.5">Replace the standard progress bar with an audio waveform visualization</p>
+          </div>
+          <button
+            @click="toggleWaveform"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="player.waveformEnabled ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
+              :class="player.waveformEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
+      </div>
     </section>
 
     <!-- ── Animated Covers ────────────────────────────────────────── -->
@@ -1202,7 +1233,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, reactive } from 'vue'
+import { ref, computed, onMounted, onUnmounted, reactive } from 'vue'
 import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { usePlaylistStore } from '@/stores/playlist'
@@ -1320,6 +1351,26 @@ const discordClientId = ref('')
 
 // Audio output
 const selectedDevice = ref('')
+const showDeviceDropdown = ref(false)
+const deviceDropdownRef = ref<HTMLElement | null>(null)
+
+const selectedDeviceLabel = computed(() => {
+  if (!selectedDevice.value) return 'System Default'
+  const d = player.audioDevices.find(d => d.deviceId === selectedDevice.value)
+  return d ? (d.label || `Device ${d.deviceId.slice(0, 8)}`) : 'System Default'
+})
+
+function selectDevice(deviceId: string) {
+  selectedDevice.value = deviceId
+  showDeviceDropdown.value = false
+  onDeviceChange()
+}
+
+function onDeviceClickOutside(e: MouseEvent) {
+  if (deviceDropdownRef.value && !deviceDropdownRef.value.contains(e.target as Node)) {
+    showDeviceDropdown.value = false
+  }
+}
 const exclusiveMode = ref(false)
 const exclusiveModeActiveAtStartup = ref(false) // whether flags were applied at process level
 const exclusivePlatform = ref('')
@@ -1484,6 +1535,12 @@ onMounted(async () => {
 
   // Restore custom CSS value for editing
   themeCustomCSS.value = themeStore.customCSS
+
+  document.addEventListener('click', onDeviceClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', onDeviceClickOutside)
 })
 
 /* ---------- Remote Control ---------- */
@@ -1572,6 +1629,7 @@ async function onDeviceChange() {
   await player.setOutputDevice(selectedDevice.value)
   toast.success('Audio output device changed')
 }
+
 
 async function toggleExclusive() {
   exclusiveMode.value = !exclusiveMode.value
@@ -1924,3 +1982,10 @@ async function openLogFile() {
   }
 }
 </script>
+
+<style scoped>
+.dropdown-enter-active { transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1); }
+.dropdown-leave-active { transition: all 0.1s ease-in; }
+.dropdown-enter-from, .dropdown-leave-to { opacity: 0; transform: translateY(-4px); }
+.dropdown-enter-to, .dropdown-leave-from { opacity: 1; transform: translateY(0); }
+</style>

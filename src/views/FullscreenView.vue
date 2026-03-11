@@ -572,17 +572,17 @@
       <Transition name="slide-left">
         <div
           v-if="showImmersiveMenu"
-          class="fixed top-0 left-0 bottom-0 z-[85] w-[300px] max-w-[85vw] flex flex-col bg-[#0e0e1c]/95 backdrop-blur-2xl border-r border-white/[0.08] shadow-2xl"
+          class="fixed top-0 left-0 bottom-0 z-[85] w-[300px] max-w-[85vw] flex flex-col shadow-2xl imm-settings-panel"
         >
           <!-- Header -->
           <div class="flex items-center justify-between px-5 pt-5 pb-4 shrink-0">
             <div>
-              <h2 class="text-base font-bold text-white">Settings</h2>
-              <p class="text-[11px] text-white/30 mt-0.5">Immersive mode</p>
+              <h2 class="text-base font-bold" style="color: rgb(var(--app-text) / 0.95)">Settings</h2>
+              <p class="text-[11px] mt-0.5" style="color: rgb(var(--app-text) / 0.30)">Immersive mode</p>
             </div>
             <button
               @click="showImmersiveMenu = false"
-              class="w-8 h-8 flex items-center justify-center rounded-lg text-white/30 hover:text-white hover:bg-white/[0.08] transition-colors"
+              class="imm-close-btn w-8 h-8 flex items-center justify-center rounded-lg transition-colors"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -594,30 +594,30 @@
           <div class="flex-1 overflow-y-auto px-5 pb-5 space-y-5">
             <!-- Style -->
             <div>
-              <p class="text-[10px] font-semibold uppercase tracking-wider text-white/25 mb-2">Style</p>
+              <p class="imm-section-label text-[10px] font-semibold uppercase tracking-wider mb-2">Style</p>
               <div class="relative" ref="styleDropdownRef">
                 <button
                   @click.stop="showStyleDropdown = !showStyleDropdown"
-                  class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-white/[0.06] border border-white/[0.08] hover:border-white/[0.12] transition-colors"
+                  class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl imm-select-btn transition-colors"
                 >
-                  <span class="text-sm text-white/70">{{ currentStyleLabel }}</span>
-                  <svg class="w-4 h-4 text-white/30 transition-transform" :class="showStyleDropdown ? 'rotate-180' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <span class="imm-text text-sm">{{ currentStyleLabel }}</span>
+                  <svg class="imm-icon w-4 h-4 transition-transform" :class="showStyleDropdown ? 'rotate-180' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
                 <Transition name="dropdown">
                   <div
                     v-if="showStyleDropdown"
-                    class="absolute top-full left-0 right-0 mt-1.5 rounded-xl bg-[#16162a]/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl py-1 z-10"
+                    class="absolute top-full left-0 right-0 mt-1.5 rounded-xl shadow-2xl py-1 z-10 imm-dropdown"
                   >
                     <button
                       v-for="style in immersiveStyles"
                       :key="style.id"
                       @click="immersiveStyle = style.id; showStyleDropdown = false"
-                      class="w-full flex items-center justify-between px-3.5 py-2 text-sm transition-colors"
+                      class="w-full flex items-center justify-between px-3.5 py-2 text-sm transition-colors imm-dropdown-item"
                       :class="immersiveStyle === style.id
                         ? 'text-accent bg-accent/[0.08]'
-                        : 'text-white/60 hover:text-white hover:bg-white/[0.06]'"
+                        : 'imm-dropdown-item-inactive'"
                     >
                       <span>{{ style.label }}</span>
                       <svg v-if="immersiveStyle === style.id" class="w-4 h-4 text-accent" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -631,18 +631,18 @@
 
             <!-- Background effects -->
             <div>
-              <p class="text-[10px] font-semibold uppercase tracking-wider text-white/25 mb-2">Background</p>
+              <p class="imm-section-label text-[10px] font-semibold uppercase tracking-wider mb-2">Background</p>
 
               <!-- Vibrant (not shown for modern — it's always vibrant) -->
               <label v-if="immersiveStyle !== 'modern'" class="flex items-center justify-between cursor-pointer">
                 <div>
-                  <span class="text-sm text-white/70">Vibrant background</span>
-                  <p class="text-[11px] text-white/30 mt-0.5">Brighter colors, no noise</p>
+                  <span class="imm-text text-sm">Vibrant background</span>
+                  <p class="imm-hint text-[11px] mt-0.5">Brighter colors, no noise</p>
                 </div>
                 <button
                   @click="vibrantBackground = !vibrantBackground"
                   class="relative w-9 h-5 rounded-full transition-colors duration-200"
-                  :class="vibrantBackground ? 'bg-accent' : 'bg-white/15'"
+                  :class="vibrantBackground ? 'bg-accent' : 'imm-toggle-off'"
                 >
                   <span
                     class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-control shadow transition-transform duration-200"
@@ -658,13 +658,13 @@
                 :class="immersiveStyle !== 'modern' ? 'mt-3' : ''"
               >
                 <div>
-                  <span class="text-sm text-white/70">Animated background</span>
-                  <p class="text-[11px] text-white/30 mt-0.5">Dynamic moving backgrounds</p>
+                  <span class="imm-text text-sm">Animated background</span>
+                  <p class="imm-hint text-[11px] mt-0.5">Dynamic moving backgrounds</p>
                 </div>
                 <button
                   @click="animatedBackground = !animatedBackground"
                   class="relative w-9 h-5 rounded-full transition-colors duration-200"
-                  :class="animatedBackground ? 'bg-accent' : 'bg-white/15'"
+                  :class="animatedBackground ? 'bg-accent' : 'imm-toggle-off'"
                 >
                   <span
                     class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-control shadow transition-transform duration-200"
@@ -681,26 +681,26 @@
                 <div class="relative" ref="animStyleDropdownRef">
                   <button
                     @click.stop="showAnimStyleDropdown = !showAnimStyleDropdown"
-                    class="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] hover:border-white/[0.12] transition-colors"
+                    class="w-full flex items-center justify-between px-3 py-2 rounded-xl imm-select-btn transition-colors"
                   >
-                    <span class="text-sm text-white/70">{{ currentAnimStyleLabel }}</span>
-                    <svg class="w-4 h-4 text-white/30 transition-transform" :class="showAnimStyleDropdown ? 'rotate-180' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <span class="imm-text text-sm">{{ currentAnimStyleLabel }}</span>
+                    <svg class="imm-icon w-4 h-4 transition-transform" :class="showAnimStyleDropdown ? 'rotate-180' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                     </svg>
                   </button>
                   <Transition name="dropdown">
                     <div
                       v-if="showAnimStyleDropdown"
-                      class="absolute top-full left-0 right-0 mt-1.5 rounded-xl bg-[#16162a]/95 backdrop-blur-xl border border-white/[0.08] shadow-2xl py-1 z-10"
+                      class="absolute top-full left-0 right-0 mt-1.5 rounded-xl shadow-2xl py-1 z-10 imm-dropdown"
                     >
                       <button
                         v-for="animOpt in animatedStyles"
                         :key="animOpt.id"
                         @click="animatedStyle = animOpt.id; showAnimStyleDropdown = false"
-                        class="w-full flex items-center justify-between px-3.5 py-2 text-left transition-colors"
+                        class="w-full flex items-center justify-between px-3.5 py-2 text-left transition-colors imm-dropdown-item"
                         :class="animatedStyle === animOpt.id
                           ? 'text-accent bg-accent/[0.08]'
-                          : 'text-white/60 hover:text-white hover:bg-white/[0.06]'"
+                          : 'imm-dropdown-item-inactive'"
                       >
                         <div>
                           <span class="text-sm">{{ animOpt.label }}</span>
@@ -718,16 +718,16 @@
 
             <!-- Playback controls (modern only) -->
             <div v-if="immersiveStyle === 'modern'">
-              <p class="text-[10px] font-semibold uppercase tracking-wider text-white/25 mb-2">Controls</p>
+              <p class="imm-section-label text-[10px] font-semibold uppercase tracking-wider mb-2">Controls</p>
               <label class="flex items-center justify-between cursor-pointer">
                 <div>
-                  <span class="text-sm text-white/70">Hide playback controls</span>
-                  <p class="text-[11px] text-white/30 mt-0.5">Shortcuts still work</p>
+                  <span class="imm-text text-sm">Hide playback controls</span>
+                  <p class="imm-hint text-[11px] mt-0.5">Shortcuts still work</p>
                 </div>
                 <button
                   @click="hideControls = !hideControls"
                   class="relative w-9 h-5 rounded-full transition-colors duration-200"
-                  :class="hideControls ? 'bg-accent' : 'bg-white/15'"
+                  :class="hideControls ? 'bg-accent' : 'imm-toggle-off'"
                 >
                   <span
                     class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-control shadow transition-transform duration-200"
@@ -739,13 +739,13 @@
 
             <!-- Animated Covers -->
             <div>
-              <p class="text-[10px] font-semibold uppercase tracking-wider text-white/25 mb-2">Media</p>
+              <p class="imm-section-label text-[10px] font-semibold uppercase tracking-wider mb-2">Media</p>
               <label class="flex items-center justify-between cursor-pointer">
-                <span class="text-sm text-white/70">Animated covers</span>
+                <span class="imm-text text-sm">Animated covers</span>
                 <button
                   @click="player.setAnimatedCoversEnabled(!player.animatedCoversEnabled)"
                   class="relative w-9 h-5 rounded-full transition-colors duration-200"
-                  :class="player.animatedCoversEnabled ? 'bg-accent' : 'bg-white/15'"
+                  :class="player.animatedCoversEnabled ? 'bg-accent' : 'imm-toggle-off'"
                 >
                   <span
                     class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-control shadow transition-transform duration-200"
@@ -1508,6 +1508,42 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* ── Immersive settings panel — dark glass, themeable ────────── */
+/* Defaults are set in .immersive-scope (main.css) so light       */
+/* themes don't wash the panel out with a bright backdrop blur.   */
+.imm-settings-panel {
+  background: var(--glass-heavy-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-right: 1px solid var(--border);
+  border-top-left-radius: var(--win-radius, 0);
+  border-bottom-left-radius: var(--win-radius, 0);
+  overflow: hidden;
+}
+.imm-dropdown {
+  background: var(--glass-heavy-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.imm-select-btn {
+  background: rgb(var(--app-text) / 0.06);
+  border: 1px solid rgb(var(--app-text) / 0.08);
+}
+.imm-select-btn:hover { border-color: rgb(var(--app-text) / 0.18); }
+
+/* ── Themed text / interactive classes inside the immersive panel ── */
+.imm-section-label { color: rgb(var(--app-text) / 0.25); }
+.imm-text { color: rgb(var(--app-text) / 0.70); }
+.imm-hint { color: rgb(var(--app-text) / 0.30); }
+.imm-icon { color: rgb(var(--app-text) / 0.30); }
+.imm-close-btn { color: rgb(var(--app-text) / 0.30); }
+.imm-close-btn:hover { color: rgb(var(--app-text) / 0.90); background: rgb(var(--app-text) / 0.08); }
+.imm-toggle-off { background: rgb(var(--app-text) / 0.15); }
+.imm-dropdown-item-inactive { color: rgb(var(--app-text) / 0.60); }
+.imm-dropdown-item-inactive:hover { color: rgb(var(--app-text) / 0.90); background: rgb(var(--app-text) / 0.06); }
+
 /* ── Idle/Active fade ─────────────────────────────────────────── */
 .fs-fade {
   transition: opacity 0.5s ease, transform 0.5s ease;

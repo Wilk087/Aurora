@@ -19,7 +19,7 @@
             <div v-if="showSortMenu" class="fixed inset-0 z-[90]" @click="showSortMenu = false" />
             <div
               v-if="showSortMenu"
-              class="fixed z-[100] w-48 rounded-xl bg-[#1a1a2e]/95 backdrop-blur-lg border border-white/10 py-1.5 shadow-2xl"
+              class="fixed z-[100] w-48 rounded-xl menu-panel py-1.5 shadow-2xl"
               :style="sortMenuStyle"
             >
               <button
@@ -125,7 +125,7 @@
         class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60"
         @click.self="showCreateDialog = false"
       >
-        <div class="w-96 rounded-xl bg-[#1a1a2e] border border-white/10 p-6 shadow-2xl">
+        <div class="w-96 rounded-xl menu-panel p-6 shadow-2xl">
           <h2 class="text-lg font-bold mb-4">New Playlist</h2>
           <input
             v-model="newPlaylistName"
@@ -161,7 +161,7 @@
         @click="contextPlaylist = null"
       >
         <div
-          class="fixed z-[101] w-48 rounded-xl bg-[#1a1a2e] border border-white/10 py-1.5 shadow-2xl"
+          class="fixed z-[101] w-48 rounded-xl menu-panel py-1.5 shadow-2xl"
           :style="{ top: contextY + 'px', left: contextX + 'px' }"
           @click.stop
         >
@@ -203,7 +203,7 @@
         class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60"
         @click.self="showRenameDialog = false"
       >
-        <div class="w-96 rounded-xl bg-[#1a1a2e] border border-white/10 p-6 shadow-2xl">
+        <div class="w-96 rounded-xl menu-panel p-6 shadow-2xl">
           <h2 class="text-lg font-bold mb-4">Rename Playlist</h2>
           <input
             v-model="renameValue"

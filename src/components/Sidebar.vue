@@ -143,7 +143,7 @@
       <div v-if="plCtx.show" class="fixed inset-0 z-[90]" @click="plCtx.show = false" @contextmenu.prevent="plCtx.show = false" />
       <div
         v-if="plCtx.show"
-        class="fixed z-[100] w-48 rounded-xl bg-[#1a1a2e]/95 backdrop-blur-lg border border-white/10 py-1.5 shadow-2xl"
+        class="fixed z-[100] w-48 rounded-xl menu-panel py-1.5 shadow-2xl"
         :style="{ top: plCtx.y + 'px', left: plCtx.x + 'px' }"
       >
         <button
