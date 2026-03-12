@@ -247,6 +247,9 @@ interface Window {
     // Logging
     getLogPath: () => Promise<string>
     log: (level: 'info' | 'warn' | 'error' | 'debug', message: string) => void
+    // App lifecycle
+    onBeforeQuit: (callback: () => void) => void
+    quitReady: () => void
     // Remote control
     onRemoteCommand: (callback: (command: string, data?: any) => void) => void
     removeRemoteCommandListener: () => void

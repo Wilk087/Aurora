@@ -222,6 +222,12 @@ contextBridge.exposeInMainWorld('api', {
   log: (level: 'info' | 'warn' | 'error' | 'debug', message: string) =>
     ipcRenderer.send('logger:write', level, message),
 
+  // App lifecycle
+  onBeforeQuit: (callback: () => void) => {
+    ipcRenderer.on('app:before-quit', () => callback())
+  },
+  quitReady: () => ipcRenderer.send('app:quit-ready'),
+
   // Remote control
   onRemoteCommand: (callback: (command: string, data?: any) => void) => {
     ipcRenderer.on('remote:command', (_, command, data) => callback(command, data))

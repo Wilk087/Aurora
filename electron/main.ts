@@ -307,6 +307,7 @@ if (disabledFeatures.length > 0) {
 // ── Globals ────────────────────────────────────────────────────────────────
 let mainWindow: BrowserWindow | null = null
 let isRelaunching = false
+let isQuitting = false // prevents before-quit re-entry after sync completes
 
 const AUDIO_EXTENSIONS = new Set([
   '.mp3', '.flac', '.ogg', '.opus', '.wav', '.m4a', '.aac', '.wma', '.alac',
@@ -2562,6 +2563,23 @@ app.whenReady().then(async () => {
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  })
+})
+
+app.on('before-quit', (e) => {
+  if (isQuitting || isRelaunching) return // already handled, let quit proceed
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  e.preventDefault()
+  mainWindow.webContents.send('app:before-quit')
+  // Give renderer up to 6s to finish syncing, then force-quit regardless
+  const timeout = setTimeout(() => {
+    isQuitting = true
+    app.quit()
+  }, 6000)
+  ipcMain.once('app:quit-ready', () => {
+    clearTimeout(timeout)
+    isQuitting = true
+    app.quit()
   })
 })
 

@@ -146,6 +146,17 @@ onMounted(async () => {
 watch(() => playlistStore.playlists, () => syncStore.schedulePush(), { deep: true })
 watch(() => favoritesStore.ids, () => syncStore.schedulePush(), { deep: true })
 
+// Sync before the app closes
+window.api.onBeforeQuit(async () => {
+  try {
+    if (syncStore.config.enabled && syncStore.config.folder) {
+      await syncStore.push()
+    }
+  } finally {
+    window.api.quitReady()
+  }
+})
+
 // Extract a dominant colour from the current track's cover art
 watch(
   () => player.currentTrack?.coverArt,
