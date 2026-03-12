@@ -1,124 +1,296 @@
 <template>
-  <div class="w-full h-full flex flex-col select-none overflow-hidden">
+  <div
+    class="w-full h-full flex flex-col select-none overflow-hidden"
+  >
 
-    <!-- ── EXPANDED MODE ──────────────────────────────────────────── -->
-    <template v-if="expanded">
+    <!-- ══ COVER MODE ══════════════════════════════════════════════════ -->
+    <template v-if="mode === 'cover'">
 
-      <!-- Cover block: full-width square, controls overlaid -->
-      <div class="relative shrink-0 drag-region" style="width:360px;height:360px">
-        <!-- Animated cover video -->
+      <!-- Drag strip (always-on-top thin bar for window moving) -->
+      <div class="absolute inset-x-0 top-0 h-7 drag-region z-[4]" />
+
+      <!-- Full cover fill -->
+      <div class="absolute inset-0 z-[1]">
         <video
           v-show="animatedActive"
           ref="videoEl"
           class="absolute inset-0 w-full h-full object-cover"
           muted loop playsinline
         />
-        <!-- Static cover -->
         <img
           v-show="!animatedActive"
-          v-if="player.currentTrack?.coverArt"
+          v-if="coverUrl"
           :src="coverUrl"
           class="absolute inset-0 w-full h-full object-cover"
         />
-        <div
-          v-if="!player.currentTrack?.coverArt && !animatedActive"
-          class="absolute inset-0 bg-white/[0.06] flex items-center justify-center"
-        >
+        <div v-if="!coverUrl && !animatedActive" class="absolute inset-0 bg-white/[0.04] flex items-center justify-center">
           <svg class="w-16 h-16 text-white/10" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
           </svg>
         </div>
-
-        <!-- Bottom overlay: gradient + title/artist + controls -->
-        <div class="absolute inset-x-0 bottom-0 pt-16 pb-3 px-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent no-drag">
-          <p class="text-sm font-bold truncate text-white leading-tight drop-shadow">
-            {{ player.currentTrack?.title ?? 'Nothing playing' }}
-          </p>
-          <p class="text-xs text-white/60 truncate leading-tight mt-0.5 drop-shadow mb-2">
-            {{ player.currentTrack?.artist ?? '' }}
-          </p>
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <button @click="player.previous()" class="w-8 h-8 flex items-center justify-center rounded-full text-white/70 hover:text-white transition-colors">
-                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" /></svg>
-              </button>
-              <button @click="player.togglePlay()" class="w-10 h-10 flex items-center justify-center rounded-full bg-white/90 text-black hover:bg-white active:scale-95 transition-all shadow-lg">
-                <svg v-if="player.isPlaying" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
-                <svg v-else class="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-              </button>
-              <button @click="player.next()" class="w-8 h-8 flex items-center justify-center rounded-full text-white/70 hover:text-white transition-colors">
-                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg>
-              </button>
-            </div>
-            <!-- Compact / expand buttons -->
-            <div class="flex items-center gap-1">
-              <button @click="toggleExpanded" class="w-7 h-7 flex items-center justify-center rounded-full bg-black/30 text-white/60 hover:text-white hover:bg-black/50 transition-colors" title="Compact view">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4.5M9 9H4.5M9 9 3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5 5.25 5.25" />
-                </svg>
-              </button>
-              <button @click="exitMini" class="w-7 h-7 flex items-center justify-center rounded-full bg-black/30 text-white/60 hover:text-white hover:bg-black/50 transition-colors" title="Expand to full player">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
 
-      <!-- Lyrics section -->
-      <div class="flex-1 overflow-hidden relative no-drag bg-black/30">
-        <!-- Loading -->
-        <div v-if="lyricsLoading" class="h-full flex items-center justify-center">
-          <div class="w-5 h-5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
-        </div>
+      <!-- Mouse-capture layer (no-drag, detects hover; below overlay) -->
+      <div
+        class="absolute inset-0 z-[2] no-drag"
+        @mousemove="onMouseMove"
+        @mouseleave="onMouseLeave"
+      />
 
-        <!-- No lyrics -->
-        <div v-else-if="lyricsLines.length === 0" class="h-full flex items-center justify-center">
-          <p class="text-white/20 text-xs">No lyrics available</p>
-        </div>
+      <!-- Overlay (fades in on mouse movement / window blur) -->
+      <Transition name="cover-overlay">
+        <div v-if="overlayVisible" class="absolute inset-0 z-[3] flex flex-col no-drag">
 
-        <!-- Lyrics (synced or plain) -->
-        <div
-          v-else
-          ref="lyricsScroll"
-          class="mini-lyrics h-full overflow-y-auto px-5"
-        >
-          <div class="h-[40%]" />
+          <!-- Top bar: mode toggles -->
+          <div class="flex items-center justify-end gap-1 px-2.5 pt-2.5 pb-1"
+               style="background: linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, transparent 100%)">
+            <!-- Cover→lyrics -->
+            <button @click="setMode('lyrics')" class="overlay-btn" title="Lyrics view">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+              </svg>
+            </button>
+            <!-- Cover→compact -->
+            <button @click="setMode('compact')" class="overlay-btn" title="Compact">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4.5M9 9H4.5M9 9 3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5 5.25 5.25" />
+              </svg>
+            </button>
+            <!-- Exit mini -->
+            <button @click="exitMini" class="overlay-btn" title="Full player">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Spacer -->
+          <div class="flex-1" />
+
+          <!-- Bottom: title/artist + controls + progress -->
+          <div style="background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)">
+            <!-- Progress bar -->
+            <div class="mx-3 mb-2.5 relative cursor-pointer h-[3px] rounded-full overflow-hidden" @click="onProgressClick">
+              <div class="absolute inset-0 bg-white/20 rounded-full" />
+              <div class="absolute inset-y-0 left-0 bg-white/80 rounded-full transition-none" :style="{ width: player.progress + '%' }" />
+            </div>
+
+            <!-- Track info -->
+            <div class="px-3 mb-2">
+              <p class="text-[11px] font-bold truncate text-white leading-tight drop-shadow">
+                {{ player.currentTrack?.title ?? 'Nothing playing' }}
+              </p>
+              <p class="text-[10px] text-white/55 truncate leading-tight mt-0.5">
+                {{ player.currentTrack?.artist ?? '' }}
+              </p>
+            </div>
+
+            <!-- Controls row -->
+            <div class="flex items-center justify-between px-3 pb-3">
+              <!-- Left extras: shuffle + favorite -->
+              <div class="flex items-center gap-1.5">
+                <button
+                  @click="player.toggleShuffle()"
+                  class="w-7 h-7 flex items-center justify-center rounded-full transition-colors"
+                  :class="player.isShuffle ? 'text-accent' : 'text-white/40 hover:text-white/70'"
+                >
+                  <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" />
+                  </svg>
+                </button>
+                <button
+                  @click="currentTrackId ? favoritesStore.toggle(currentTrackId) : undefined"
+                  class="w-7 h-7 flex items-center justify-center rounded-full transition-colors"
+                  :class="currentTrackId && favoritesStore.isFavorite(currentTrackId) ? 'text-accent' : 'text-white/40 hover:text-white/70'"
+                >
+                  <svg v-if="currentTrackId && favoritesStore.isFavorite(currentTrackId)" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 17.5 3 20.58 3 23 5.42 23 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                  </svg>
+                  <svg v-else class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55l-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z" />
+                  </svg>
+                </button>
+              </div>
+
+              <!-- Center: prev/play/next -->
+              <div class="flex items-center gap-2">
+                <button @click="player.previous()" class="w-8 h-8 flex items-center justify-center text-white/70 hover:text-white transition-colors">
+                  <svg class="w-4.5 h-4.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" /></svg>
+                </button>
+                <button @click="player.togglePlay()" class="w-11 h-11 flex items-center justify-center rounded-full bg-white text-black hover:bg-white/85 active:scale-95 transition-all shadow-lg shadow-black/40">
+                  <svg v-if="player.isPlaying" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
+                  <svg v-else class="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                </button>
+                <button @click="player.next()" class="w-8 h-8 flex items-center justify-center text-white/70 hover:text-white transition-colors">
+                  <svg class="w-4.5 h-4.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg>
+                </button>
+              </div>
+
+              <!-- Right: repeat -->
+              <div class="flex items-center gap-1.5">
+                <button
+                  @click="player.cycleRepeat()"
+                  class="w-7 h-7 flex items-center justify-center rounded-full transition-colors relative"
+                  :class="player.repeatMode !== 'off' ? 'text-accent' : 'text-white/40 hover:text-white/70'"
+                >
+                  <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" />
+                  </svg>
+                  <span v-if="player.repeatMode === 'one'" class="absolute -top-0.5 -right-0.5 text-[8px] font-bold text-accent leading-none">1</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </Transition>
+
+    </template>
+
+    <!-- ══ LYRICS MODE ═════════════════════════════════════════════════ -->
+    <template v-else-if="mode === 'lyrics'">
+
+      <!-- Ambient blurred background -->
+      <div class="absolute inset-0 overflow-hidden">
+        <video
+          v-show="animatedActive"
+          ref="videoEl"
+          class="absolute inset-0 w-full h-full object-cover scale-125 blur-[48px] opacity-50"
+          muted loop playsinline
+        />
+        <img
+          v-show="!animatedActive"
+          v-if="coverUrl"
+          :src="coverUrl"
+          class="absolute inset-0 w-full h-full object-cover scale-125 blur-[48px] opacity-40"
+        />
+        <div class="absolute inset-0 bg-black/65" />
+      </div>
+
+      <!-- Lyrics area -->
+      <div class="flex-1 relative min-h-0">
+        <!-- Top drag region (always draggable, under gradient) -->
+        <div class="absolute inset-x-0 top-0 h-10 drag-region z-[1]" />
+        <div class="absolute inset-x-0 top-0 h-16 pointer-events-none z-[2]" style="background: linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, transparent 100%)" />
+
+        <div v-if="lyricsLoading" class="absolute inset-0 flex items-center justify-center">
+          <div class="w-5 h-5 border-2 border-white/15 border-t-white/50 rounded-full animate-spin" />
+        </div>
+        <div v-else-if="lyricsLines.length === 0" class="absolute inset-0 flex flex-col items-start justify-center px-6 gap-1 drag-region">
+          <svg class="w-7 h-7 text-white/10 mb-1" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+          </svg>
+          <p class="text-white/20 text-sm font-semibold">No lyrics available</p>
+        </div>
+        <div v-else ref="lyricsScroll" class="mini-lyrics absolute inset-0 overflow-y-auto no-drag z-[3]">
+          <div class="h-[30%]" />
           <div
             v-for="(line, i) in lyricsLines"
             :key="i"
             :ref="(el) => { if (el) lineEls[i] = el as HTMLElement }"
             @click="isSynced ? player.seek(line.time) : undefined"
-            class="mini-lyric-line py-1.5 text-center"
+            class="mini-lyric-line px-5"
             :class="[
               isSynced ? 'cursor-pointer' : '',
               !isSynced ? 'is-plain' :
               i === currentLineIndex ? 'is-active' :
               Math.abs(i - currentLineIndex) === 1 ? 'is-near' :
-              Math.abs(i - currentLineIndex) === 2 ? 'is-far' : 'is-hidden'
+              Math.abs(i - currentLineIndex) === 2 ? 'is-far' :
+              Math.abs(i - currentLineIndex) === 3 ? 'is-distant' : 'is-hidden'
             ]"
-          >
-            <span class="text-base font-extrabold leading-snug">
-              {{ line.text || '···' }}
-            </span>
-          </div>
-          <div class="h-[40%]" />
+          >{{ line.text || '···' }}</div>
+          <div class="h-[55%]" />
         </div>
+        <div class="absolute inset-x-0 bottom-0 h-20 pointer-events-none z-[2]" style="background: linear-gradient(to top, rgba(0,0,0,0.80) 0%, transparent 100%)" />
+      </div>
 
-        <!-- Fade masks -->
-        <div class="absolute inset-x-0 top-0 h-10 pointer-events-none mini-lyrics-mask-top" />
-        <div class="absolute inset-x-0 bottom-0 h-10 pointer-events-none mini-lyrics-mask-bottom" />
+      <!-- Progress bar -->
+      <div class="h-[2px] shrink-0 relative cursor-pointer no-drag z-10" @click="onProgressClick">
+        <div class="absolute inset-0 bg-white/10" />
+        <div class="absolute inset-y-0 left-0 bg-white/60 transition-none" :style="{ width: player.progress + '%' }" />
+      </div>
+
+      <!-- Bottom control strip -->
+      <div class="shrink-0 flex items-center gap-2 px-3 pt-2 pb-3 no-drag z-10" style="background: rgba(0,0,0,0.35); backdrop-filter: blur(20px)">
+        <!-- Cover thumbnail — click to enter cover mode -->
+        <div
+          class="w-10 h-10 rounded-lg overflow-hidden bg-white/10 shrink-0 cursor-pointer transition-transform hover:scale-105"
+          @click="setMode('cover')"
+          title="Cover view"
+        >
+          <img v-if="coverUrl" :src="coverUrl" class="w-full h-full object-cover" />
+          <div v-else class="w-full h-full flex items-center justify-center">
+            <svg class="w-4 h-4 text-white/20" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+            </svg>
+          </div>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-[11px] font-semibold truncate text-white leading-tight">{{ player.currentTrack?.title ?? 'Nothing playing' }}</p>
+          <p class="text-[10px] text-white/45 truncate leading-tight mt-0.5">{{ player.currentTrack?.artist ?? '' }}</p>
+        </div>
+        <!-- Controls -->
+        <div class="flex items-center gap-0.5 shrink-0">
+          <button
+            @click="player.toggleShuffle()"
+            class="w-7 h-7 flex items-center justify-center rounded-full transition-colors"
+            :class="player.isShuffle ? 'text-accent' : 'text-white/40 hover:text-white/70'"
+          >
+            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" />
+            </svg>
+          </button>
+          <button
+            @click="currentTrackId ? favoritesStore.toggle(currentTrackId) : undefined"
+            class="w-7 h-7 flex items-center justify-center rounded-full transition-colors"
+            :class="currentTrackId && favoritesStore.isFavorite(currentTrackId) ? 'text-accent' : 'text-white/40 hover:text-white/70'"
+          >
+            <svg v-if="currentTrackId && favoritesStore.isFavorite(currentTrackId)" class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 17.5 3 20.58 3 23 5.42 23 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+            </svg>
+            <svg v-else class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55l-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z" />
+            </svg>
+          </button>
+          <button @click="player.previous()" class="w-7 h-7 flex items-center justify-center rounded-full text-white/55 hover:text-white transition-colors">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" /></svg>
+          </button>
+          <button @click="player.togglePlay()" class="w-9 h-9 flex items-center justify-center rounded-full bg-white text-black hover:bg-white/85 active:scale-95 transition-all shadow-md">
+            <svg v-if="player.isPlaying" class="w-[18px] h-[18px]" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
+            <svg v-else class="w-[18px] h-[18px] ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+          </button>
+          <button @click="player.next()" class="w-7 h-7 flex items-center justify-center rounded-full text-white/55 hover:text-white transition-colors">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg>
+          </button>
+          <button
+            @click="player.cycleRepeat()"
+            class="w-7 h-7 flex items-center justify-center rounded-full transition-colors relative"
+            :class="player.repeatMode !== 'off' ? 'text-accent' : 'text-white/40 hover:text-white/70'"
+          >
+            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" />
+            </svg>
+            <span v-if="player.repeatMode === 'one'" class="absolute -top-0.5 -right-0.5 text-[7px] font-bold text-accent leading-none">1</span>
+          </button>
+        </div>
+        <button @click="exitMini" class="w-6 h-6 flex items-center justify-center rounded-full text-white/30 hover:text-white/70 transition-colors shrink-0" title="Full player">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+          </svg>
+        </button>
       </div>
 
     </template>
 
-    <!-- ── COMPACT MODE ───────────────────────────────────────────── -->
+    <!-- ══ COMPACT MODE ════════════════════════════════════════════════ -->
     <template v-else>
       <div class="flex-1 flex items-center gap-2 px-2 drag-region min-w-0">
-        <!-- Cover art -->
-        <div class="w-14 h-14 rounded-lg overflow-hidden bg-white/10 shrink-0 no-drag">
+        <!-- Cover thumbnail — click to enter cover mode -->
+        <div
+          class="w-12 h-12 rounded-lg overflow-hidden bg-white/10 shrink-0 no-drag cursor-pointer transition-transform hover:scale-105"
+          @click="setMode('cover')"
+          title="Cover view"
+        >
           <img v-if="player.currentTrack?.coverArt" :src="coverUrl" class="w-full h-full object-cover" />
           <div v-else class="w-full h-full flex items-center justify-center">
             <svg class="w-5 h-5 text-white/20" fill="currentColor" viewBox="0 0 24 24">
@@ -127,7 +299,6 @@
           </div>
         </div>
 
-        <!-- Title + Artist -->
         <div class="flex-1 min-w-0 no-drag">
           <p class="text-xs font-semibold truncate text-white leading-tight">
             {{ player.currentTrack?.title ?? 'Nothing playing' }}
@@ -137,85 +308,171 @@
           </p>
         </div>
 
-        <!-- Controls -->
-        <div class="flex items-center gap-1 shrink-0 no-drag">
-          <button @click="player.previous()" class="w-7 h-7 flex items-center justify-center rounded-full text-white/60 hover:text-white transition-colors">
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" /></svg>
+        <div class="flex items-center gap-0.5 shrink-0 no-drag">
+          <!-- Favorite -->
+          <button
+            @click="currentTrackId ? favoritesStore.toggle(currentTrackId) : undefined"
+            class="w-6 h-6 flex items-center justify-center rounded-full transition-colors"
+            :class="currentTrackId && favoritesStore.isFavorite(currentTrackId) ? 'text-accent' : 'text-white/40 hover:text-white/70'"
+          >
+            <svg v-if="currentTrackId && favoritesStore.isFavorite(currentTrackId)" class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 17.5 3 20.58 3 23 5.42 23 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+            </svg>
+            <svg v-else class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M16.5 3c-1.74 0-3.41.81-4.5 2.09C10.91 3.81 9.24 3 7.5 3 4.42 3 2 5.42 2 8.5c0 3.78 3.4 6.86 8.55 11.54L12 21.35l1.45-1.32C18.6 15.36 22 12.28 22 8.5 22 5.42 19.58 3 16.5 3zm-4.4 15.55l-.1.1-.1-.1C7.14 14.24 4 11.39 4 8.5 4 6.5 5.5 5 7.5 5c1.54 0 3.04.99 3.57 2.36h1.87C13.46 5.99 14.96 5 16.5 5c2 0 3.5 1.5 3.5 3.5 0 2.89-3.14 5.74-7.9 10.05z" />
+            </svg>
           </button>
+          <!-- Shuffle -->
+          <button
+            @click="player.toggleShuffle()"
+            class="w-6 h-6 flex items-center justify-center rounded-full transition-colors"
+            :class="player.isShuffle ? 'text-accent' : 'text-white/40 hover:text-white/70'"
+          >
+            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" />
+            </svg>
+          </button>
+          <!-- Prev -->
+          <button @click="player.previous()" class="w-6 h-6 flex items-center justify-center rounded-full text-white/60 hover:text-white transition-colors">
+            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" /></svg>
+          </button>
+          <!-- Play/Pause -->
           <button @click="player.togglePlay()" class="w-8 h-8 flex items-center justify-center rounded-full bg-control text-control-fg hover:scale-105 active:scale-95 transition-all">
             <svg v-if="player.isPlaying" class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
             <svg v-else class="w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
           </button>
-          <button @click="player.next()" class="w-7 h-7 flex items-center justify-center rounded-full text-white/60 hover:text-white transition-colors">
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg>
+          <!-- Next -->
+          <button @click="player.next()" class="w-6 h-6 flex items-center justify-center rounded-full text-white/60 hover:text-white transition-colors">
+            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" /></svg>
           </button>
-        </div>
-
-        <!-- Toggle expanded / exit mini -->
-        <div class="flex items-center shrink-0 no-drag">
-          <button @click="toggleExpanded" class="w-7 h-7 flex items-center justify-center rounded-full text-white/40 hover:text-white/70 transition-colors" title="Lyrics view">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <!-- Repeat -->
+          <button
+            @click="player.cycleRepeat()"
+            class="w-6 h-6 flex items-center justify-center rounded-full transition-colors relative"
+            :class="player.repeatMode !== 'off' ? 'text-accent' : 'text-white/40 hover:text-white/70'"
+          >
+            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" />
+            </svg>
+            <span v-if="player.repeatMode === 'one'" class="absolute -top-0.5 -right-0.5 text-[7px] font-bold text-accent leading-none">1</span>
+          </button>
+          <!-- Lyrics mode -->
+          <button @click="setMode('lyrics')" class="w-6 h-6 flex items-center justify-center rounded-full text-white/40 hover:text-white/70 transition-colors" title="Lyrics view">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
             </svg>
           </button>
-          <button @click="exitMini" class="w-7 h-7 flex items-center justify-center rounded-full text-white/40 hover:text-white/70 transition-colors" title="Expand">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <!-- Full player -->
+          <button @click="exitMini" class="w-6 h-6 flex items-center justify-center rounded-full text-white/40 hover:text-white/70 transition-colors" title="Expand">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
             </svg>
           </button>
         </div>
       </div>
+
+      <!-- Progress bar -->
+      <div class="h-1 shrink-0 relative cursor-pointer no-drag" @click="onProgressClick">
+        <div class="absolute inset-0 bg-white/10" />
+        <div class="absolute inset-y-0 left-0 bg-accent transition-none" :style="{ width: player.progress + '%' }" />
+      </div>
     </template>
 
-    <!-- Progress bar (always visible) -->
-    <div class="h-1 shrink-0 relative cursor-pointer no-drag" @click="onProgressClick">
-      <div class="absolute inset-0 bg-white/10" />
-      <div class="absolute inset-y-0 left-0 bg-accent transition-none" :style="{ width: player.progress + '%' }" />
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
+import { useFavoritesStore } from '@/stores/favorites'
 import { parseLRC, findCurrentLine, type LyricLine } from '@/utils/lrcParser'
 import Hls from 'hls.js'
 
-const COMPACT_H = 90
-const EXPANDED_H = 660
+type MiniMode = 'compact' | 'cover' | 'lyrics'
+
+const MODE_HEIGHT: Record<MiniMode, number> = {
+  compact: 90,
+  cover: 360,
+  lyrics: 560,
+}
 
 const router = useRouter()
 const player = usePlayerStore()
+const favoritesStore = useFavoritesStore()
 
-const expanded = ref(false)
+const mode = ref<MiniMode>('compact')
 const videoEl = ref<HTMLVideoElement | null>(null)
 const animatedActive = ref(false)
 const lyricsScroll = ref<HTMLElement | null>(null)
 const lineEls = ref<Record<number, HTMLElement>>({})
 
-// ── Lyrics state ────────────────────────────────────────────────────
 const lyricsLines = ref<LyricLine[]>([])
 const isSynced = ref(false)
 const lyricsLoading = ref(false)
 const currentLineIndex = ref(-1)
 
-// ── Cover ────────────────────────────────────────────────────────────
+// ── Cover mode overlay (idle-hide + window blur) ──────────────────────
+const overlayVisible = ref(false)
+let idleTimer: ReturnType<typeof setTimeout> | null = null
+
+function onMouseMove() {
+  if (mode.value !== 'cover') return
+  overlayVisible.value = true
+  if (idleTimer) clearTimeout(idleTimer)
+  idleTimer = setTimeout(() => { overlayVisible.value = false }, 2200)
+}
+
+function onMouseLeave() {
+  if (mode.value !== 'cover') return
+  if (idleTimer) clearTimeout(idleTimer)
+  idleTimer = setTimeout(() => { overlayVisible.value = false }, 400)
+}
+
+// Show controls when window loses focus (so you can see them without hovering)
+function onWindowBlur() {
+  if (mode.value !== 'cover') return
+  overlayVisible.value = true
+  if (idleTimer) { clearTimeout(idleTimer); idleTimer = null }
+}
+
+// When window regains focus, start fade timer
+function onWindowFocus() {
+  if (mode.value !== 'cover') return
+  if (idleTimer) clearTimeout(idleTimer)
+  idleTimer = setTimeout(() => { overlayVisible.value = false }, 2200)
+}
+
+onMounted(() => {
+  window.addEventListener('blur', onWindowBlur)
+  window.addEventListener('focus', onWindowFocus)
+  favoritesStore.load()
+})
+
+// ── Cover URL ────────────────────────────────────────────────────────
 const coverUrl = computed(() =>
   player.currentTrack?.coverArt ? window.api.getMediaUrl(player.currentTrack.coverArt) : '',
 )
 
-// ── Mode toggle ──────────────────────────────────────────────────────
-function toggleExpanded() {
-  expanded.value = !expanded.value
-  window.api.resizeMiniPlayer(expanded.value ? EXPANDED_H : COMPACT_H)
-  if (expanded.value) {
+// ── Favorites helpers ────────────────────────────────────────────────
+const currentTrackId = computed(() => player.currentTrack?.id ?? null)
+
+// ── Mode switching ───────────────────────────────────────────────────
+function setMode(newMode: MiniMode) {
+  const prev = mode.value
+  mode.value = newMode
+  window.api.resizeMiniPlayer(MODE_HEIGHT[newMode])
+
+  if (newMode === 'lyrics') {
     loadLyrics()
-    if (player.animatedCoversEnabled && player.currentTrack) {
-      fetchAnimatedCover(player.currentTrack)
-    }
+    if (player.animatedCoversEnabled && player.currentTrack) fetchAnimatedCover(player.currentTrack)
+  } else if (newMode === 'cover') {
+    overlayVisible.value = false
+    if (player.animatedCoversEnabled && player.currentTrack) fetchAnimatedCover(player.currentTrack)
   } else {
-    destroyHls()
+    // compact
+    if (prev !== 'compact') destroyHls()
+    overlayVisible.value = false
   }
 }
 
@@ -290,11 +547,7 @@ async function loadLyrics() {
     const lrc = await window.api.getLyrics(track.path)
     if (lrc) {
       const parsed = parseLRC(lrc)
-      if (parsed.length > 0) {
-        lyricsLines.value = parsed
-        isSynced.value = true
-        return
-      }
+      if (parsed.length > 0) { lyricsLines.value = parsed; isSynced.value = true; return }
       lyricsLines.value = lrc.split('\n').filter(l => l.trim()).map(t => ({ text: t.trim(), time: 0 }))
       return
     }
@@ -304,12 +557,8 @@ async function loadLyrics() {
     })
     if (onlineLrc) {
       const parsed = parseLRC(onlineLrc)
-      if (parsed.length > 0) {
-        lyricsLines.value = parsed
-        isSynced.value = true
-      } else {
-        lyricsLines.value = onlineLrc.split('\n').filter(l => l.trim()).map(t => ({ text: t.trim(), time: 0 }))
-      }
+      if (parsed.length > 0) { lyricsLines.value = parsed; isSynced.value = true }
+      else { lyricsLines.value = onlineLrc.split('\n').filter(l => l.trim()).map(t => ({ text: t.trim(), time: 0 })) }
     }
   } catch { /* ignore */ } finally {
     lyricsLoading.value = false
@@ -317,7 +566,7 @@ async function loadLyrics() {
 }
 
 watch(() => player.currentTime, (time) => {
-  if (!isSynced.value || lyricsLines.value.length === 0) return
+  if (mode.value !== 'lyrics' || !isSynced.value || lyricsLines.value.length === 0) return
   const idx = findCurrentLine(lyricsLines.value, time + player.lyricsOffset)
   if (idx !== currentLineIndex.value) {
     currentLineIndex.value = idx
@@ -328,64 +577,110 @@ watch(() => player.currentTime, (time) => {
   }
 })
 
-// Reload when track changes while expanded
 watch(() => player.currentTrack?.path, () => {
-  if (!expanded.value) return
-  loadLyrics()
-  destroyHls()
-  if (player.animatedCoversEnabled && player.currentTrack) {
+  if (mode.value === 'lyrics') { loadLyrics(); destroyHls() }
+  else if (mode.value === 'cover') destroyHls()
+  if (mode.value !== 'compact' && player.animatedCoversEnabled && player.currentTrack) {
     fetchAnimatedCover(player.currentTrack)
   }
 })
 
 watch(() => player.animatedCoversEnabled, (enabled) => {
-  if (!expanded.value) return
+  if (mode.value === 'compact') return
   if (!enabled) destroyHls()
   else if (player.currentTrack) fetchAnimatedCover(player.currentTrack)
 })
 
-onUnmounted(() => { destroyHls() })
+onUnmounted(() => {
+  destroyHls()
+  if (idleTimer) clearTimeout(idleTimer)
+  window.removeEventListener('blur', onWindowBlur)
+  window.removeEventListener('focus', onWindowFocus)
+})
 </script>
 
 <style scoped>
-.mini-lyrics::-webkit-scrollbar { display: none; }
+/* ── Overlay transition ── */
+.cover-overlay-enter-active,
+.cover-overlay-leave-active {
+  transition: opacity 0.25s ease;
+}
+.cover-overlay-enter-from,
+.cover-overlay-leave-to {
+  opacity: 0;
+}
+
+/* ── Overlay icon buttons ── */
+.overlay-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  color: rgba(255, 255, 255, 0.65);
+  transition: background 0.15s, color 0.15s;
+}
+.overlay-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: white;
+}
+
+/* ── Lyrics scroll ── */
 .mini-lyrics { scrollbar-width: none; }
+.mini-lyrics::-webkit-scrollbar { display: none; }
 
-.mini-lyrics-mask-top {
-  background: linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, transparent 100%);
-}
-.mini-lyrics-mask-bottom {
-  background: linear-gradient(to top, rgba(0,0,0,0.35) 0%, transparent 100%);
-}
-
+/*
+  Scale-based cascade: all lines share the same font-size so there's no
+  layout reflow when the active line changes. transform: scale() gives
+  the visual size difference without shifting any sibling lines.
+*/
 .mini-lyric-line {
-  transition: opacity 0.35s ease-out, transform 0.35s ease-out, color 0.35s ease-out;
-  will-change: opacity, transform;
-  color: rgba(255, 255, 255, 0.10);
-  transform: scale(0.92);
+  display: block;
+  text-align: left;
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.25;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  transform-origin: left center;
+  transform: scale(0.62);
+  color: rgba(255, 255, 255, 0.04);
+  transition:
+    transform 0.38s cubic-bezier(0.4, 0, 0.2, 1),
+    color     0.38s ease-out;
+  will-change: transform, color;
 }
 .mini-lyric-line.is-active {
-  color: white;
-  transform: scale(1.06);
-  text-shadow: 0 0 30px rgba(139, 92, 246, 0.45), 0 0 60px rgba(139, 92, 246, 0.15);
+  transform: scale(1.52);
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.97);
+  text-shadow: 0 1px 20px rgba(255,255,255,0.10), 0 0 40px rgba(180,130,255,0.18);
 }
 .mini-lyric-line.is-near {
-  color: rgba(255, 255, 255, 0.30);
-  transform: scale(0.97);
+  transform: scale(0.93);
+  color: rgba(255, 255, 255, 0.32);
 }
 .mini-lyric-line.is-far {
-  color: rgba(255, 255, 255, 0.14);
-  transform: scale(0.93);
+  transform: scale(0.80);
+  color: rgba(255, 255, 255, 0.15);
+}
+.mini-lyric-line.is-distant {
+  transform: scale(0.70);
+  color: rgba(255, 255, 255, 0.08);
 }
 .mini-lyric-line.is-hidden {
-  color: rgba(255, 255, 255, 0.06);
-  transform: scale(0.90);
+  transform: scale(0.62);
+  color: rgba(255, 255, 255, 0.03);
 }
 .mini-lyric-line.is-plain {
+  transform: scale(1.0);
+  font-weight: 600;
   color: rgba(255, 255, 255, 0.55);
-  transform: scale(1);
 }
-.mini-lyric-line:hover {
-  color: rgba(255, 255, 255, 0.30);
+.mini-lyric-line:not(.is-active):not(.is-plain):hover {
+  color: rgba(255, 255, 255, 0.22);
 }
 </style>
