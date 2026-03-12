@@ -486,6 +486,15 @@ async function saveSettings(settings: any): Promise<void> {
   scheduleAutoExport()
 }
 
+async function mergeSettingsFile(partial: Record<string, any>): Promise<void> {
+  const current = await loadSettings()
+  for (const [key, value] of Object.entries(partial)) {
+    if (value === null || value === undefined) delete current[key]
+    else current[key] = value
+  }
+  await saveSettings(current)
+}
+
 // ── Auto-export / backup ───────────────────────────────────────────────────
 const defaultExportPath = join(userDataPath, 'backups')
 let autoExportTimer: ReturnType<typeof setTimeout> | null = null
@@ -569,6 +578,7 @@ async function performImport(importPath: string): Promise<{ settings: boolean; f
 const favoritesPath = join(userDataPath, 'favorites.json')
 let favoriteIds: string[] = []
 let favoriteMeta: Record<string, TrackMetaSnapshot> = {}
+let favoritesUpdatedAt = 0
 
 async function loadFavorites(): Promise<{ ids: string[]; meta: Record<string, TrackMetaSnapshot> }> {
   try {
@@ -579,9 +589,10 @@ async function loadFavorites(): Promise<{ ids: string[]; meta: Record<string, Tr
         favoriteIds = raw
         favoriteMeta = {}
       } else {
-        // New format: { ids, meta }
+        // New format: { ids, meta, updatedAt }
         favoriteIds = raw.ids || []
         favoriteMeta = raw.meta || {}
+        favoritesUpdatedAt = raw.updatedAt ?? 0
       }
     }
   } catch { favoriteIds = []; favoriteMeta = {} }
@@ -589,7 +600,8 @@ async function loadFavorites(): Promise<{ ids: string[]; meta: Record<string, Tr
 }
 
 async function saveFavorites(): Promise<void> {
-  await writeFile(favoritesPath, JSON.stringify({ ids: favoriteIds, meta: favoriteMeta }, null, 2))
+  favoritesUpdatedAt = Date.now()
+  await writeFile(favoritesPath, JSON.stringify({ ids: favoriteIds, meta: favoriteMeta, updatedAt: favoritesUpdatedAt }, null, 2))
   scheduleAutoExport()
 }
 
@@ -1351,6 +1363,12 @@ app.whenReady().then(async () => {
   ipcMain.handle('playlists:delete', async (_, id: string) => {
     playlists = playlists.filter(p => p.id !== id)
     await savePlaylists()
+    // Track tombstone for cross-device sync
+    const s = await loadSettings()
+    const cutoff = Date.now() - 30 * 86400000
+    const deletedIds: { id: string; deletedAt: number }[] = (s.syncDeletedIds ?? []).filter((d: any) => d.deletedAt > cutoff)
+    deletedIds.push({ id, deletedAt: Date.now() })
+    await mergeSettingsFile({ syncDeletedIds: deletedIds })
     return playlists
   })
 
@@ -2137,16 +2155,20 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('stats:load', async () => {
     const deviceId = await getOrCreateDeviceId()
-    const statsFile = join(statsDir, `plays-${deviceId}.jsonl`)
     const events: any[] = []
-    if (existsSync(statsFile)) {
-      const raw = await readFile(statsFile, 'utf-8')
-      for (const line of raw.split('\n')) {
-        const trimmed = line.trim()
-        if (!trimmed) continue
-        try { events.push(JSON.parse(trimmed)) } catch { /* skip corrupted lines */ }
+    try {
+      const files = await readdir(statsDir)
+      for (const file of files) {
+        if (!file.startsWith('plays-') || !file.endsWith('.jsonl')) continue
+        const raw = await readFile(join(statsDir, file), 'utf-8')
+        for (const line of raw.split('\n')) {
+          const trimmed = line.trim()
+          if (!trimmed) continue
+          try { events.push(JSON.parse(trimmed)) } catch { /* skip corrupted lines */ }
+        }
       }
-    }
+    } catch { /* stats dir may not exist yet */ }
+    events.sort((a, b) => a.ts - b.ts)
     return { deviceId, events }
   })
 
@@ -2155,6 +2177,142 @@ app.whenReady().then(async () => {
     const statsFile = join(statsDir, `plays-${deviceId}.jsonl`)
     await appendFile(statsFile, JSON.stringify(event) + '\n', 'utf-8')
     return true
+  })
+
+  // ── IPC: Sync ──────────────────────────────────────────────────────────────
+  let syncWatcher: ReturnType<typeof fsWatch> | null = null
+
+  ipcMain.handle('sync:get-config', async () => {
+    const s = await loadSettings()
+    return {
+      enabled: s.syncEnabled ?? false,
+      folder: s.syncFolder ?? '',
+      syncPlaylists: s.syncPlaylists ?? true,
+      syncFavorites: s.syncFavorites ?? true,
+    }
+  })
+
+  ipcMain.handle('sync:set-config', async (_, config: any) => {
+    await mergeSettingsFile({
+      syncEnabled: config.enabled,
+      syncFolder: config.folder,
+      syncPlaylists: config.syncPlaylists,
+      syncFavorites: config.syncFavorites,
+    })
+  })
+
+  ipcMain.handle('sync:push', async (_, data: any) => {
+    try {
+      const s = await loadSettings()
+      const folder = s.syncFolder
+      if (!folder || !existsSync(folder)) return { ok: false, error: 'Sync folder not found' }
+      const syncPath = join(folder, 'aurora-sync.json')
+      await writeFile(syncPath, JSON.stringify(data, null, 2), 'utf-8')
+      return { ok: true }
+    } catch (e: any) {
+      return { ok: false, error: e.message }
+    }
+  })
+
+  ipcMain.handle('sync:pull', async () => {
+    try {
+      const s = await loadSettings()
+      const folder = s.syncFolder
+      if (!folder || !existsSync(folder)) return { data: null, error: 'Sync folder not found' }
+      const syncPath = join(folder, 'aurora-sync.json')
+      if (!existsSync(syncPath)) return { data: null, error: null }
+      const raw = await readFile(syncPath, 'utf-8')
+      return { data: JSON.parse(raw), error: null }
+    } catch (e: any) {
+      return { data: null, error: e.message }
+    }
+  })
+
+  ipcMain.handle('sync:pick-folder', async () => {
+    if (!mainWindow) return null
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Choose Sync Folder',
+      properties: ['openDirectory'],
+    })
+    return result.canceled ? null : result.filePaths[0]
+  })
+
+  ipcMain.handle('sync:watch', async (_, folder: string) => {
+    if (syncWatcher) { syncWatcher.close(); syncWatcher = null }
+    if (!folder || !existsSync(folder)) return
+    try {
+      syncWatcher = fsWatch(folder, (_, filename) => {
+        if (filename === 'aurora-sync.json') {
+          mainWindow?.webContents.send('sync:file-changed')
+        }
+      })
+    } catch { /* folder may not be watchable */ }
+  })
+
+  ipcMain.handle('sync:unwatch', async () => {
+    if (syncWatcher) { syncWatcher.close(); syncWatcher = null }
+  })
+
+  ipcMain.handle('sync:apply-playlists', async (_, newPlaylists: any[]) => {
+    playlists = newPlaylists
+    await savePlaylists()
+  })
+
+  ipcMain.handle('sync:get-state', async () => {
+    const deviceId = await getOrCreateDeviceId()
+    const s = await loadSettings()
+    const cutoff = Date.now() - 30 * 86400000
+    const deletedPlaylistIds = (s.syncDeletedIds ?? []).filter((d: any) => d.deletedAt > cutoff)
+    return { deviceId, favoritesUpdatedAt, deletedPlaylistIds }
+  })
+
+  ipcMain.handle('sync:get-stats-events', async () => {
+    const deviceId = await getOrCreateDeviceId()
+    const statsFile = join(statsDir, `plays-${deviceId}.jsonl`)
+    if (!existsSync(statsFile)) return []
+    const raw = await readFile(statsFile, 'utf-8')
+    return raw.split('\n').filter(Boolean).map(l => { try { return JSON.parse(l) } catch { return null } }).filter(Boolean)
+  })
+
+  ipcMain.handle('sync:push-stats', async (_, deviceId: string, events: any[]) => {
+    try {
+      const s = await loadSettings()
+      const folder = s.syncFolder
+      if (!folder || !existsSync(folder)) return { ok: false, error: 'Sync folder not found' }
+      const statsPath = join(folder, `aurora-stats-${deviceId}.json`)
+      await writeFile(statsPath, JSON.stringify(events), 'utf-8')
+      return { ok: true }
+    } catch (e: any) {
+      return { ok: false, error: e.message }
+    }
+  })
+
+  ipcMain.handle('sync:pull-stats', async (_, ownDeviceId: string) => {
+    try {
+      const s = await loadSettings()
+      const folder = s.syncFolder
+      if (!folder || !existsSync(folder)) return []
+      const files = await readdir(folder)
+      const result: { remoteDeviceId: string; events: any[] }[] = []
+      for (const file of files) {
+        if (!file.startsWith('aurora-stats-') || !file.endsWith('.json')) continue
+        const remoteDeviceId = file.slice('aurora-stats-'.length, -'.json'.length)
+        if (remoteDeviceId === ownDeviceId) continue
+        try {
+          const raw = await readFile(join(folder, file), 'utf-8')
+          result.push({ remoteDeviceId, events: JSON.parse(raw) })
+        } catch { /* skip corrupted */ }
+      }
+      return result
+    } catch {
+      return []
+    }
+  })
+
+  ipcMain.handle('sync:apply-remote-stats', async (_, remoteDeviceId: string, events: any[]) => {
+    await mkdir(statsDir, { recursive: true })
+    const statsFile = join(statsDir, `plays-${remoteDeviceId}.jsonl`)
+    await writeFile(statsFile, events.map((e: any) => JSON.stringify(e)).join('\n') + '\n', 'utf-8')
   })
 
   // ── IPC: Themes ──

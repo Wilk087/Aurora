@@ -857,6 +857,112 @@
       </div>
     </section>
 
+    <!-- ── Sync ──────────────────────────────────────────────────── -->
+    <section v-show="activeTab === 'sync'" class="mb-8">
+      <h2 class="text-lg font-semibold text-white mb-1">Sync Folder</h2>
+      <p class="text-xs text-white/40 mb-4">
+        Point Aurora to any folder managed by Dropbox, Google Drive, Syncthing, or similar.
+        Aurora will read and write <span class="font-mono text-white/60">aurora-sync.json</span> there to keep playlists and favorites in sync across devices — no account required.
+      </p>
+
+      <div class="rounded-xl bg-white/[0.04] border border-white/[0.06] divide-y divide-white/[0.06]">
+        <!-- Enable toggle -->
+        <div class="flex items-center justify-between px-4 py-3">
+          <div>
+            <p class="text-sm text-white/80">Enable Sync</p>
+            <p class="text-xs text-white/30 mt-0.5">Automatically push and pull changes via the sync file</p>
+          </div>
+          <button
+            @click="toggleSync"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="syncConfig.enabled ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
+              :class="syncConfig.enabled ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
+
+        <!-- Folder picker -->
+        <div class="px-4 py-3">
+          <p class="text-sm text-white/70 mb-2">Sync Folder</p>
+          <div class="flex items-center gap-2">
+            <div class="flex-1 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm truncate select-text"
+              :class="syncConfig.folder ? 'text-white/70' : 'text-white/25'">
+              {{ syncConfig.folder || 'No folder selected' }}
+            </div>
+            <button
+              v-if="syncConfig.folder"
+              @click="openSyncFolder()"
+              class="p-2 rounded-lg bg-white/[0.08] hover:bg-white/[0.12] text-white/40 hover:text-white/70 transition-all shrink-0"
+              title="Open folder"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+              </svg>
+            </button>
+            <button
+              @click="chooseSyncFolder"
+              class="px-3 py-2 rounded-lg bg-white/[0.08] hover:bg-white/[0.12] text-sm font-medium text-white/60 hover:text-white/80 transition-all shrink-0"
+            >
+              Browse
+            </button>
+          </div>
+        </div>
+
+        <!-- What to sync -->
+        <div class="px-4 py-3 space-y-2">
+          <p class="text-sm text-white/70 mb-1">What to sync</p>
+          <label class="flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" v-model="syncConfig.syncPlaylists" @change="saveSyncConfig"
+              class="w-4 h-4 rounded accent-accent" />
+            <span class="text-sm text-white/70">Playlists</span>
+          </label>
+          <label class="flex items-center gap-3 cursor-pointer">
+            <input type="checkbox" v-model="syncConfig.syncFavorites" @change="saveSyncConfig"
+              class="w-4 h-4 rounded accent-accent" />
+            <span class="text-sm text-white/70">Favorites</span>
+          </label>
+          <label class="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" v-model="syncConfig.syncStats" @change="saveSyncConfig"
+              class="w-4 h-4 rounded accent-accent mt-0.5" />
+            <div>
+              <span class="text-sm text-white/70">Play History</span>
+              <p class="text-xs text-white/30 mt-0.5">Each device writes its own history file — Stats view shows combined plays from all devices</p>
+            </div>
+          </label>
+        </div>
+
+        <!-- Status + actions -->
+        <div class="px-4 py-3 flex items-center justify-between gap-4">
+          <div class="min-w-0">
+            <p v-if="syncStore.syncError" class="text-xs text-red-400 truncate">{{ syncStore.syncError }}</p>
+            <p v-else-if="syncStore.lastSynced" class="text-xs text-white/30">
+              Last synced {{ formatSyncTime(syncStore.lastSynced) }}
+            </p>
+            <p v-else class="text-xs text-white/25">Not synced yet</p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button
+              @click="syncStore.pull()"
+              :disabled="syncStore.syncing || !syncConfig.enabled || !syncConfig.folder"
+              class="px-4 py-1.5 rounded-lg bg-white/[0.08] hover:bg-white/[0.12] disabled:opacity-30 text-xs font-medium text-white/70 hover:text-white/90 transition-all"
+            >
+              Pull
+            </button>
+            <button
+              @click="syncStore.push()"
+              :disabled="syncStore.syncing || !syncConfig.enabled || !syncConfig.folder"
+              class="px-4 py-1.5 rounded-lg bg-accent/20 hover:bg-accent/30 disabled:opacity-30 text-xs font-medium text-accent border border-accent/20 transition-all"
+            >
+              {{ syncStore.syncing ? 'Syncing…' : 'Push Now' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ── Export / Import ──────────────────────────────────────── -->
     <section v-show="activeTab === 'system'" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">
@@ -1261,6 +1367,7 @@ import { usePlaylistStore } from '@/stores/playlist'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useThemeStore } from '@/stores/theme'
 import { usePluginStore } from '@/stores/plugins'
+import { useSyncStore } from '@/stores/sync'
 import { useToast } from '@/composables/useToast'
 import { getPluginSettingsSchema, notifyPluginSettingChanged } from '@/plugins'
 import type { PluginSettingField } from '@/types/plugin'
@@ -1272,9 +1379,47 @@ const playlistStore = usePlaylistStore()
 const favoritesStore = useFavoritesStore()
 const themeStore = useThemeStore()
 const pluginStore = usePluginStore()
+const syncStore = useSyncStore()
 const toast = useToast()
 
 const appVersion = __APP_VERSION__
+
+// ── Sync ────────────────────────────────────────────────────────────────
+const syncConfig = ref<SyncConfig>({ enabled: false, folder: '', syncPlaylists: true, syncFavorites: true, syncStats: true })
+
+async function loadSyncConfig() {
+  syncConfig.value = await window.api.syncGetConfig()
+  syncStore.config = syncConfig.value
+}
+
+async function saveSyncConfig() {
+  await syncStore.saveConfig({ ...syncConfig.value })
+}
+
+async function toggleSync() {
+  syncConfig.value.enabled = !syncConfig.value.enabled
+  await saveSyncConfig()
+}
+
+async function chooseSyncFolder() {
+  const folder = await syncStore.pickFolder()
+  if (folder) {
+    syncConfig.value.folder = folder
+    await saveSyncConfig()
+  }
+}
+
+function openSyncFolder() {
+  if (syncConfig.value.folder) window.api.openPath(syncConfig.value.folder)
+}
+
+function formatSyncTime(ts: number): string {
+  const diff = Date.now() - ts
+  if (diff < 60000) return 'just now'
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`
+  return new Date(ts).toLocaleDateString()
+}
 
 // ── Tab navigation ─────────────────────────────────────────────────────
 const activeTab = ref('general')
@@ -1283,6 +1428,7 @@ const tabs = [
   { id: 'appearance', label: 'Appearance' },
   { id: 'integrations', label: 'Integrations' },
   { id: 'plugins', label: 'Plugins' },
+  { id: 'sync', label: 'Sync' },
   { id: 'system', label: 'System' },
 ]
 
@@ -1491,6 +1637,8 @@ const rpcFormatOptions = [
 ]
 
 onMounted(async () => {
+  loadSyncConfig()
+
   const settings = await window.api.getSettings()
   discordEnabled.value = settings.discordRPC !== false
   discordFormat.value = settings.discordRPCFormat || 'title-artist'

@@ -54,6 +54,7 @@ import { useFavoritesStore } from '@/stores/favorites'
 import { useThemeStore } from '@/stores/theme'
 import { usePluginStore } from '@/stores/plugins'
 import { useStatsStore } from '@/stores/stats'
+import { useSyncStore } from '@/stores/sync'
 import Titlebar from '@/components/Titlebar.vue'
 import Sidebar from '@/components/Sidebar.vue'
 import PlayerBar from '@/components/PlayerBar.vue'
@@ -70,6 +71,7 @@ const favoritesStore = useFavoritesStore()
 const themeStore = useThemeStore()
 const pluginStore = usePluginStore()
 const statsStore = useStatsStore()
+const syncStore = useSyncStore()
 const { focusSearch } = useSearchFocus()
 
 // Expose stores globally for cross-store lazy access (avoids circular require issues)
@@ -130,11 +132,19 @@ onMounted(async () => {
   await playlistStore.loadPlaylists()
   await favoritesStore.load()
 
+  // Init sync (non-blocking — pull after data loaded)
+  await syncStore.loadConfig()
+  syncStore.pull()
+
   // Restore user theme and load plugins
   await themeStore.restoreTheme()
   themeStore.watchThemesDirectory()
   await pluginStore.init()
 })
+
+// Auto-push to sync folder when playlists or favorites change
+watch(() => playlistStore.playlists, () => syncStore.schedulePush(), { deep: true })
+watch(() => favoritesStore.ids, () => syncStore.schedulePush(), { deep: true })
 
 // Extract a dominant colour from the current track's cover art
 watch(

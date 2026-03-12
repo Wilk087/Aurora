@@ -109,6 +109,14 @@ interface Playlist {
   ruleMatch?: 'all' | 'any'
 }
 
+interface SyncConfig {
+  enabled: boolean
+  folder: string
+  syncPlaylists: boolean
+  syncFavorites: boolean
+  syncStats: boolean
+}
+
 interface FolderEntry {
   name: string
   path: string
@@ -181,6 +189,22 @@ interface Window {
     // Stats
     statsLoad: () => Promise<{ deviceId: string; events: PlayEvent[] }>
     statsAppend: (event: PlayEvent) => Promise<boolean>
+    // Sync
+    syncGetConfig: () => Promise<SyncConfig>
+    syncSetConfig: (config: SyncConfig) => Promise<void>
+    syncPush: (data: any) => Promise<{ ok: boolean; error?: string }>
+    syncPull: () => Promise<{ data: any | null; error: string | null }>
+    syncPickFolder: () => Promise<string | null>
+    syncWatch: (folder: string) => Promise<void>
+    syncUnwatch: () => Promise<void>
+    syncApplyPlaylists: (playlists: Playlist[]) => Promise<void>
+    syncGetState: () => Promise<{ deviceId: string; favoritesUpdatedAt: number; deletedPlaylistIds: { id: string; deletedAt: number }[] }>
+    syncGetStatsEvents: () => Promise<PlayEvent[]>
+    syncPushStats: (deviceId: string, events: PlayEvent[]) => Promise<{ ok: boolean; error?: string }>
+    syncPullStats: (ownDeviceId: string) => Promise<{ remoteDeviceId: string; events: PlayEvent[] }[]>
+    syncApplyRemoteStats: (remoteDeviceId: string, events: PlayEvent[]) => Promise<void>
+    onSyncFileChanged: (callback: () => void) => void
+    removeSyncFileChangedListener: () => void
     // Cache management
     resetCache: (targets: string[]) => Promise<Record<string, boolean>>
     // File explorer

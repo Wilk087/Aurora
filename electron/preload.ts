@@ -98,6 +98,27 @@ contextBridge.exposeInMainWorld('api', {
   statsLoad: () => ipcRenderer.invoke('stats:load'),
   statsAppend: (event: any) => ipcRenderer.invoke('stats:append', event),
 
+  // Sync
+  syncGetConfig: () => ipcRenderer.invoke('sync:get-config'),
+  syncSetConfig: (config: any) => ipcRenderer.invoke('sync:set-config', config),
+  syncPush: (data: any) => ipcRenderer.invoke('sync:push', data),
+  syncPull: () => ipcRenderer.invoke('sync:pull'),
+  syncPickFolder: () => ipcRenderer.invoke('sync:pick-folder'),
+  syncWatch: (folder: string) => ipcRenderer.invoke('sync:watch', folder),
+  syncUnwatch: () => ipcRenderer.invoke('sync:unwatch'),
+  syncApplyPlaylists: (playlists: any[]) => ipcRenderer.invoke('sync:apply-playlists', playlists),
+  syncGetState: () => ipcRenderer.invoke('sync:get-state'),
+  syncGetStatsEvents: () => ipcRenderer.invoke('sync:get-stats-events'),
+  syncPushStats: (deviceId: string, events: any[]) => ipcRenderer.invoke('sync:push-stats', deviceId, events),
+  syncPullStats: (ownDeviceId: string) => ipcRenderer.invoke('sync:pull-stats', ownDeviceId),
+  syncApplyRemoteStats: (remoteDeviceId: string, events: any[]) => ipcRenderer.invoke('sync:apply-remote-stats', remoteDeviceId, events),
+  onSyncFileChanged: (callback: () => void) => {
+    ipcRenderer.on('sync:file-changed', callback)
+  },
+  removeSyncFileChangedListener: () => {
+    ipcRenderer.removeAllListeners('sync:file-changed')
+  },
+
   // Cache management
   resetCache: (targets: string[]): Promise<Record<string, boolean>> => ipcRenderer.invoke('cache:reset', targets),
 
