@@ -140,6 +140,9 @@ interface Window {
     enterFullscreen: () => void
     exitFullscreen: () => void
     setWindowOpacity: (value: number) => void
+    enterMiniPlayer: () => void
+    exitMiniPlayer: () => void
+    resizeMiniPlayer: (height: number) => void
     // Window state events
     onWindowStateChange: (callback: (state: { maximized: boolean; fullscreen: boolean }) => void) => void
     removeWindowStateChangeListener: () => void

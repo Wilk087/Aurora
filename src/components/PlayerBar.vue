@@ -182,6 +182,17 @@
         </svg>
       </button>
 
+      <!-- Mini player toggle -->
+      <button
+        @click="enterMini"
+        class="w-8 h-8 flex items-center justify-center rounded-full text-white/40 hover:text-white/70 transition-colors"
+        title="Mini player"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4.5M9 9H4.5M9 9 3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5 5.25 5.25" />
+        </svg>
+      </button>
+
       <!-- Fullscreen toggle -->
       <button
         @click="$router.push('/fullscreen')"
@@ -283,6 +294,11 @@ const router = useRouter()
 const player = usePlayerStore()
 const library = useLibraryStore()
 const showQueue = ref(false)
+
+function enterMini() {
+  window.api.enterMiniPlayer()
+  router.push('/mini')
+}
 
 const coverUrl = computed(() =>
   player.currentTrack?.coverArt ? window.api.getMediaUrl(player.currentTrack.coverArt) : '',

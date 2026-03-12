@@ -20,6 +20,9 @@ contextBridge.exposeInMainWorld('api', {
   enterFullscreen: () => ipcRenderer.send('window:enter-fullscreen'),
   exitFullscreen: () => ipcRenderer.send('window:exit-fullscreen'),
   setWindowOpacity: (value: number) => ipcRenderer.send('window:set-opacity', value),
+  enterMiniPlayer: () => ipcRenderer.send('window:enter-mini'),
+  exitMiniPlayer: () => ipcRenderer.send('window:exit-mini'),
+  resizeMiniPlayer: (height: number) => ipcRenderer.send('window:resize-mini', height),
 
   // Window state events (OS-level maximize/fullscreen)
   onWindowStateChange: (callback: (state: { maximized: boolean; fullscreen: boolean }) => void) => {

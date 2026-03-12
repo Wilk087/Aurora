@@ -14,15 +14,15 @@
     />
 
     <!-- Titlebar -->
-    <Titlebar v-if="!isFullscreen" />
+    <Titlebar v-if="!isFullscreen && !isMini" />
 
     <!-- Main layout -->
     <div class="flex flex-1 overflow-hidden relative z-10">
-      <Sidebar v-if="!isFullscreen" />
+      <Sidebar v-if="!isFullscreen && !isMini" />
 
       <main class="flex-1 overflow-y-auto overflow-x-hidden">
         <router-view v-slot="{ Component }">
-          <keep-alive :max="5" :exclude="['FullscreenView']">
+          <keep-alive :max="5" :exclude="['FullscreenView', 'MiniPlayerView']">
             <component :is="Component" :key="$route.path" />
           </keep-alive>
         </router-view>
@@ -30,7 +30,7 @@
     </div>
 
     <!-- Bottom player bar -->
-    <PlayerBar v-if="player.currentTrack && !isFullscreen" />
+    <PlayerBar v-if="player.currentTrack && !isFullscreen && !isMini" />
 
     <!-- First-time setup wizard -->
     <SetupWizard v-if="showSetupWizard" @complete="showSetupWizard = false" />
@@ -85,10 +85,15 @@ const isWindowFullscreen = ref(false)
 const showSetupWizard = ref(false)
 
 const isFullscreen = computed(() => route.path === '/fullscreen')
+const isMini = computed(() => route.path === '/mini')
 
 // Determine whether to show rounded corners & glass styling
 const appContainerClasses = computed(() => {
   if (isFullscreen.value) return 'bg-black'
+  if (isMini.value) {
+    const glass = player.transparencyEnabled ? 'glass-heavy' : 'bg-solid'
+    return `${glass} rounded-xl border border-white/[0.06]`
+  }
   const noRounding = isWindowMaximized.value || isWindowFullscreen.value
   const glass = player.transparencyEnabled ? 'glass-heavy' : 'bg-solid'
   const border = 'border border-white/[0.06]'

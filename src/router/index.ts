@@ -75,6 +75,11 @@ const router = createRouter({
       name: 'fullscreen',
       component: () => import('@/views/FullscreenView.vue'),
     },
+    {
+      path: '/mini',
+      name: 'mini',
+      component: () => import('@/views/MiniPlayerView.vue'),
+    },
   ],
 })
 

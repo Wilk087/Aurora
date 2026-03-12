@@ -1523,6 +1523,32 @@ app.whenReady().then(async () => {
     mainWindow.setOpacity(Math.max(0.1, Math.min(1, value)))
   })
 
+  let normalBounds: Electron.Rectangle | null = null
+  ipcMain.on('window:enter-mini', () => {
+    if (!mainWindow) return
+    normalBounds = mainWindow.getBounds()
+    mainWindow.setMinimumSize(360, 90)
+    mainWindow.setResizable(false)
+    mainWindow.setAlwaysOnTop(true)
+    mainWindow.setBounds({ width: 360, height: 90 })
+  })
+  ipcMain.on('window:exit-mini', () => {
+    if (!mainWindow) return
+    mainWindow.setResizable(true)
+    mainWindow.setAlwaysOnTop(false)
+    mainWindow.setMinimumSize(900, 600)
+    if (normalBounds) {
+      mainWindow.setBounds(normalBounds)
+      normalBounds = null
+    }
+  })
+  ipcMain.on('window:resize-mini', (_, height: number) => {
+    if (!mainWindow) return
+    const b = mainWindow.getBounds()
+    mainWindow.setMinimumSize(360, height)
+    mainWindow.setBounds({ x: b.x, y: b.y, width: 360, height })
+  })
+
   // ── IPC: MPRIS updates (renderer → main → D-Bus) ──
   ipcMain.on('mpris:metadata', (_, data) => updateMprisMetadata(data))
   ipcMain.on('mpris:playback-status', (_, status) => updateMprisPlaybackStatus(status))
