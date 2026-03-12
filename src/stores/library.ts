@@ -36,6 +36,7 @@ export const useLibraryStore = defineStore('library', () => {
   const searchQuery = ref('')
   const sortOrder = ref<SortOrder>('title')
   const albumSortOrder = ref<AlbumSortOrder>('name')
+  const searchLyricsEnabled = ref(false)
 
   // ── Computed ─────────────────────────────────────────────────────────────
   const albums = computed<Album[]>(() => {
@@ -177,16 +178,23 @@ export const useLibraryStore = defineStore('library', () => {
 
   // ── Actions ──────────────────────────────────────────────────────────────
   async function loadLibrary() {
-    const [rawTracks, rawFolders] = await Promise.all([
+    const [rawTracks, rawFolders, settings] = await Promise.all([
       window.api.getLibrary(),
       window.api.getFolders(),
+      window.api.getSettings(),
     ])
     localTracks.value = rawTracks.map((t: Track) => markRaw(t))
     folders.value = rawFolders
+    searchLyricsEnabled.value = settings.searchLyricsEnabled === true
     libraryReady.value = true
 
     // Auto-load subsonic library if configured
     autoLoadSubsonic()
+  }
+
+  function setSearchLyricsEnabled(enabled: boolean) {
+    searchLyricsEnabled.value = enabled
+    window.api.mergeSettings({ searchLyricsEnabled: enabled })
   }
 
   async function addFolder() {
@@ -321,6 +329,7 @@ export const useLibraryStore = defineStore('library', () => {
     searchQuery,
     sortOrder,
     albumSortOrder,
+    searchLyricsEnabled,
     albums,
     filteredAlbums,
     artists,
@@ -334,6 +343,7 @@ export const useLibraryStore = defineStore('library', () => {
     getAlbumById,
     setSortOrder,
     setAlbumSortOrder,
+    setSearchLyricsEnabled,
     mergeSubsonicTracks,
     clearSubsonicTracks,
   }

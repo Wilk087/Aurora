@@ -89,6 +89,25 @@
         </div>
       </section>
 
+      <!-- Lyrics -->
+      <section v-if="library.searchLyricsEnabled && topLyricsTracks.length">
+        <h2 class="text-xs font-semibold uppercase tracking-widest text-white/40 mb-3">In Lyrics</h2>
+        <div class="flex flex-col">
+          <SongRow
+            v-for="(track, i) in topLyricsTracks"
+            :key="track.id"
+            :track="track"
+            :index="i"
+            :selected="false"
+            :selectable="false"
+            :selected-tracks="[]"
+            @play="playTrack(track)"
+            @select="() => {}"
+          />
+        </div>
+        <p v-if="lyricsSearching" class="text-xs text-white/30 mt-2 text-center">Searching lyrics…</p>
+      </section>
+
       <!-- Playlists -->
       <section v-if="topPlaylists.length">
         <h2 class="text-xs font-semibold uppercase tracking-widest text-white/40 mb-3">Playlists</h2>
@@ -144,7 +163,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, watch, onMounted, onUnmounted } from 'vue'
+import { computed, reactive, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
@@ -184,6 +203,45 @@ const topSongs = computed(() => library.filteredTracks.slice(0, MAX_SONGS))
 const topAlbums = computed(() => library.filteredAlbums.slice(0, MAX_ALBUMS))
 const topArtists = computed(() => filteredArtists.value.slice(0, MAX_ARTISTS))
 const topPlaylists = computed(() => filteredPlaylists.value.slice(0, MAX_PLAYLISTS))
+
+// Lyrics search — async, debounced, only runs when the setting is enabled
+const lyricsMatchIds = ref<Set<string>>(new Set())
+const lyricsSearching = ref(false)
+let lyricsDebounce: ReturnType<typeof setTimeout> | null = null
+
+watch(
+  () => [library.searchQuery, library.searchLyricsEnabled] as const,
+  ([query, enabled]) => {
+    if (lyricsDebounce) clearTimeout(lyricsDebounce)
+    if (!enabled || !query) {
+      lyricsMatchIds.value = new Set()
+      return
+    }
+    lyricsSearching.value = true
+    lyricsDebounce = setTimeout(async () => {
+      // Only search tracks not already matched by the regular search
+      const alreadyMatched = new Set(library.filteredTracks.map(t => t.id))
+      const candidates = library.tracks
+        .filter(t => !alreadyMatched.has(t.id))
+        .map(t => ({ id: t.id, path: t.path }))
+      try {
+        const ids = await window.api.searchLyrics(query, candidates)
+        lyricsMatchIds.value = new Set(ids)
+      } catch {
+        lyricsMatchIds.value = new Set()
+      } finally {
+        lyricsSearching.value = false
+      }
+    }, 400)
+  },
+  { immediate: true },
+)
+
+const MAX_LYRICS = 5
+const topLyricsTracks = computed(() => {
+  if (!library.searchLyricsEnabled || !lyricsMatchIds.value.size) return []
+  return library.tracks.filter(t => lyricsMatchIds.value.has(t.id)).slice(0, MAX_LYRICS)
+})
 
 // Selection — scoped to the displayed songs
 const selection = useSelection(() => topSongs.value)
@@ -235,7 +293,9 @@ const hasNoResults = computed(() =>
   !topSongs.value.length &&
   !topAlbums.value.length &&
   !topArtists.value.length &&
-  !topPlaylists.value.length,
+  !topPlaylists.value.length &&
+  !topLyricsTracks.value.length &&
+  !lyricsSearching.value,
 )
 
 function playTrack(track: Track) {

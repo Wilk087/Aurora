@@ -109,6 +109,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // Save lyrics
   saveLyrics: (trackPath: string, lrcContent: string) => ipcRenderer.invoke('lyrics:save', trackPath, lrcContent),
+  searchLyrics: (query: string, tracks: { id: string; path: string }[]) => ipcRenderer.invoke('lyrics:search', query, tracks),
 
   // App version & update checking
   getAppVersion: (): Promise<string> => ipcRenderer.invoke('app:get-version'),

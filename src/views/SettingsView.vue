@@ -187,6 +187,27 @@
       </div>
     </section>
 
+    <!-- ── Search ────────────────────────────────────────────────── -->
+    <section v-show="activeTab === 'general'" class="mb-8">
+      <h2 class="text-lg font-semibold text-white mb-4">Search</h2>
+      <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+        <div>
+          <p class="text-sm text-white/80">Search in Lyrics</p>
+          <p class="text-xs text-white/30 mt-0.5">Include downloaded .lrc lyrics files when searching your library</p>
+        </div>
+        <button
+          @click="library.setSearchLyricsEnabled(!library.searchLyricsEnabled)"
+          class="relative w-11 h-6 rounded-full transition-colors duration-200"
+          :class="library.searchLyricsEnabled ? 'bg-accent' : 'bg-white/15'"
+        >
+          <div
+            class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
+            :class="library.searchLyricsEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'"
+          />
+        </button>
+      </div>
+    </section>
+
     <!-- ── Audio Output ───────────────────────────────────────────── -->
     <section v-show="activeTab === 'general'" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Audio Output</h2>

@@ -1820,6 +1820,25 @@ app.whenReady().then(async () => {
     await saveLyricsFile(trackPath, lrcContent)
   })
 
+  ipcMain.handle('lyrics:search', async (_, query: string, tracks: { id: string; path: string }[]) => {
+    if (!query || !tracks.length) return []
+    const q = query.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    const matchingIds: string[] = []
+    for (const track of tracks) {
+      if (track.path.startsWith('subsonic://')) continue
+      try {
+        const lyrics = await findLocalLyrics(track.path)
+        if (lyrics) {
+          const normalized = lyrics.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+          // Strip LRC timestamps so we only search the lyric text itself
+          const clean = normalized.replace(/\[\d+:\d+[\.\:]\d+\]/g, ' ')
+          if (clean.includes(q)) matchingIds.push(track.id)
+        }
+      } catch {}
+    }
+    return matchingIds
+  })
+
   // ── IPC: Export / Import ──
   ipcMain.handle('export:run', async (_, customPath?: string) => {
     const settings = await loadSettings()

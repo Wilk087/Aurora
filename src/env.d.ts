@@ -188,8 +188,9 @@ interface Window {
     subsonicFetchLibrary: () => Promise<Track[]>
     subsonicGetStreamUrl: (songId: string) => Promise<string>
     subsonicGetCoverUrl: (coverArtId: string) => Promise<string>
-    // LRC save
+    // LRC save / search
     saveLyrics: (trackPath: string, lrcContent: string) => Promise<void>
+    searchLyrics: (query: string, tracks: { id: string; path: string }[]) => Promise<string[]>
     // App version & update checking
     getAppVersion: () => Promise<string>
     checkForUpdate: () => Promise<{ currentVersion: string; latestVersion: string; url: string } | null>
