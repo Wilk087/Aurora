@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog, protocol, net, shell, screen } from 'electron'
 import { join, extname, basename, dirname } from 'path'
-import { readdir, readFile, writeFile, mkdir, stat, rm, copyFile, unlink, appendFile } from 'fs/promises'
+import { readdir, readFile, writeFile, rename, mkdir, stat, rm, copyFile, unlink, appendFile } from 'fs/promises'
 import { existsSync, createReadStream, readFileSync, watch as fsWatch } from 'fs'
 import { createHash } from 'crypto'
 import { request as httpsRequest, get as httpsGet } from 'https'
@@ -2189,6 +2189,7 @@ app.whenReady().then(async () => {
       folder: s.syncFolder ?? '',
       syncPlaylists: s.syncPlaylists ?? true,
       syncFavorites: s.syncFavorites ?? true,
+      syncStats: s.syncStats ?? true,
     }
   })
 
@@ -2198,16 +2199,30 @@ app.whenReady().then(async () => {
       syncFolder: config.folder,
       syncPlaylists: config.syncPlaylists,
       syncFavorites: config.syncFavorites,
+      syncStats: config.syncStats,
     })
   })
+
+  // Atomic write: write to .tmp then rename. Falls back to direct write on network FS
+  // (e.g. Tailscale Drive / WebDAV) that doesn't support rename-over-existing.
+  async function atomicWrite(targetPath: string, content: string) {
+    const tmpPath = targetPath + '.tmp'
+    await writeFile(tmpPath, content, 'utf-8')
+    try {
+      await rename(tmpPath, targetPath)
+    } catch {
+      // Network FS fallback: rename failed, write directly then clean up tmp
+      await writeFile(targetPath, content, 'utf-8')
+      await unlink(tmpPath).catch(() => {})
+    }
+  }
 
   ipcMain.handle('sync:push', async (_, data: any) => {
     try {
       const s = await loadSettings()
       const folder = s.syncFolder
       if (!folder || !existsSync(folder)) return { ok: false, error: 'Sync folder not found' }
-      const syncPath = join(folder, 'aurora-sync.json')
-      await writeFile(syncPath, JSON.stringify(data, null, 2), 'utf-8')
+      await atomicWrite(join(folder, 'aurora-sync.json'), JSON.stringify(data, null, 2))
       return { ok: true }
     } catch (e: any) {
       return { ok: false, error: e.message }
@@ -2242,7 +2257,7 @@ app.whenReady().then(async () => {
     if (!folder || !existsSync(folder)) return
     try {
       syncWatcher = fsWatch(folder, (_, filename) => {
-        if (filename === 'aurora-sync.json') {
+        if (filename === 'aurora-sync.json' && !filename.endsWith('.tmp')) {
           mainWindow?.webContents.send('sync:file-changed')
         }
       })
@@ -2279,8 +2294,7 @@ app.whenReady().then(async () => {
       const s = await loadSettings()
       const folder = s.syncFolder
       if (!folder || !existsSync(folder)) return { ok: false, error: 'Sync folder not found' }
-      const statsPath = join(folder, `aurora-stats-${deviceId}.json`)
-      await writeFile(statsPath, JSON.stringify(events), 'utf-8')
+      await atomicWrite(join(folder, `aurora-stats-${deviceId}.json`), JSON.stringify(events))
       return { ok: true }
     } catch (e: any) {
       return { ok: false, error: e.message }
@@ -2295,7 +2309,7 @@ app.whenReady().then(async () => {
       const files = await readdir(folder)
       const result: { remoteDeviceId: string; events: any[] }[] = []
       for (const file of files) {
-        if (!file.startsWith('aurora-stats-') || !file.endsWith('.json')) continue
+        if (!file.startsWith('aurora-stats-') || !file.endsWith('.json') || file.endsWith('.tmp')) continue
         const remoteDeviceId = file.slice('aurora-stats-'.length, -'.json'.length)
         if (remoteDeviceId === ownDeviceId) continue
         try {
