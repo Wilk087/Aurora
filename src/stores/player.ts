@@ -25,6 +25,11 @@ export const usePlayerStore = defineStore('player', () => {
   audio.preload = 'auto'
   audio.crossOrigin = 'anonymous' // Required for Web Audio API with cross-origin sources (e.g. Navidrome streams)
 
+  // Second audio element — used exclusively for crossfade pre-playback
+  const audioNext = new Audio()
+  audioNext.preload = 'auto'
+  audioNext.crossOrigin = 'anonymous'
+
   // ── Subsonic stream preload system ─────────────────────────────────────
   // Two-tier cache:
   //  1. _urlCache   – resolved stream URLs for ALL subsonic tracks in the
@@ -174,6 +179,10 @@ export const usePlayerStore = defineStore('player', () => {
   let gainNode: GainNode | null = null
   let analyserNode: AnalyserNode | null = null
   const frequencyBuf = new Uint8Array(128)
+  // Crossfade gain nodes — inserted in both chain modes
+  let mainFadeGain: GainNode | null = null
+  let nextFadeGain: GainNode | null = null
+  let nextSourceNode: MediaElementAudioSourceNode | null = null
 
   // ── Exclusive mode (process-level flag from main process) ──────────────
   let exclusiveModeActive = false
@@ -192,7 +201,12 @@ export const usePlayerStore = defineStore('player', () => {
   function initAudioChain() {
     if (audioCtx) return
     audioCtx = createAudioContext()
+    mainFadeGain = audioCtx.createGain()
+    mainFadeGain.gain.value = 1
+    nextFadeGain = audioCtx.createGain()
+    nextFadeGain.gain.value = 0
     sourceNode = audioCtx.createMediaElementSource(audio)
+    nextSourceNode = audioCtx.createMediaElementSource(audioNext)
     compressorNode = audioCtx.createDynamicsCompressor()
     // Gentle normalization settings
     compressorNode.threshold.value = -24   // start compressing at -24dB
@@ -205,22 +219,36 @@ export const usePlayerStore = defineStore('player', () => {
     analyserNode = audioCtx.createAnalyser()
     analyserNode.fftSize = 256
     analyserNode.smoothingTimeConstant = 0.8
-    // Chain: source -> compressor -> gain -> analyser -> output
-    sourceNode.connect(compressorNode)
+    // Chain: source -> mainFadeGain -> compressor -> gain -> analyser -> output
+    sourceNode.connect(mainFadeGain)
+    mainFadeGain.connect(compressorNode)
     compressorNode.connect(gainNode)
     gainNode.connect(analyserNode)
     analyserNode.connect(audioCtx.destination)
+    // Crossfade next: nextSource -> nextFadeGain -> compressor (merges before compressor)
+    nextSourceNode.connect(nextFadeGain)
+    nextFadeGain.connect(compressorNode)
   }
 
   function initAudioBypass() {
     if (audioCtx) return
     audioCtx = createAudioContext()
+    mainFadeGain = audioCtx.createGain()
+    mainFadeGain.gain.value = 1
+    nextFadeGain = audioCtx.createGain()
+    nextFadeGain.gain.value = 0
     sourceNode = audioCtx.createMediaElementSource(audio)
+    nextSourceNode = audioCtx.createMediaElementSource(audioNext)
     analyserNode = audioCtx.createAnalyser()
     analyserNode.fftSize = 256
     analyserNode.smoothingTimeConstant = 0.8
-    sourceNode.connect(analyserNode)
+    // source -> mainFadeGain -> analyser -> output
+    sourceNode.connect(mainFadeGain)
+    mainFadeGain.connect(analyserNode)
     analyserNode.connect(audioCtx.destination)
+    // next -> nextFadeGain -> analyser (merges at analyser)
+    nextSourceNode.connect(nextFadeGain)
+    nextFadeGain.connect(analyserNode)
   }
   // ── Reactive state ───────────────────────────────────────────────────────
   const currentTrack = ref<Track | null>(null)
@@ -327,6 +355,13 @@ export const usePlayerStore = defineStore('player', () => {
   // ── Audio normalization ───────────────────────────────────────────────
   const normalization = ref(false)
 
+  // ── Crossfade ────────────────────────────────────────────────────────────
+  const crossfadeEnabled = ref(false)
+  const crossfadeDuration = ref(5) // seconds
+  let isCrossfading = false
+  let cfNextTrack: Track | null = null
+  let cfNextIndex = -1
+
   // ── LRC sync mode (pause at end of track instead of advancing) ────────
   const lrcSyncMode = ref(false)
 
@@ -409,6 +444,13 @@ export const usePlayerStore = defineStore('player', () => {
         getStatsStore()?.recordPlay(currentTrack.value, audio.currentTime)
       }
     }
+    // Crossfade trigger
+    if (crossfadeEnabled.value && !isCrossfading && duration.value > 0 && isPlaying.value) {
+      const timeLeft = duration.value - audio.currentTime
+      if (timeLeft > 0 && timeLeft <= crossfadeDuration.value + 0.2) {
+        startCrossfade()
+      }
+    }
   })
   audio.addEventListener('durationchange', () => {
     duration.value = audio.duration
@@ -466,6 +508,7 @@ export const usePlayerStore = defineStore('player', () => {
 
   watch(volume, (val) => {
     audio.volume = val * val
+    if (isCrossfading) audioNext.volume = val * val
     if (val > 0 && isMuted.value) isMuted.value = false
     // Persist volume
     window.api.mergeSettings({ volume: val })
@@ -473,6 +516,7 @@ export const usePlayerStore = defineStore('player', () => {
 
   watch(isMuted, (val) => {
     audio.muted = val
+    if (isCrossfading) audioNext.muted = val
   })
 
   // ── Restore persisted playback settings ────────────────────────────────────
@@ -503,6 +547,8 @@ export const usePlayerStore = defineStore('player', () => {
       setOutputDevice(s.outputDeviceId).catch(() => {})
     }
     scrobblingEnabled = s.scrobblingEnabled === true
+    if (typeof s.crossfadeEnabled === 'boolean') crossfadeEnabled.value = s.crossfadeEnabled
+    if (s.crossfadeDuration !== undefined) crossfadeDuration.value = s.crossfadeDuration
   })
 
   // ── MediaSession action handlers (MPRIS integration) ─────────────────────
@@ -653,6 +699,7 @@ export const usePlayerStore = defineStore('player', () => {
 
   // ── Internal helpers ─────────────────────────────────────────────────────
   async function loadTrack(track: Track) {
+    cancelCrossfade()
     currentTrack.value = track
     duration.value = track.duration || 0
     isLoading.value = true
@@ -765,6 +812,11 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   function handleTrackEnd() {
+    // If a crossfade is already in progress, finalize it (swap audioNext → audio)
+    if (isCrossfading) {
+      finalizeCrossfade()
+      return
+    }
     // LRC sync mode: pause at end so user can save their work
     if (lrcSyncMode.value) {
       audio.currentTime = 0
@@ -797,6 +849,133 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
+  function cancelCrossfade() {
+    if (!isCrossfading) return
+    isCrossfading = false
+    cfNextTrack = null
+    cfNextIndex = -1
+    audioNext.pause()
+    audioNext.src = ''
+    if (audioCtx && mainFadeGain && nextFadeGain) {
+      const now = audioCtx.currentTime
+      mainFadeGain.gain.cancelScheduledValues(now)
+      nextFadeGain.gain.cancelScheduledValues(now)
+      mainFadeGain.gain.setValueAtTime(1, now)
+      nextFadeGain.gain.setValueAtTime(0, now)
+    }
+  }
+
+  async function startCrossfade() {
+    if (isCrossfading) return
+    let nextIdx = currentIndex.value + 1
+    if (nextIdx >= queue.value.length) {
+      if (repeatMode.value === 'all') nextIdx = 0
+      else return
+    }
+    if (repeatMode.value === 'one') return // repeat-one doesn't crossfade
+    const nextTrack = queue.value[nextIdx]
+    isCrossfading = true
+    cfNextTrack = nextTrack
+    cfNextIndex = nextIdx
+    try {
+      if (nextTrack.source === 'subsonic' && nextTrack.path.startsWith('subsonic://')) {
+        const cachedUrl = _getCachedUrl(nextTrack.id)
+        if (cachedUrl) {
+          audioNext.src = cachedUrl
+        } else {
+          const songId = nextTrack.path.replace('subsonic://', '')
+          const url = await window.api.subsonicGetStreamUrl(songId)
+          _urlCache.set(nextTrack.id, url)
+          audioNext.src = url
+        }
+      } else {
+        audioNext.src = window.api.getMediaUrl(nextTrack.path)
+      }
+      audioNext.volume = audio.volume
+      audioNext.muted = audio.muted
+      audioNext.load()
+      await new Promise<void>(resolve => {
+        audioNext.addEventListener('canplay', () => resolve(), { once: true })
+        audioNext.addEventListener('error', () => { isCrossfading = false; resolve() }, { once: true })
+        setTimeout(resolve, 3000) // timeout fallback
+      })
+      if (!isCrossfading) return
+      await audioNext.play().catch(() => { isCrossfading = false })
+      if (!isCrossfading) return
+      if (audioCtx && mainFadeGain && nextFadeGain) {
+        const now = audioCtx.currentTime
+        const dur = crossfadeDuration.value
+        mainFadeGain.gain.cancelScheduledValues(now)
+        mainFadeGain.gain.setValueAtTime(mainFadeGain.gain.value, now)
+        mainFadeGain.gain.linearRampToValueAtTime(0, now + dur)
+        nextFadeGain.gain.cancelScheduledValues(now)
+        nextFadeGain.gain.setValueAtTime(0, now)
+        nextFadeGain.gain.linearRampToValueAtTime(1, now + dur)
+      }
+    } catch {
+      isCrossfading = false
+      cfNextTrack = null
+      cfNextIndex = -1
+    }
+  }
+
+  async function finalizeCrossfade() {
+    if (!cfNextTrack) return
+    const nextTrack = cfNextTrack
+    const nextIdx = cfNextIndex
+    const savedSrc = audioNext.src
+    const savedPos = audioNext.currentTime
+    // Keep next audible, silence main while we reload it
+    if (audioCtx && mainFadeGain && nextFadeGain) {
+      const now = audioCtx.currentTime
+      mainFadeGain.gain.cancelScheduledValues(now)
+      nextFadeGain.gain.cancelScheduledValues(now)
+      mainFadeGain.gain.setValueAtTime(0, now)
+      nextFadeGain.gain.setValueAtTime(1, now)
+    }
+    // Update reactive state
+    currentIndex.value = nextIdx
+    currentTrack.value = nextTrack
+    duration.value = audioNext.duration || nextTrack.duration || 0
+    scrobbleReported = false
+    statsReported = false
+    if (scrobbleTimer) { clearTimeout(scrobbleTimer); scrobbleTimer = null }
+    // Load next track into main audio element (audioNext covers audio during this gap)
+    audio.src = savedSrc
+    audio.load()
+    await new Promise<void>(resolve => {
+      audio.addEventListener('canplay', () => resolve(), { once: true })
+      audio.addEventListener('error', () => resolve(), { once: true })
+      setTimeout(resolve, 2000)
+    })
+    audio.currentTime = Math.min(savedPos, audio.duration || Infinity)
+    await audio.play().catch(() => {})
+    // Switch gains: bring main back up, silence next
+    if (audioCtx && mainFadeGain && nextFadeGain) {
+      const now = audioCtx.currentTime
+      mainFadeGain.gain.setValueAtTime(1, now)
+      nextFadeGain.gain.setValueAtTime(0, now)
+    }
+    audioNext.pause()
+    audioNext.src = ''
+    isCrossfading = false
+    cfNextTrack = null
+    cfNextIndex = -1
+    // Update remaining metadata / preload
+    pluginBus.emit('trackChange', { ...nextTrack })
+    _preloadAdjacent()
+    if (waveformEnabled.value) {
+      if (nextTrack.source === 'subsonic' && nextTrack.path.startsWith('subsonic://')) {
+        generateSubsonicWaveform(nextTrack.path.replace('subsonic://', ''))
+      } else {
+        generateWaveform(nextTrack.path)
+      }
+    }
+    if (scrobblingEnabled) {
+      window.api.updateNowPlaying({ title: nextTrack.title, artist: nextTrack.artist, album: nextTrack.album, duration: nextTrack.duration }).catch(() => {})
+    }
+  }
+
   // ── Actions ──────────────────────────────────────────────────────────────
   async function play(track?: Track) {
     if (track) {
@@ -812,6 +991,7 @@ export const usePlayerStore = defineStore('player', () => {
 
     try {
       await audio.play()
+      if (isCrossfading) audioNext.play().catch(() => {})
     } catch (err) {
       console.error('Play error:', err)
     }
@@ -819,6 +999,7 @@ export const usePlayerStore = defineStore('player', () => {
 
   function pause() {
     audio.pause()
+    if (isCrossfading) audioNext.pause()
   }
 
   function togglePlay() {
@@ -827,6 +1008,7 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   async function next() {
+    cancelCrossfade()
     if (queue.value.length === 0) return
     let nextIdx = currentIndex.value + 1
     if (nextIdx >= queue.value.length) {
@@ -839,6 +1021,7 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   async function previous() {
+    cancelCrossfade()
     if (audio.currentTime > 3) {
       audio.currentTime = 0
       return
@@ -1111,6 +1294,17 @@ export const usePlayerStore = defineStore('player', () => {
     // We'll show a toast from the UI side prompting a restart
   }
 
+  function setCrossfadeEnabled(enabled: boolean) {
+    crossfadeEnabled.value = enabled
+    window.api.mergeSettings({ crossfadeEnabled: enabled })
+    if (!enabled) cancelCrossfade()
+  }
+
+  function setCrossfadeDuration(seconds: number) {
+    crossfadeDuration.value = Math.max(1, Math.min(12, seconds))
+    window.api.mergeSettings({ crossfadeDuration: crossfadeDuration.value })
+  }
+
   function setScrobblingEnabled(enabled: boolean) {
     scrobblingEnabled = enabled
     window.api.mergeSettings({ scrobblingEnabled: enabled })
@@ -1294,6 +1488,11 @@ export const usePlayerStore = defineStore('player', () => {
     // Audio normalization
     normalization,
     setNormalization,
+    // Crossfade
+    crossfadeEnabled,
+    crossfadeDuration,
+    setCrossfadeEnabled,
+    setCrossfadeDuration,
     // Scrobbling
     setScrobblingEnabled,
     // Playback error

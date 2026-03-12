@@ -324,6 +324,36 @@
           </button>
         </div>
 
+        <!-- Crossfade -->
+        <div class="px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <p class="text-sm text-white/80">Crossfade</p>
+              <p class="text-xs text-white/30 mt-0.5">Smoothly blend between tracks</p>
+            </div>
+            <button
+              @click="player.setCrossfadeEnabled(!player.crossfadeEnabled)"
+              class="relative w-11 h-6 rounded-full transition-colors duration-200"
+              :class="player.crossfadeEnabled ? 'bg-accent' : 'bg-white/15'"
+            >
+              <div
+                class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
+                :class="player.crossfadeEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'"
+              />
+            </button>
+          </div>
+          <div v-if="player.crossfadeEnabled" class="flex items-center gap-3">
+            <span class="text-xs text-white/40 w-4 text-right">1s</span>
+            <input
+              type="range" min="1" max="12" step="0.5"
+              :value="player.crossfadeDuration"
+              @input="player.setCrossfadeDuration(+($event.target as HTMLInputElement).value)"
+              class="flex-1 accent-accent"
+            />
+            <span class="text-xs text-white/60 tabular-nums w-8">{{ player.crossfadeDuration }}s</span>
+          </div>
+        </div>
+
         <!-- Lyrics offset -->
         <div class="px-4 py-3 rounded-xl bg-white/[0.05]">
           <div class="flex items-center justify-between mb-2">
