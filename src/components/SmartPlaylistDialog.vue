@@ -9,7 +9,7 @@
     <Transition name="dialog-slide">
       <div
         v-if="show"
-        class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[90] w-[520px] max-w-[90vw] max-h-[80vh] overflow-y-auto rounded-2xl bg-[#12121f]/95 backdrop-blur-2xl border border-white/[0.08] shadow-2xl"
+        class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[90] w-[540px] max-w-[90vw] max-h-[80vh] overflow-y-auto rounded-2xl bg-[#12121f]/95 backdrop-blur-2xl border border-white/[0.08] shadow-2xl"
       >
         <div class="p-6">
           <h2 class="text-xl font-bold text-white mb-1">
@@ -53,12 +53,23 @@
                 @change="onFieldChange(i)"
                 class="px-2 py-1.5 rounded-lg bg-white/[0.06] border border-white/[0.06] text-sm text-white/70 outline-none"
               >
-                <option value="genre">Genre</option>
-                <option value="year">Year</option>
-                <option value="artist">Artist</option>
-                <option value="album">Album</option>
-                <option value="title">Title</option>
-                <option value="bpm">BPM</option>
+                <optgroup label="Metadata">
+                  <option value="title">Title</option>
+                  <option value="artist">Artist</option>
+                  <option value="album">Album</option>
+                  <option value="genre">Genre</option>
+                  <option value="year">Year</option>
+                  <option value="bpm">BPM</option>
+                </optgroup>
+                <optgroup label="File">
+                  <option value="format">Format</option>
+                  <option value="bitrate">Bitrate (kbps)</option>
+                  <option value="duration">Duration (sec)</option>
+                </optgroup>
+                <optgroup label="Activity">
+                  <option value="playCount">Play Count</option>
+                  <option value="recentlyAdded">Recently Added (days)</option>
+                </optgroup>
               </select>
 
               <!-- Operator -->
@@ -72,9 +83,14 @@
                   <option value="less">less than</option>
                   <option value="between">between</option>
                 </template>
+                <template v-else-if="rule.field === 'recentlyAdded'">
+                  <option value="less">within last</option>
+                  <option value="greater">older than</option>
+                </template>
                 <template v-else>
                   <option value="is">is</option>
                   <option value="contains">contains</option>
+                  <option value="not_contains">does not contain</option>
                   <option value="starts">starts with</option>
                 </template>
               </select>
@@ -82,18 +98,21 @@
               <!-- Value -->
               <input
                 v-model="rule.value"
-                :placeholder="isNumericField(rule.field) ? '0' : 'value'"
+                :placeholder="isNumericField(rule.field) ? '0' : rule.field === 'format' ? 'flac' : 'value'"
                 :type="isNumericField(rule.field) ? 'number' : 'text'"
                 class="flex-1 min-w-0 px-2 py-1.5 rounded-lg bg-white/[0.06] border border-white/[0.06] text-sm text-white/70 placeholder:text-white/20 outline-none focus:border-accent/30"
               />
+
+              <!-- Unit suffix -->
+              <span v-if="rule.field === 'recentlyAdded'" class="text-xs text-white/30 shrink-0">days</span>
 
               <!-- Second value for between -->
               <template v-if="rule.operator === 'between'">
                 <span class="text-xs text-white/30">–</span>
                 <input
                   v-model="rule.value2"
-                  :placeholder="isNumericField(rule.field) ? '0' : 'value'"
-                  :type="isNumericField(rule.field) ? 'number' : 'text'"
+                  placeholder="0"
+                  type="number"
                   class="w-20 px-2 py-1.5 rounded-lg bg-white/[0.06] border border-white/[0.06] text-sm text-white/70 placeholder:text-white/20 outline-none focus:border-accent/30"
                 />
               </template>
@@ -152,6 +171,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { useLibraryStore } from '@/stores/library'
+import { evaluateSmartPlaylist } from '@/utils/smartPlaylistMatcher'
 
 const props = defineProps<{
   show: boolean
@@ -161,6 +181,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   save: [data: { name: string; rules: SmartPlaylistRule[]; ruleMatch: 'all' | 'any' }]
+  update: [data: { id: string; name: string; rules: SmartPlaylistRule[]; ruleMatch: 'all' | 'any' }]
 }>()
 
 const library = useLibraryStore()
@@ -172,13 +193,15 @@ const rules = ref<SmartPlaylistRule[]>([
 ])
 
 function isNumericField(field: string): boolean {
-  return field === 'year' || field === 'bpm'
+  return ['year', 'bpm', 'playCount', 'bitrate', 'duration'].includes(field)
 }
 
 function onFieldChange(i: number) {
   const rule = rules.value[i]
   if (isNumericField(rule.field)) {
     rule.operator = 'equals'
+  } else if (rule.field === 'recentlyAdded') {
+    rule.operator = 'less'
   } else {
     rule.operator = 'is'
   }
@@ -190,41 +213,12 @@ function addRule() {
   rules.value.push({ field: 'genre', operator: 'is', value: '', value2: '' })
 }
 
-// Preview matching tracks count
 const matchCount = computed(() => {
   const validRules = rules.value.filter(r => r.value.toString().trim() !== '')
   if (validRules.length === 0) return -1
-
-  return library.tracks.filter((track: Track) => {
-    const results = validRules.map(rule => matchRule(track, rule))
-    return ruleMatch.value === 'all' ? results.every(Boolean) : results.some(Boolean)
-  }).length
+  return evaluateSmartPlaylist(library.tracks, validRules, ruleMatch.value).length
 })
 
-function matchRule(track: Track, rule: SmartPlaylistRule): boolean {
-  const fieldValue = String((track as unknown as Record<string, unknown>)[rule.field] || '').toLowerCase()
-  const ruleValue = String(rule.value).toLowerCase()
-
-  switch (rule.operator) {
-    case 'is':
-    case 'equals':
-      return fieldValue === ruleValue
-    case 'contains':
-      return fieldValue.includes(ruleValue)
-    case 'starts':
-      return fieldValue.startsWith(ruleValue)
-    case 'greater':
-      return Number(fieldValue) > Number(rule.value)
-    case 'less':
-      return Number(fieldValue) < Number(rule.value)
-    case 'between':
-      return Number(fieldValue) >= Number(rule.value) && Number(fieldValue) <= Number(rule.value2)
-    default:
-      return false
-  }
-}
-
-// Reset when dialog opens/closes
 watch(
   () => props.show,
   (newVal) => {
@@ -244,16 +238,17 @@ watch(
 
 function save() {
   if (!name.value.trim() || rules.value.length === 0) return
-  emit('save', {
-    name: name.value.trim(),
-    rules: rules.value.filter(r => r.value.toString().trim() !== ''),
-    ruleMatch: ruleMatch.value,
-  })
+  const filteredRules = rules.value.filter(r => r.value.toString().trim() !== '')
+  if (props.editing) {
+    emit('update', { id: props.editing.id, name: name.value.trim(), rules: filteredRules, ruleMatch: ruleMatch.value })
+  } else {
+    emit('save', { name: name.value.trim(), rules: filteredRules, ruleMatch: ruleMatch.value })
+  }
 }
 </script>
 
 <style scoped>
-select option {
+select option, select optgroup {
   background: #1a1a2e;
   color: rgba(255, 255, 255, 0.8);
 }

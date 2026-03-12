@@ -1,6 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog, protocol, net, shell, screen } from 'electron'
 import { join, extname, basename, dirname } from 'path'
-import { readdir, readFile, writeFile, mkdir, stat, rm, copyFile, unlink } from 'fs/promises'
+import { readdir, readFile, writeFile, mkdir, stat, rm, copyFile, unlink, appendFile } from 'fs/promises'
 import { existsSync, createReadStream, readFileSync, watch as fsWatch } from 'fs'
 import { createHash } from 'crypto'
 import { request as httpsRequest, get as httpsGet } from 'https'
@@ -1392,6 +1392,93 @@ app.whenReady().then(async () => {
     return pl || null
   })
 
+  ipcMain.handle('playlists:reorder-tracks', async (_, id: string, fromIndex: number, toIndex: number) => {
+    const pl = playlists.find(p => p.id === id)
+    if (pl && !pl.smart) {
+      const [removed] = pl.trackIds.splice(fromIndex, 1)
+      pl.trackIds.splice(toIndex, 0, removed)
+      pl.updatedAt = Date.now()
+      await savePlaylists()
+    }
+    return pl || null
+  })
+
+  ipcMain.handle('playlists:export-m3u', async (_, id: string) => {
+    const pl = playlists.find(p => p.id === id)
+    if (!pl) return { success: false }
+    const result = await dialog.showSaveDialog(mainWindow!, {
+      defaultPath: `${pl.name}.m3u`,
+      filters: [{ name: 'M3U Playlist', extensions: ['m3u', 'm3u8'] }],
+    })
+    if (result.canceled || !result.filePath) return { success: false }
+    const trackMap = new Map(cache.tracks.map((t: any) => [t.id, t]))
+    const lines = ['#EXTM3U']
+    for (const tid of pl.trackIds) {
+      const track = trackMap.get(tid)
+      if (!track || !track.path || track.source === 'subsonic') continue
+      lines.push(`#EXTINF:${Math.round(track.duration || 0)},${track.artist} - ${track.title}`)
+      lines.push(track.path)
+    }
+    await writeFile(result.filePath, lines.join('\n'), 'utf-8')
+    return { success: true, path: result.filePath }
+  })
+
+  ipcMain.handle('playlists:import-m3u', async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      filters: [{ name: 'M3U Playlist', extensions: ['m3u', 'm3u8'] }],
+      properties: ['openFile'],
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    const filePath = result.filePaths[0]
+    const content = await readFile(filePath, 'utf-8')
+    const lines = content.split(/\r?\n/)
+    // Parse EXTINF + path pairs
+    const parsedPaths: string[] = []
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim()
+      if (!line || line.startsWith('#EXTM3U') || line.startsWith('#EXTINFO')) continue
+      if (line.startsWith('#EXTINF')) {
+        const nextLine = lines[i + 1]?.trim()
+        if (nextLine && !nextLine.startsWith('#')) { parsedPaths.push(nextLine); i++ }
+      } else if (!line.startsWith('#')) {
+        parsedPaths.push(line)
+      }
+    }
+    // Match paths against library
+    const m3uDir = dirname(filePath)
+    const pathMap = new Map(cache.tracks.map((t: any) => [t.path.replace(/\\/g, '/'), t]))
+    const matched: any[] = []
+    const unmatched: string[] = []
+    for (const rawPath of parsedPaths) {
+      const normalized = rawPath.replace(/\\/g, '/')
+      const absPath = normalized.startsWith('/') || /^[A-Za-z]:/.test(normalized)
+        ? normalized
+        : join(m3uDir, rawPath).replace(/\\/g, '/')
+      const track = pathMap.get(absPath)
+      if (track) matched.push(track)
+      else unmatched.push(rawPath)
+    }
+    // Create new playlist
+    const name = basename(filePath, extname(filePath))
+    const now = Date.now()
+    const pl: Playlist = {
+      id: generateId(`playlist-${name}-${now}`),
+      name,
+      trackIds: [],
+      createdAt: now,
+      updatedAt: now,
+    }
+    const trackMeta: Record<string, TrackMetaSnapshot> = {}
+    for (const t of matched) {
+      pl.trackIds.push(t.id)
+      trackMeta[t.id] = { title: t.title, artist: t.artist, album: t.album }
+    }
+    pl.trackMeta = trackMeta
+    playlists.push(pl)
+    await savePlaylists()
+    return { playlistId: pl.id, matched: matched.length, unmatched }
+  })
+
   // ── IPC: Window controls ──
   ipcMain.on('window:minimize', () => mainWindow?.minimize())
   ipcMain.on('window:maximize', () => {
@@ -2032,6 +2119,42 @@ app.whenReady().then(async () => {
       await savePlaylists()
     }
     return pl || null
+  })
+
+  // ── IPC: Stats ──
+  const statsDir = join(userDataPath, 'stats')
+  const deviceIdPath = join(statsDir, 'device-id.txt')
+
+  async function getOrCreateDeviceId(): Promise<string> {
+    await mkdir(statsDir, { recursive: true })
+    if (existsSync(deviceIdPath)) {
+      return (await readFile(deviceIdPath, 'utf-8')).trim()
+    }
+    const id = createHash('md5').update(userDataPath + Date.now()).digest('hex').slice(0, 12)
+    await writeFile(deviceIdPath, id, 'utf-8')
+    return id
+  }
+
+  ipcMain.handle('stats:load', async () => {
+    const deviceId = await getOrCreateDeviceId()
+    const statsFile = join(statsDir, `plays-${deviceId}.jsonl`)
+    const events: any[] = []
+    if (existsSync(statsFile)) {
+      const raw = await readFile(statsFile, 'utf-8')
+      for (const line of raw.split('\n')) {
+        const trimmed = line.trim()
+        if (!trimmed) continue
+        try { events.push(JSON.parse(trimmed)) } catch { /* skip corrupted lines */ }
+      }
+    }
+    return { deviceId, events }
+  })
+
+  ipcMain.handle('stats:append', async (_, event: any) => {
+    const deviceId = await getOrCreateDeviceId()
+    const statsFile = join(statsDir, `plays-${deviceId}.jsonl`)
+    await appendFile(statsFile, JSON.stringify(event) + '\n', 'utf-8')
+    return true
   })
 
   // ── IPC: Themes ──

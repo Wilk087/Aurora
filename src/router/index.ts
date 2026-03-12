@@ -1,6 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 
-const PERSIST_ROUTES = ['/', '/albums', '/playlists', '/settings', '/folders', '/favorites']
+const PERSIST_ROUTES = ['/', '/albums', '/playlists', '/settings', '/folders', '/favorites', '/stats']
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -59,6 +59,11 @@ const router = createRouter({
       path: '/settings',
       name: 'settings',
       component: () => import('@/views/SettingsView.vue'),
+    },
+    {
+      path: '/stats',
+      name: 'stats',
+      component: () => import('@/views/StatsView.vue'),
     },
     {
       path: '/search',

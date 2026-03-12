@@ -86,6 +86,18 @@ contextBridge.exposeInMainWorld('api', {
   updateSmartPlaylist: (id: string, rules: any[], ruleMatch: string) =>
     ipcRenderer.invoke('playlists:update-smart', id, rules, ruleMatch),
 
+  // Playlist reorder & M3U
+  reorderPlaylistTracks: (id: string, fromIndex: number, toIndex: number) =>
+    ipcRenderer.invoke('playlists:reorder-tracks', id, fromIndex, toIndex),
+  exportPlaylistM3U: (id: string) =>
+    ipcRenderer.invoke('playlists:export-m3u', id),
+  importPlaylistM3U: () =>
+    ipcRenderer.invoke('playlists:import-m3u'),
+
+  // Stats
+  statsLoad: () => ipcRenderer.invoke('stats:load'),
+  statsAppend: (event: any) => ipcRenderer.invoke('stats:append', event),
+
   // Cache management
   resetCache: (targets: string[]): Promise<Record<string, boolean>> => ipcRenderer.invoke('cache:reset', targets),
 

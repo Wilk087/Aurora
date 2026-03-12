@@ -13,6 +13,12 @@ function getLibStore() {
   return _libStore
 }
 
+let _statsStore: any = null
+function getStatsStore() {
+  if (!_statsStore) _statsStore = (window as any).__auroraStatsStore
+  return _statsStore
+}
+
 export const usePlayerStore = defineStore('player', () => {
   // ── Internal audio element ───────────────────────────────────────────────
   const audio = new Audio()
@@ -360,6 +366,9 @@ export const usePlayerStore = defineStore('player', () => {
   let scrobbleTimer: ReturnType<typeof setTimeout> | null = null
   let scrobbleReported = false
 
+  // ── Stats tracking ───────────────────────────────────────────────────────
+  let statsReported = false
+
   // ── Computed ─────────────────────────────────────────────────────────────
   const progress = computed(() => {
     if (duration.value === 0) return 0
@@ -391,6 +400,13 @@ export const usePlayerStore = defineStore('player', () => {
           duration: duration.value,
           timestamp: Date.now(),
         }).catch(() => {})
+      }
+    }
+    // Record play in stats after 50% listened
+    if (!statsReported && currentTrack.value && duration.value > 10) {
+      if (audio.currentTime >= duration.value * 0.5) {
+        statsReported = true
+        getStatsStore()?.recordPlay(currentTrack.value, audio.currentTime)
       }
     }
   })
@@ -670,8 +686,9 @@ export const usePlayerStore = defineStore('player', () => {
     // Update preload caches (resolve remaining URLs + shift buffer window)
     _preloadAdjacent()
 
-    // Reset scrobble tracking for new track
+    // Reset scrobble + stats tracking for new track
     scrobbleReported = false
+    statsReported = false
     if (scrobbleTimer) { clearTimeout(scrobbleTimer); scrobbleTimer = null }
 
     // Generate waveform if enabled

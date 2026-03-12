@@ -1254,7 +1254,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, reactive } from 'vue'
+import { ref, computed, onMounted, onUnmounted, reactive, watch } from 'vue'
 import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { usePlaylistStore } from '@/stores/playlist'
@@ -1321,6 +1321,12 @@ async function onDeletePluginConfirm() {
 const expandedPluginSettings = ref<string | null>(null)
 /** Loaded setting values per plugin: { pluginId: { key: value } } */
 const pluginSettingValues = reactive<Record<string, Record<string, any>>>({})
+
+watch(() => pluginStore.enabledIds, (enabledIds) => {
+  if (expandedPluginSettings.value && !enabledIds.includes(expandedPluginSettings.value)) {
+    expandedPluginSettings.value = null
+  }
+})
 
 function hasPluginSettings(pluginId: string): boolean {
   const manifest = pluginStore.manifests.find(m => m.id === pluginId)

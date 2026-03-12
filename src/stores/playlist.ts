@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useLibraryStore } from './library'
+import { evaluateSmartPlaylist } from '@/utils/smartPlaylistMatcher'
+import { songKey } from '@/utils/smartPlaylistMatcher'
 
 export type PlaylistSortOrder = 'updated' | 'created' | 'name' | 'tracks'
 
@@ -18,6 +20,23 @@ export const usePlaylistStore = defineStore('playlist', () => {
     const pl = await window.api.createPlaylist(name)
     playlists.value = [...playlists.value, pl]
     return pl
+  }
+
+  async function createSmartPlaylist(name: string, rules: SmartPlaylistRule[], ruleMatch: 'all' | 'any'): Promise<Playlist> {
+    const pl = await window.api.createSmartPlaylist(name, JSON.parse(JSON.stringify(rules)), ruleMatch)
+    playlists.value = [...playlists.value, pl]
+    return pl
+  }
+
+  async function updateSmartPlaylistRules(id: string, rules: SmartPlaylistRule[], ruleMatch: 'all' | 'any') {
+    const updated = await window.api.updateSmartPlaylist(id, JSON.parse(JSON.stringify(rules)), ruleMatch)
+    if (updated) {
+      const idx = playlists.value.findIndex(p => p.id === id)
+      if (idx >= 0) {
+        playlists.value = [...playlists.value.slice(0, idx), updated, ...playlists.value.slice(idx + 1)]
+      }
+    }
+    return updated
   }
 
   async function deletePlaylist(id: string) {
@@ -41,7 +60,6 @@ export const usePlaylistStore = defineStore('playlist', () => {
 
   async function addTracks(playlistId: string, trackIds: string[]) {
     const library = useLibraryStore()
-    // Build metadata snapshot for the tracks being added
     const trackMeta: Record<string, TrackMetaSnapshot> = {}
     const trackMap = new Map(library.tracks.map(t => [t.id, t]))
     for (const tid of trackIds) {
@@ -77,17 +95,45 @@ export const usePlaylistStore = defineStore('playlist', () => {
     }
   }
 
+  async function reorderTracks(playlistId: string, fromIndex: number, toIndex: number) {
+    // Optimistic update
+    const idx = playlists.value.findIndex(p => p.id === playlistId)
+    if (idx >= 0) {
+      const pl = { ...playlists.value[idx], trackIds: [...playlists.value[idx].trackIds] }
+      const [removed] = pl.trackIds.splice(fromIndex, 1)
+      pl.trackIds.splice(toIndex, 0, removed)
+      playlists.value = [...playlists.value.slice(0, idx), pl, ...playlists.value.slice(idx + 1)]
+    }
+    // Persist
+    const updated = await window.api.reorderPlaylistTracks(playlistId, fromIndex, toIndex)
+    if (updated) {
+      const i = playlists.value.findIndex(p => p.id === playlistId)
+      if (i >= 0) {
+        playlists.value = [...playlists.value.slice(0, i), updated, ...playlists.value.slice(i + 1)]
+      }
+    }
+  }
+
   function getPlaylistById(id: string) {
     return playlists.value.find(p => p.id === id) || null
   }
 
-  /** Resolve a playlist's trackIds to full Track objects from library */
+  /** Resolve a playlist's tracks. Smart playlists are evaluated dynamically. */
   function getPlaylistTracks(id: string): Track[] {
     const library = useLibraryStore()
     const pl = getPlaylistById(id)
     if (!pl) return []
+
+    if (pl.smart && pl.rules && pl.rules.length > 0) {
+      const getPlayCount = (key: string): number => {
+        const statsStore = (window as any).__auroraStatsStore
+        return statsStore ? statsStore.playCount(key) : 0
+      }
+      return evaluateSmartPlaylist(library.tracks, pl.rules, pl.ruleMatch || 'all', getPlayCount)
+    }
+
+    // Normal playlist — resolve by ID with metadata snapshot fallback
     const trackMap = new Map(library.tracks.map(t => [t.id, t]))
-    // Build metadata index for fallback lookups (title+artist+album → Track)
     const byMeta = new Map<string, Track>()
     for (const t of library.tracks) {
       const key = `${t.title}\0${t.artist}\0${t.album}`.toLowerCase()
@@ -95,10 +141,8 @@ export const usePlaylistStore = defineStore('playlist', () => {
     }
     return pl.trackIds
       .map(tid => {
-        // 1. Direct ID lookup
         const direct = trackMap.get(tid)
         if (direct) return direct
-        // 2. Metadata fallback: use stored snapshot to find a cross-source match
         const meta = pl.trackMeta?.[tid]
         if (meta) {
           const key = `${meta.title}\0${meta.artist}\0${meta.album}`.toLowerCase()
@@ -117,7 +161,12 @@ export const usePlaylistStore = defineStore('playlist', () => {
       case 'created':
         return list.sort((a, b) => b.createdAt - a.createdAt)
       case 'tracks':
-        return list.sort((a, b) => b.trackIds.length - a.trackIds.length)
+        return list.sort((a, b) => {
+          // For normal playlists use stored count for performance; smart playlists sort last
+          const ca = a.smart ? -1 : a.trackIds.length
+          const cb = b.smart ? -1 : b.trackIds.length
+          return cb - ca
+        })
       case 'updated':
       default:
         return list.sort((a, b) => b.updatedAt - a.updatedAt)
@@ -131,11 +180,15 @@ export const usePlaylistStore = defineStore('playlist', () => {
     playlistSortOrder,
     loadPlaylists,
     createPlaylist,
+    createSmartPlaylist,
+    updateSmartPlaylistRules,
     deletePlaylist,
     renamePlaylist,
     addTracks,
     removeTrack,
+    reorderTracks,
     getPlaylistById,
     getPlaylistTracks,
+    songKey,
   }
 })

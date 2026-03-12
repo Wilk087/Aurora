@@ -35,6 +35,20 @@ interface Track {
   encodedBy?: string
   comment?: string
   bpm?: number
+  // Stats / smart playlist fields
+  mbid?: string
+  addedAt?: number
+  bitrate?: number
+}
+
+interface PlayEvent {
+  ts: number
+  key: string
+  title: string
+  artist: string
+  album: string
+  duration: number
+  playedFor: number
 }
 
 interface TrackCredits {
@@ -71,8 +85,8 @@ interface ArtistInfo {
 }
 
 interface SmartPlaylistRule {
-  field: 'genre' | 'year' | 'artist' | 'album' | 'duration' | 'title' | 'bpm'
-  operator: 'is' | 'contains' | 'gt' | 'lt' | 'between' | 'equals' | 'greater' | 'less' | 'starts'
+  field: 'genre' | 'year' | 'artist' | 'album' | 'duration' | 'title' | 'bpm' | 'playCount' | 'recentlyAdded' | 'format' | 'bitrate'
+  operator: 'is' | 'contains' | 'not_contains' | 'gt' | 'lt' | 'between' | 'equals' | 'greater' | 'less' | 'starts'
   value: string
   value2?: string // for 'between'
 }
@@ -160,6 +174,13 @@ interface Window {
     // Smart playlists
     createSmartPlaylist: (name: string, rules: SmartPlaylistRule[], ruleMatch: 'all' | 'any') => Promise<Playlist>
     updateSmartPlaylist: (id: string, rules: SmartPlaylistRule[], ruleMatch: 'all' | 'any') => Promise<Playlist | null>
+    // Playlist reorder & M3U
+    reorderPlaylistTracks: (id: string, fromIndex: number, toIndex: number) => Promise<Playlist | null>
+    exportPlaylistM3U: (id: string) => Promise<{ success: boolean; path?: string }>
+    importPlaylistM3U: () => Promise<{ playlistId: string; matched: number; unmatched: string[] } | null>
+    // Stats
+    statsLoad: () => Promise<{ deviceId: string; events: PlayEvent[] }>
+    statsAppend: (event: PlayEvent) => Promise<boolean>
     // Cache management
     resetCache: (targets: string[]) => Promise<Record<string, boolean>>
     // File explorer

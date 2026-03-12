@@ -53,6 +53,7 @@ import { usePlaylistStore } from '@/stores/playlist'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useThemeStore } from '@/stores/theme'
 import { usePluginStore } from '@/stores/plugins'
+import { useStatsStore } from '@/stores/stats'
 import Titlebar from '@/components/Titlebar.vue'
 import Sidebar from '@/components/Sidebar.vue'
 import PlayerBar from '@/components/PlayerBar.vue'
@@ -68,11 +69,13 @@ const playlistStore = usePlaylistStore()
 const favoritesStore = useFavoritesStore()
 const themeStore = useThemeStore()
 const pluginStore = usePluginStore()
+const statsStore = useStatsStore()
 const { focusSearch } = useSearchFocus()
 
 // Expose stores globally for cross-store lazy access (avoids circular require issues)
 ;(window as any).__auroraLibStore = library
 ;(window as any).__auroraPlaylistStore = playlistStore
+;(window as any).__auroraStatsStore = statsStore
 
 const dynamicColor = ref<string | null>(null)
 const isWindowMaximized = ref(false)
@@ -103,6 +106,9 @@ onMounted(async () => {
     isWindowMaximized.value = state.maximized
     isWindowFullscreen.value = state.fullscreen
   })
+
+  // Load stats (non-blocking)
+  statsStore.loadStats()
 
   // Load saved settings
   const settings = await window.api.getSettings()

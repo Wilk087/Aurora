@@ -8,14 +8,16 @@
       </div>
 
       <div class="flex-1 min-w-0 pt-2">
-        <p class="text-xs font-semibold uppercase tracking-wider text-white/30 mb-1">Playlist</p>
+        <p class="text-xs font-semibold uppercase tracking-wider mb-1" :class="playlist.smart ? 'text-accent/60' : 'text-white/30'">
+          {{ playlist.smart ? 'Smart Playlist' : 'Playlist' }}
+        </p>
         <h1 class="text-3xl font-bold mb-2 truncate">{{ playlist.name }}</h1>
         <p class="text-sm text-white/40 mb-4">
           {{ tracks.length }} {{ tracks.length === 1 ? 'song' : 'songs' }}
           <span v-if="totalDuration" class="ml-2">&middot; {{ formatDuration(totalDuration) }}</span>
         </p>
 
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-3 flex-wrap">
           <!-- Play all -->
           <button
             v-if="tracks.length > 0"
@@ -39,6 +41,31 @@
             </svg>
             Shuffle
           </button>
+
+          <!-- Edit Rules (smart playlists) -->
+          <button
+            v-if="playlist.smart"
+            @click="showEditRules = true"
+            class="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white/[0.08] hover:bg-white/[0.12] transition-colors text-sm font-medium text-white/70"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+            </svg>
+            Edit Rules
+          </button>
+
+          <!-- Export M3U (normal playlists) -->
+          <button
+            v-if="!playlist.smart && tracks.length > 0"
+            @click="exportM3U"
+            class="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white/[0.08] hover:bg-white/[0.12] transition-colors text-sm font-medium text-white/50"
+            title="Export as M3U"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            Export
+          </button>
         </div>
       </div>
     </div>
@@ -49,10 +76,29 @@
         v-for="(track, i) in tracks"
         :key="track.id + '-' + i"
         class="group flex items-center gap-3 px-4 py-2 rounded-lg cursor-pointer transition-all"
-        :class="isTrackActive(track) ? 'bg-white/[0.1]' : 'hover:bg-white/[0.05]'"
+        :class="[
+          isTrackActive(track) ? 'bg-white/[0.1]' : 'hover:bg-white/[0.05]',
+          dragOverIndex === i ? 'border-t-2 border-accent' : '',
+        ]"
+        :draggable="!playlist.smart"
         @click="playFromIndex(i)"
         @contextmenu.prevent="openTrackMenu(track, $event)"
+        @dragstart="!playlist.smart && onDragStart(i, $event)"
+        @dragover.prevent="!playlist.smart && onDragOver(i)"
+        @drop="!playlist.smart && onDrop(i)"
+        @dragend="onDragEnd"
       >
+        <!-- Drag handle (normal playlists only) -->
+        <div
+          v-if="!playlist.smart"
+          class="w-4 shrink-0 text-white/15 opacity-0 group-hover:opacity-100 cursor-grab transition-opacity"
+          @click.stop
+        >
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M8 6a2 2 0 110-4 2 2 0 010 4zm0 8a2 2 0 110-4 2 2 0 010 4zm0 8a2 2 0 110-4 2 2 0 010 4zm8-16a2 2 0 110-4 2 2 0 010 4zm0 8a2 2 0 110-4 2 2 0 010 4zm0 8a2 2 0 110-4 2 2 0 010 4z" />
+          </svg>
+        </div>
+
         <!-- # / playing indicator -->
         <div class="w-8 text-center shrink-0">
           <div v-if="isTrackActive(track) && player.isPlaying" class="flex items-center justify-center gap-[2px]">
@@ -112,8 +158,9 @@
           <span class="text-xs text-white/30 tabular-nums">{{ formatTime(track.duration) }}</span>
         </div>
 
-        <!-- Remove from playlist -->
+        <!-- Remove from playlist (normal playlists only) -->
         <button
+          v-if="!playlist.smart"
           @click.stop="removeTrack(track.id)"
           class="w-7 h-7 rounded-full text-white/20 hover:text-red-400 hover:bg-white/[0.06] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shrink-0"
           title="Remove from playlist"
@@ -126,9 +173,14 @@
     </div>
 
     <!-- Empty track list -->
-    <div v-else class="flex flex-col items-center justify-center h-40 text-white/30">
-      <p class="text-sm">This playlist is empty</p>
-      <p class="text-xs mt-1">Add songs from your library</p>
+    <div v-else class="flex flex-col items-center justify-center h-48 text-white/30">
+      <svg class="w-12 h-12 mb-3" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z" />
+      </svg>
+      <p class="text-sm font-medium mb-1">This playlist is empty</p>
+      <p class="text-xs text-white/20">
+        {{ playlist.smart ? 'No tracks match the current rules — try editing them' : 'Right-click tracks in your library to add them here' }}
+      </p>
     </div>
 
     <!-- Track context menu -->
@@ -165,14 +217,24 @@
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" /></svg>
             Show in File Explorer
           </button>
-          <div class="border-t border-white/[0.06] my-1" />
-          <button @click="ctxRemoveFromPlaylist" class="w-full px-4 py-2 text-left text-sm text-red-400 hover:text-red-300 hover:bg-white/[0.06] transition-colors flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-            Remove from Playlist
-          </button>
+          <template v-if="!playlist.smart">
+            <div class="border-t border-white/[0.06] my-1" />
+            <button @click="ctxRemoveFromPlaylist" class="w-full px-4 py-2 text-left text-sm text-red-400 hover:text-red-300 hover:bg-white/[0.06] transition-colors flex items-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              Remove from Playlist
+            </button>
+          </template>
         </div>
       </div>
     </Teleport>
+
+    <!-- Edit Rules dialog -->
+    <SmartPlaylistDialog
+      :show="showEditRules"
+      :editing="editingRules"
+      @close="showEditRules = false"
+      @update="onUpdateRules"
+    />
   </div>
 
   <!-- Playlist not found -->
@@ -193,6 +255,7 @@ import { useToast } from '@/composables/useToast'
 import { formatTime } from '@/utils/formatTime'
 import PlaylistCover from '@/components/PlaylistCover.vue'
 import ArtistLinks from '@/components/ArtistLinks.vue'
+import SmartPlaylistDialog from '@/components/SmartPlaylistDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -232,9 +295,7 @@ function isTrackActive(track: Track): boolean {
 }
 
 function playAll() {
-  if (tracks.value.length > 0) {
-    player.playAll(tracks.value, 0)
-  }
+  if (tracks.value.length > 0) player.playAll(tracks.value, 0)
 }
 
 function shufflePlay() {
@@ -251,7 +312,63 @@ async function removeTrack(trackId: string) {
   await playlistStore.removeTrack(playlist.value.id, trackId)
 }
 
-// ── Track context menu ───────────────────────────
+// ── Drag-to-reorder ───────────────────────
+const dragFromIndex = ref<number | null>(null)
+const dragOverIndex = ref<number | null>(null)
+
+function onDragStart(i: number, e: DragEvent) {
+  dragFromIndex.value = i
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
+}
+
+function onDragOver(i: number) {
+  dragOverIndex.value = i
+}
+
+function onDrop(i: number) {
+  if (dragFromIndex.value !== null && dragFromIndex.value !== i && playlist.value) {
+    playlistStore.reorderTracks(playlist.value.id, dragFromIndex.value, i)
+  }
+  dragFromIndex.value = null
+  dragOverIndex.value = null
+}
+
+function onDragEnd() {
+  dragFromIndex.value = null
+  dragOverIndex.value = null
+}
+
+// ── M3U export ───────────────────────────
+async function exportM3U() {
+  if (!playlist.value) return
+  const result = await window.api.exportPlaylistM3U(playlist.value.id)
+  if (result.success && result.path) {
+    toast.success(`Exported to ${result.path.split('/').pop()}`)
+  }
+}
+
+// ── Edit Rules (smart playlists) ─────────
+const showEditRules = ref(false)
+const editingRules = computed(() => {
+  if (!playlist.value?.smart) return null
+  return {
+    id: playlist.value.id,
+    name: playlist.value.name,
+    rules: playlist.value.rules || [],
+    ruleMatch: playlist.value.ruleMatch || 'all' as 'all' | 'any',
+  }
+})
+
+async function onUpdateRules(data: { id: string; name: string; rules: SmartPlaylistRule[]; ruleMatch: 'all' | 'any' }) {
+  await playlistStore.updateSmartPlaylistRules(data.id, data.rules, data.ruleMatch)
+  const current = playlistStore.getPlaylistById(data.id)
+  if (current && data.name !== current.name) {
+    await playlistStore.renamePlaylist(data.id, data.name)
+  }
+  showEditRules.value = false
+}
+
+// ── Track context menu ───────────────────
 const ctxTrack = ref<Track | null>(null)
 const ctxX = ref(0)
 const ctxY = ref(0)
@@ -286,11 +403,6 @@ function ctxGoToAlbum() {
   )
   ctxTrack.value = null
   if (album) router.push(`/album/${album.id}`)
-}
-
-function goToTrackArtist(track: Track) {
-  const artist = track.albumArtist || track.artist
-  router.push(`/artist/${encodeURIComponent(artist)}`)
 }
 
 function goToTrackAlbum(track: Track) {
