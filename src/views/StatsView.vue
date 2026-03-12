@@ -77,7 +77,10 @@
               </div>
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium truncate">{{ track.title }}</p>
-                <p class="text-xs text-white/40 truncate">{{ track.artist }}</p>
+                <p
+                  class="text-xs text-white/40 truncate hover:text-accent/80 transition-colors cursor-pointer w-fit"
+                  @click.stop="$router.push(`/artist/${encodeURIComponent(track.artist)}`)"
+                >{{ track.artist }}</p>
               </div>
               <span class="text-xs px-2 py-0.5 rounded-full bg-accent/10 text-accent/80 shrink-0 tabular-nums">
                 {{ track.count }}×
@@ -137,7 +140,10 @@
               </div>
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium truncate">{{ album.album }}</p>
-                <p class="text-xs text-white/40 truncate">{{ album.artist }}</p>
+                <p
+                  class="text-xs text-white/40 truncate hover:text-accent/80 transition-colors cursor-pointer w-fit"
+                  @click.stop="$router.push(`/artist/${encodeURIComponent(album.artist)}`)"
+                >{{ album.artist }}</p>
               </div>
               <span class="text-xs px-2 py-0.5 rounded-full bg-accent/10 text-accent/80 shrink-0 tabular-nums">
                 {{ album.count }}×
