@@ -1354,9 +1354,9 @@
   <Teleport to="body">
     <Transition name="fade">
       <div v-if="showRestartDialog" class="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-        <div class="bg-[#1a1a1a] border border-white/[0.08] rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
-          <h3 class="text-lg font-semibold text-white mb-2">{{ restartDialogTitle }}</h3>
-          <p class="text-sm text-white/50 mb-6">{{ restartDialogMessage }}</p>
+        <div class="glass-heavy border border-[var(--border)] rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+          <h3 class="text-lg font-semibold text-[var(--text-primary)] mb-2">{{ restartDialogTitle }}</h3>
+          <p class="text-sm text-[var(--text-secondary)] mb-6">{{ restartDialogMessage }}</p>
           <div class="flex items-center justify-end gap-3">
             <button
               @click="dismissRestart"

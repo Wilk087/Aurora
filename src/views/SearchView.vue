@@ -304,10 +304,13 @@ function playTrack(track: Track) {
 }
 
 function getPlaylistCovers(pl: Playlist): string[] {
+  if (pl.customImage) {
+    return [window.api.getMediaUrl(pl.customImage)]
+  }
   const covers: string[] = []
-  for (const id of pl.trackIds) {
-    const track = library.tracks.find(t => t.id === id)
-    if (track?.coverArt) {
+  const tracks = playlistStore.getPlaylistTracks(pl.id)
+  for (const track of tracks) {
+    if (track.coverArt) {
       const url = window.api.getMediaUrl(track.coverArt)
       if (!covers.includes(url)) covers.push(url)
     }

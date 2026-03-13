@@ -32,6 +32,10 @@ const props = defineProps<{ playlistId: string }>()
 const playlistStore = usePlaylistStore()
 
 const covers = computed(() => {
+  const pl = playlistStore.getPlaylistById(props.playlistId)
+  if (pl?.customImage) {
+    return [window.api.getMediaUrl(pl.customImage)]
+  }
   const tracks = playlistStore.getPlaylistTracks(props.playlistId)
   // Collect unique cover art paths
   const seen = new Set<string>()

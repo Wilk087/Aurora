@@ -95,6 +95,17 @@ export const usePlaylistStore = defineStore('playlist', () => {
     }
   }
 
+  async function setCustomImage(playlistId: string, imagePath: string | null) {
+    const updated = await window.api.setPlaylistCustomImage(playlistId, imagePath)
+    if (updated) {
+      const idx = playlists.value.findIndex(p => p.id === playlistId)
+      if (idx >= 0) {
+        playlists.value = [...playlists.value.slice(0, idx), updated, ...playlists.value.slice(idx + 1)]
+      }
+    }
+    return updated
+  }
+
   async function reorderTracks(playlistId: string, fromIndex: number, toIndex: number) {
     // Optimistic update
     const idx = playlists.value.findIndex(p => p.id === playlistId)
@@ -189,6 +200,7 @@ export const usePlaylistStore = defineStore('playlist', () => {
     reorderTracks,
     getPlaylistById,
     getPlaylistTracks,
+    setCustomImage,
     songKey,
   }
 })

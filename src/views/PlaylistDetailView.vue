@@ -3,8 +3,29 @@
     <!-- Header -->
     <div class="flex items-start gap-6 mb-8">
       <!-- Cover -->
-      <div class="w-48 h-48 rounded-xl overflow-hidden shadow-2xl shrink-0">
+      <div
+        class="w-48 h-48 rounded-xl overflow-hidden shadow-2xl shrink-0 relative group cursor-pointer"
+        @click="pickCustomImage"
+        title="Click to set custom cover image"
+      >
         <PlaylistCover :playlist-id="playlist.id" />
+        <!-- Hover overlay -->
+        <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+          <svg class="w-8 h-8 text-white/80" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+          </svg>
+        </div>
+        <!-- Remove custom image button -->
+        <button
+          v-if="playlist.customImage"
+          @click.stop="clearCustomImage"
+          class="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/70 text-white/80 hover:text-white hover:bg-black/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          title="Remove custom cover"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
 
       <div class="flex-1 min-w-0 pt-2">
@@ -429,5 +450,18 @@ async function ctxToggleFavorite() {
   await favoritesStore.toggle(ctxTrack.value.id)
   toast.success(favoritesStore.isFavorite(ctxTrack.value.id) ? 'Added to Favorites' : 'Removed from Favorites')
   ctxTrack.value = null
+}
+
+// ── Custom cover image ────────────────────
+async function pickCustomImage() {
+  if (!playlist.value) return
+  const imagePath = await window.api.openImageDialog()
+  if (!imagePath) return
+  await playlistStore.setCustomImage(playlist.value.id, imagePath)
+}
+
+async function clearCustomImage() {
+  if (!playlist.value) return
+  await playlistStore.setCustomImage(playlist.value.id, null)
 }
 </script>

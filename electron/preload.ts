@@ -288,4 +288,8 @@ contextBridge.exposeInMainWorld('api', {
   pluginsOpenFolder: (): Promise<void> => ipcRenderer.invoke('plugins:open-folder'),
   pluginsIpcInvoke: (channel: string, ...args: any[]): Promise<any> => ipcRenderer.invoke(channel, ...args),
   pluginsIpcSend: (channel: string, ...args: any[]) => ipcRenderer.send(channel, ...args),
+
+  // Playlist custom image
+  openImageDialog: (): Promise<string | null> => ipcRenderer.invoke('dialog:open-image'),
+  setPlaylistCustomImage: (id: string, imagePath: string | null): Promise<any> => ipcRenderer.invoke('playlists:set-custom-image', id, imagePath),
 })

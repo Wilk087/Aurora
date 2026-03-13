@@ -623,6 +623,7 @@ interface Playlist {
   smart?: boolean
   rules?: any[]
   ruleMatch?: 'all' | 'any'
+  customImage?: string
 }
 
 let playlists: Playlist[] = []
@@ -1129,6 +1130,17 @@ app.whenReady().then(async () => {
     return result.filePaths[0]
   })
 
+  ipcMain.handle('dialog:open-image', async () => {
+    if (!mainWindow) return null
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openFile'],
+      title: 'Select Cover Image',
+      filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif'] }],
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths[0]
+  })
+
   // ── IPC: Library ──
   ipcMain.handle('library:scan-folder', async (_, folderPath: string) => {
     const audioFiles = await scanDirectory(folderPath)
@@ -1377,6 +1389,20 @@ app.whenReady().then(async () => {
     const pl = playlists.find(p => p.id === id)
     if (pl) {
       pl.name = name
+      pl.updatedAt = Date.now()
+      await savePlaylists()
+    }
+    return pl || null
+  })
+
+  ipcMain.handle('playlists:set-custom-image', async (_, id: string, imagePath: string | null) => {
+    const pl = playlists.find(p => p.id === id)
+    if (pl) {
+      if (imagePath === null) {
+        delete pl.customImage
+      } else {
+        pl.customImage = imagePath
+      }
       pl.updatedAt = Date.now()
       await savePlaylists()
     }
