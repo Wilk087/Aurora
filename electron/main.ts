@@ -989,6 +989,21 @@ async function createWindow() {
   logger.info('Window created')
 }
 
+// ── Linux display server detection (must run before app.whenReady) ─────────
+// Use ozone-platform-hint=auto so Electron 28 picks Wayland or X11 automatically.
+// We still log which session type was detected for debugging purposes.
+if (process.platform === 'linux') {
+  const waylandDisplay = process.env.WAYLAND_DISPLAY
+  const sessionType = process.env.XDG_SESSION_TYPE
+  const isWayland = !!waylandDisplay || sessionType === 'wayland'
+
+  // ozone-platform-hint=auto lets Electron choose the right backend without
+  // us needing to manipulate enable-features (which can break compositors).
+  app.commandLine.appendSwitch('ozone-platform-hint', 'auto')
+
+  logger.info(`Display server: ${isWayland ? 'Wayland' : 'X11'} (WAYLAND_DISPLAY=${waylandDisplay ?? 'unset'}, XDG_SESSION_TYPE=${sessionType ?? 'unset'}, DISPLAY=${process.env.DISPLAY ?? 'unset'})`)
+}
+
 // ── App lifecycle ──────────────────────────────────────────────────────────
 app.whenReady().then(async () => {
   // Register localfile:// protocol to serve local files with range-request
