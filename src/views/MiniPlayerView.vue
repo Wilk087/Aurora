@@ -6,9 +6,6 @@
     <!-- ══ COVER MODE ══════════════════════════════════════════════════ -->
     <template v-if="mode === 'cover'">
 
-      <!-- Drag strip (always-on-top thin bar for window moving) -->
-      <div class="absolute inset-x-0 top-0 h-7 drag-region z-[4]" />
-
       <!-- Full cover fill -->
       <div class="absolute inset-0 z-[1]">
         <video
@@ -30,42 +27,42 @@
         </div>
       </div>
 
-      <!-- Mouse-capture layer (no-drag, detects hover; below overlay) -->
+      <!-- When overlay is hidden: full-window drag + mouse-detect layer -->
       <div
-        class="absolute inset-0 z-[2] no-drag"
+        v-if="!overlayVisible"
+        class="absolute inset-0 z-[2] drag-region"
         @mousemove="onMouseMove"
-        @mouseleave="onMouseLeave"
       />
 
       <!-- Overlay (fades in on mouse movement / window blur) -->
       <Transition name="cover-overlay">
-        <div v-if="overlayVisible" class="absolute inset-0 z-[3] flex flex-col no-drag">
+        <div v-if="overlayVisible" class="absolute inset-0 z-[3] flex flex-col no-drag" @mousemove="onMouseMove" @mouseleave="onMouseLeave">
 
-          <!-- Top bar: mode toggles -->
-          <div class="flex items-center justify-end gap-1 px-2.5 pt-2.5 pb-1"
+          <!-- Top bar: draggable background, no-drag buttons -->
+          <div class="flex items-center justify-end gap-1 px-2.5 pt-2.5 pb-1 drag-region"
                style="background: linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, transparent 100%)">
             <!-- Cover→lyrics -->
-            <button @click="setMode('lyrics')" class="overlay-btn" title="Lyrics view">
+            <button @click="setMode('lyrics')" class="overlay-btn no-drag" title="Lyrics view">
               <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
               </svg>
             </button>
             <!-- Cover→compact -->
-            <button @click="setMode('compact')" class="overlay-btn" title="Compact">
+            <button @click="setMode('compact')" class="overlay-btn no-drag" title="Compact">
               <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4.5M9 9H4.5M9 9 3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5 5.25 5.25" />
               </svg>
             </button>
             <!-- Exit mini -->
-            <button @click="exitMini" class="overlay-btn" title="Full player">
+            <button @click="exitMini" class="overlay-btn no-drag" title="Full player">
               <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
               </svg>
             </button>
           </div>
 
-          <!-- Spacer -->
-          <div class="flex-1" />
+          <!-- Spacer (drag region — middle of cover is the best drag handle) -->
+          <div class="flex-1 drag-region" />
 
           <!-- Bottom: title/artist + controls + progress -->
           <div style="background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%)">
@@ -80,9 +77,12 @@
               <p class="text-[11px] font-bold truncate text-white leading-tight drop-shadow">
                 {{ player.currentTrack?.title ?? 'Nothing playing' }}
               </p>
-              <p class="text-[10px] text-white/55 truncate leading-tight mt-0.5">
-                {{ player.currentTrack?.artist ?? '' }}
-              </p>
+              <button
+                v-if="player.currentTrack?.artist"
+                @click="goToArtist()"
+                class="text-[10px] text-white/55 truncate leading-tight mt-0.5 hover:text-white/80 transition-colors no-drag max-w-full text-left"
+              >{{ player.currentTrack.artist }}</button>
+              <p v-else class="text-[10px] text-white/55 truncate leading-tight mt-0.5"></p>
             </div>
 
             <!-- Controls row -->
@@ -126,8 +126,25 @@
                 </button>
               </div>
 
-              <!-- Right: repeat -->
+              <!-- Right: volume + repeat -->
               <div class="flex items-center gap-1.5">
+                <button
+                  @click="player.toggleMute()"
+                  @wheel.prevent="onVolumeWheel"
+                  class="w-7 h-7 flex items-center justify-center rounded-full transition-colors"
+                  :class="player.isMuted || player.volume === 0 ? 'text-white/30' : 'text-white/40 hover:text-white/70'"
+                  title="Volume (scroll to adjust)"
+                >
+                  <svg v-if="player.isMuted || player.volume === 0" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
+                  </svg>
+                  <svg v-else-if="player.volume < 0.5" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z" />
+                  </svg>
+                  <svg v-else class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+                  </svg>
+                </button>
                 <button
                   @click="player.cycleRepeat()"
                   class="w-7 h-7 flex items-center justify-center rounded-full transition-colors relative"
@@ -169,8 +186,8 @@
 
       <!-- Lyrics area -->
       <div class="flex-1 relative min-h-0">
-        <!-- Top drag region (always draggable, under gradient) -->
-        <div class="absolute inset-x-0 top-0 h-10 drag-region z-[1]" />
+        <!-- Top drag region (always draggable, above scroll area) -->
+        <div class="absolute inset-x-0 top-0 h-10 drag-region z-[5]" />
         <div class="absolute inset-x-0 top-0 h-16 pointer-events-none z-[2]" style="background: linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, transparent 100%)" />
 
         <div v-if="lyricsLoading" class="absolute inset-0 flex items-center justify-center">
@@ -227,7 +244,12 @@
         </div>
         <div class="flex-1 min-w-0">
           <p class="text-[11px] font-semibold truncate text-white leading-tight">{{ player.currentTrack?.title ?? 'Nothing playing' }}</p>
-          <p class="text-[10px] text-white/45 truncate leading-tight mt-0.5">{{ player.currentTrack?.artist ?? '' }}</p>
+          <button
+            v-if="player.currentTrack?.artist"
+            @click="goToArtist()"
+            class="text-[10px] text-white/45 truncate leading-tight mt-0.5 hover:text-white/70 transition-colors max-w-full text-left"
+          >{{ player.currentTrack.artist }}</button>
+          <p v-else class="text-[10px] text-white/45 leading-tight mt-0.5"></p>
         </div>
         <!-- Controls -->
         <div class="flex items-center gap-0.5 shrink-0">
@@ -273,6 +295,20 @@
             <span v-if="player.repeatMode === 'one'" class="absolute -top-0.5 -right-0.5 text-[7px] font-bold text-accent leading-none">1</span>
           </button>
         </div>
+        <button
+          @click="player.toggleMute()"
+          @wheel.prevent="onVolumeWheel"
+          class="w-6 h-6 flex items-center justify-center rounded-full transition-colors shrink-0"
+          :class="player.isMuted || player.volume === 0 ? 'text-white/25' : 'text-white/40 hover:text-white/70'"
+          title="Volume (scroll to adjust)"
+        >
+          <svg v-if="player.isMuted || player.volume === 0" class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
+          </svg>
+          <svg v-else class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+          </svg>
+        </button>
         <button @click="exitMini" class="w-6 h-6 flex items-center justify-center rounded-full text-white/30 hover:text-white/70 transition-colors shrink-0" title="Full player">
           <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
@@ -299,13 +335,16 @@
           </div>
         </div>
 
-        <div class="flex-1 min-w-0 no-drag">
+        <div class="flex-1 min-w-0">
           <p class="text-xs font-semibold truncate text-white leading-tight">
             {{ player.currentTrack?.title ?? 'Nothing playing' }}
           </p>
-          <p class="text-[10px] text-white/50 truncate leading-tight mt-0.5">
-            {{ player.currentTrack?.artist ?? '' }}
-          </p>
+          <button
+            v-if="player.currentTrack?.artist"
+            @click="goToArtist()"
+            class="text-[10px] text-white/50 truncate leading-tight mt-0.5 hover:text-white/75 transition-colors no-drag max-w-full text-left"
+          >{{ player.currentTrack.artist }}</button>
+          <p v-else class="text-[10px] text-white/50 leading-tight mt-0.5"></p>
         </div>
 
         <div class="flex items-center gap-0.5 shrink-0 no-drag">
@@ -355,6 +394,21 @@
               <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z" />
             </svg>
             <span v-if="player.repeatMode === 'one'" class="absolute -top-0.5 -right-0.5 text-[7px] font-bold text-accent leading-none">1</span>
+          </button>
+          <!-- Volume -->
+          <button
+            @click="player.toggleMute()"
+            @wheel.prevent="onVolumeWheel"
+            class="w-6 h-6 flex items-center justify-center rounded-full transition-colors"
+            :class="player.isMuted || player.volume === 0 ? 'text-white/25' : 'text-white/40 hover:text-white/70'"
+            title="Volume (scroll to adjust)"
+          >
+            <svg v-if="player.isMuted || player.volume === 0" class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z" />
+            </svg>
+            <svg v-else class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" />
+            </svg>
           </button>
           <!-- Lyrics mode -->
           <button @click="setMode('lyrics')" class="w-6 h-6 flex items-center justify-center rounded-full text-white/40 hover:text-white/70 transition-colors" title="Lyrics view">
@@ -480,6 +534,21 @@ function exitMini() {
   destroyHls()
   window.api.exitMiniPlayer()
   router.push('/')
+}
+
+function goToArtist() {
+  const artist = player.currentTrack?.artist
+  if (!artist) return
+  destroyHls()
+  window.api.exitMiniPlayer()
+  router.push(`/artist/${encodeURIComponent(artist)}`)
+}
+
+function onVolumeWheel(e: WheelEvent) {
+  e.preventDefault()
+  const delta = -e.deltaY / 500
+  const newVol = Math.max(0, Math.min(1, player.volume + delta))
+  player.setVolume(newVol)
 }
 
 function onProgressClick(e: MouseEvent) {
@@ -629,7 +698,7 @@ onUnmounted(() => {
 }
 
 /* ── Lyrics scroll ── */
-.mini-lyrics { scrollbar-width: none; }
+.mini-lyrics { scrollbar-width: none; overflow-x: hidden; }
 .mini-lyrics::-webkit-scrollbar { display: none; }
 
 /*
