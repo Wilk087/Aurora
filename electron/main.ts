@@ -1001,6 +1001,10 @@ if (process.platform === 'linux') {
   // us needing to manipulate enable-features (which can break compositors).
   app.commandLine.appendSwitch('ozone-platform-hint', 'auto')
 
+  // GTK4 uses XDG portals for file dialogs, giving the proper system-native
+  // file picker (GNOME, KDE, etc.) instead of the old GTK3 chooser widget.
+  app.commandLine.appendSwitch('gtk-version', '4')
+
   logger.info(`Display server: ${isWayland ? 'Wayland' : 'X11'} (WAYLAND_DISPLAY=${waylandDisplay ?? 'unset'}, XDG_SESSION_TYPE=${sessionType ?? 'unset'}, DISPLAY=${process.env.DISPLAY ?? 'unset'})`)
 }
 
@@ -1140,17 +1144,6 @@ app.whenReady().then(async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       properties: ['openDirectory'],
       title: 'Select Music Folder',
-    })
-    if (result.canceled || result.filePaths.length === 0) return null
-    return result.filePaths[0]
-  })
-
-  ipcMain.handle('dialog:open-image', async () => {
-    if (!mainWindow) return null
-    const result = await dialog.showOpenDialog(mainWindow, {
-      properties: ['openFile'],
-      title: 'Select Cover Image',
-      filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif'] }],
     })
     if (result.canceled || result.filePaths.length === 0) return null
     return result.filePaths[0]

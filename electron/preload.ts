@@ -289,7 +289,18 @@ contextBridge.exposeInMainWorld('api', {
   pluginsIpcInvoke: (channel: string, ...args: any[]): Promise<any> => ipcRenderer.invoke(channel, ...args),
   pluginsIpcSend: (channel: string, ...args: any[]) => ipcRenderer.send(channel, ...args),
 
-  // Playlist custom image
-  openImageDialog: (): Promise<string | null> => ipcRenderer.invoke('dialog:open-image'),
+  // Playlist custom image — uses a DOM file input so Chromium routes through
+  // XDG portals on Linux, giving the proper system-native file picker.
+  openImageDialog: (): Promise<string | null> => new Promise((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/jpeg,image/png,image/webp,image/gif'
+    input.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none'
+    document.body.appendChild(input)
+    const cleanup = () => { if (document.body.contains(input)) document.body.removeChild(input) }
+    input.onchange = () => { cleanup(); resolve(input.files?.[0] ? (input.files[0] as any).path : null) }
+    input.oncancel = () => { cleanup(); resolve(null) }
+    input.click()
+  }),
   setPlaylistCustomImage: (id: string, imagePath: string | null): Promise<any> => ipcRenderer.invoke('playlists:set-custom-image', id, imagePath),
 })
