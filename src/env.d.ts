@@ -292,5 +292,10 @@ interface Window {
     // Playlist custom image
     openImageDialog: () => Promise<string | null>
     setPlaylistCustomImage: (id: string, imagePath: string | null) => Promise<Playlist | null>
+    // Open-with / file association
+    getOpenFiles: () => Promise<string[]>
+    parseFile: (filePath: string) => Promise<Track>
+    onOpenFiles: (callback: (paths: string[]) => void) => void
+    removeOpenFilesListener: () => void
   }
 }

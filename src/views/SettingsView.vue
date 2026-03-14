@@ -1674,6 +1674,7 @@ onMounted(async () => {
   discordFormat.value = settings.discordRPCFormat || 'title-artist'
   discordClientId.value = settings.discordClientId || ''
 
+
   // Load audio / playback settings
   selectedDevice.value = settings.outputDeviceId || ''
   exclusiveMode.value = settings.exclusiveMode === true

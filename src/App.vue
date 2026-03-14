@@ -145,7 +145,23 @@ onMounted(async () => {
   await themeStore.restoreTheme()
   themeStore.watchThemesDirectory()
   await pluginStore.init()
+
+  // Handle files opened via right-click "Open with" or double-click
+  const openFiles = await window.api.getOpenFiles()
+  if (openFiles.length > 0) {
+    handleOpenFiles(openFiles)
+  }
+  window.api.onOpenFiles((paths: string[]) => {
+    if (paths.length > 0) handleOpenFiles(paths)
+  })
 })
+
+async function handleOpenFiles(paths: string[]) {
+  const tracks = await Promise.all(paths.map((p: string) => window.api.parseFile(p)))
+  // Replace queue with opened files and play immediately
+  player.clearQueue()
+  await player.addToQueue(tracks)
+}
 
 // Auto-push to sync folder when playlists or favorites change
 watch(() => playlistStore.playlists, () => syncStore.schedulePush(), { deep: true })
@@ -415,6 +431,7 @@ onUnmounted(() => {
   document.removeEventListener('keydown', onGlobalKeydown)
   if (idleTimer) clearTimeout(idleTimer)
   window.api.removeWindowStateChangeListener()
+  window.api.removeOpenFilesListener()
   themeStore.unwatchThemesDirectory()
 })
 

@@ -6,7 +6,7 @@
         class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm"
         @click.self="$emit('close')"
       >
-        <div class="relative flex flex-col items-center gap-5 p-6 rounded-2xl bg-[#1a1a1a] border border-white/10 shadow-2xl max-w-[680px] w-full mx-4">
+        <div class="relative flex flex-col items-center gap-5 p-6 rounded-2xl bg-[var(--bg-tertiary)] border border-white/10 shadow-2xl max-w-[680px] w-full mx-4">
           <!-- Header -->
           <div class="flex items-center justify-between w-full">
             <h3 class="text-sm font-semibold text-white/70 uppercase tracking-wider">Lyrics Card</h3>
@@ -77,6 +77,14 @@ const LOGO_SVG = `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://ww
 
 const FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif'
 const PAD = 60 // outer padding
+
+/** Read the current theme's accent color as an rgba() string. */
+function getAccentColor(alpha: number): string {
+  const channels = getComputedStyle(document.documentElement)
+    .getPropertyValue('--accent')
+    .trim() // e.g. "139 92 246"
+  return `rgba(${channels.replace(/\s+/g, ', ')}, ${alpha})`
+}
 
 watch(
   () => props.visible,
@@ -153,10 +161,14 @@ async function renderCard() {
   canvas.style.height = `${Math.round(CARD_H * scale)}px`
 
   // ── Background ─────────────────────────────────────────────────
+  // Use a darkened version of the accent color for the gradient tint
+  const accentChannels = getComputedStyle(document.documentElement)
+    .getPropertyValue('--accent').trim().split(/\s+/).map(Number)
+  const [ar, ag, ab] = accentChannels
   const bgGrad = ctx.createLinearGradient(0, 0, CARD_W, CARD_H)
-  bgGrad.addColorStop(0, '#0f0f14')
-  bgGrad.addColorStop(0.5, '#12101c')
-  bgGrad.addColorStop(1, '#0d0b12')
+  bgGrad.addColorStop(0, `rgba(${Math.round(ar * 0.06)}, ${Math.round(ag * 0.04)}, ${Math.round(ab * 0.08)}, 1)`)
+  bgGrad.addColorStop(0.5, `rgba(${Math.round(ar * 0.07)}, ${Math.round(ag * 0.05)}, ${Math.round(ab * 0.11)}, 1)`)
+  bgGrad.addColorStop(1, `rgba(${Math.round(ar * 0.05)}, ${Math.round(ag * 0.03)}, ${Math.round(ab * 0.07)}, 1)`)
   ctx.fillStyle = bgGrad
   ctx.fillRect(0, 0, CARD_W, CARD_H)
 
@@ -236,7 +248,7 @@ function drawHorizontalLayout(
   ctx.font = `500 ${fontSize}px ${FONT}`
 
   // Decorative accent line
-  ctx.fillStyle = 'rgba(139, 92, 246, 0.4)'
+  ctx.fillStyle = getAccentColor(0.4)
   roundRect(ctx, lyricsX - 16, lyricsY - 4, 3, Math.min(lyricsMaxH, H - PAD * 2), 2)
   ctx.fill()
 
@@ -302,7 +314,7 @@ function drawVerticalLayout(
   const lyricsMaxH = H - lyricsY - 70
 
   // Accent line
-  ctx.fillStyle = 'rgba(139, 92, 246, 0.4)'
+  ctx.fillStyle = getAccentColor(0.4)
   roundRect(ctx, PAD - 2, lyricsY, 3, Math.min(lyricsMaxH, lyricsMaxH), 2)
   ctx.fill()
 

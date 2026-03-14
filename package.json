@@ -35,6 +35,15 @@
         "to": "icon.png"
       }
     ],
+    "fileAssociations": [
+      {
+        "ext": ["mp3", "flac", "ogg", "opus", "wav", "m4a", "aac", "wma"],
+        "name": "Audio File",
+        "description": "Audio file",
+        "mimeType": "audio/mpeg",
+        "role": "Viewer"
+      }
+    ],
     "linux": {
       "target": [
         "pacman",
@@ -43,12 +52,24 @@
       "icon": "build/icons",
       "category": "Audio",
       "executableName": "aurora-player",
+      "mimeTypes": [
+        "audio/mpeg",
+        "audio/flac",
+        "audio/ogg",
+        "audio/opus",
+        "audio/wav",
+        "audio/x-wav",
+        "audio/mp4",
+        "audio/aac",
+        "audio/x-ms-wma"
+      ],
       "desktop": {
         "Name": "Aurora Player",
         "Comment": "A beautiful local music player",
         "Categories": "Audio;Music;Player;AudioVideo;",
         "Keywords": "music;player;audio;",
-        "StartupWMClass": "aurora-player"
+        "StartupWMClass": "aurora-player",
+        "MimeType": "audio/mpeg;audio/flac;audio/ogg;audio/opus;audio/wav;audio/x-wav;audio/mp4;audio/aac;audio/x-ms-wma;"
       }
     },
     "win": {

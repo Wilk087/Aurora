@@ -7,7 +7,7 @@
       data-lrc-syncer-active
       @keydown="onKeyDown"
     >
-      <div class="w-full max-w-xl mx-4 bg-[#1a1a1e] rounded-2xl border border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      <div class="w-full max-w-xl mx-4 bg-[var(--bg-tertiary)] rounded-2xl border border-white/10 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
         <!-- Header -->
         <div class="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
           <div>

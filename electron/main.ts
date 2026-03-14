@@ -32,7 +32,7 @@ async function initDiscordRPC(clientId?: string) {
   if (clientId) discordClientId = clientId
   // Destroy existing connection if any
   await destroyDiscordRPC()
-  
+
   try {
     const { Client } = await import('@xhayper/discord-rpc')
     rpcClient = new Client({ clientId: discordClientId })
@@ -989,6 +989,39 @@ async function createWindow() {
   logger.info('Window created')
 }
 
+// ── Single-instance lock + file-open handling ──────────────────────────────
+const AUDIO_EXTS = new Set(['.mp3', '.flac', '.ogg', '.opus', '.wav', '.m4a', '.aac', '.wma'])
+
+function extractAudioFiles(argv: string[]): string[] {
+  // Skip the first two entries (electron binary + app path / '--' separator)
+  return argv.slice(app.isPackaged ? 1 : 2).filter((arg) => {
+    if (arg.startsWith('--') || arg.startsWith('-')) return false
+    const ext = extname(arg).toLowerCase()
+    return AUDIO_EXTS.has(ext) && existsSync(arg)
+  })
+}
+
+// Files passed via CLI on initial launch
+let pendingOpenFiles: string[] = extractAudioFiles(process.argv)
+
+const gotLock = app.requestSingleInstanceLock()
+if (!gotLock) {
+  // Another instance is already running — it will receive our files via second-instance
+  app.quit()
+} else {
+  app.on('second-instance', (_event, argv) => {
+    // A second instance was opened — bring the window to front and open the files
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
+    const files = extractAudioFiles(argv)
+    if (files.length > 0 && mainWindow) {
+      mainWindow.webContents.send('app:open-files', files)
+    }
+  })
+}
+
 // ── Linux display server detection (must run before app.whenReady) ─────────
 // Use ozone-platform-hint=auto so Electron 28 picks Wayland or X11 automatically.
 // We still log which session type was detected for debugging purposes.
@@ -1147,6 +1180,17 @@ app.whenReady().then(async () => {
     })
     if (result.canceled || result.filePaths.length === 0) return null
     return result.filePaths[0]
+  })
+
+  // ── IPC: Open files (right-click / file association) ──
+  ipcMain.handle('app:get-open-files', () => {
+    const files = pendingOpenFiles
+    pendingOpenFiles = []
+    return files
+  })
+
+  ipcMain.handle('library:parse-file', async (_, filePath: string) => {
+    return await parseTrack(filePath)
   })
 
   // ── IPC: Library ──

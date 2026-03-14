@@ -55,6 +55,16 @@ contextBridge.exposeInMainWorld('api', {
   updateDiscordPresence: (data: any) => ipcRenderer.invoke('discord:update-presence', data),
   toggleDiscordRPC: (enabled: boolean, clientId?: string) => ipcRenderer.invoke('discord:toggle', enabled, clientId),
 
+  // Open-with / file association
+  getOpenFiles: (): Promise<string[]> => ipcRenderer.invoke('app:get-open-files'),
+  parseFile: (filePath: string): Promise<any> => ipcRenderer.invoke('library:parse-file', filePath),
+  onOpenFiles: (callback: (paths: string[]) => void) => {
+    ipcRenderer.on('app:open-files', (_, paths) => callback(paths))
+  },
+  removeOpenFilesListener: () => {
+    ipcRenderer.removeAllListeners('app:open-files')
+  },
+
   // Playlists
   getPlaylists: () => ipcRenderer.invoke('playlists:get-all'),
   getPlaylist: (id: string) => ipcRenderer.invoke('playlists:get', id),
