@@ -111,6 +111,8 @@ export function createPluginAPI(pluginId: string) {
       addToQueue: player.addToQueue.bind(player),
       playNext: player.playNext.bind(player),
       playLater: player.playLater.bind(player),
+      registerUrlResolver: player.registerUrlResolver.bind(player),
+      unregisterUrlResolver: player.unregisterUrlResolver.bind(player),
     },
 
     // ── Library ──────────────────────────────────────────────────────────
@@ -120,6 +122,8 @@ export function createPluginAPI(pluginId: string) {
       get artists() { return library.artists },
       get searchQuery() { return library.searchQuery },
       set searchQuery(q: string) { library.searchQuery = q },
+      addTracks: library.addPluginTracks.bind(library),
+      removeTracks: library.removePluginTracks.bind(library),
     },
 
     // ── Playlists ────────────────────────────────────────────────────────
@@ -358,6 +362,15 @@ export function createPluginAPI(pluginId: string) {
        */
       getAlbumDetailSlot(): HTMLElement | null {
         return document.getElementById('aurora-album-detail-slot')
+      },
+      /**
+       * Get the plugin slot at the bottom of the search results page.
+       * The `data-query` attribute is kept in sync with the current search query via Vue reactivity.
+       * Use a MutationObserver on `attributeFilter: ['data-query']` to react to query changes.
+       * Returns null when the search view is not currently mounted.
+       */
+      getSearchSlot(): HTMLElement | null {
+        return document.getElementById('aurora-search-slot')
       },
       /**
        * Navigate to an app route, e.g. `'/albums'`, `'/album/some-album-id'`, `'/artist/Artist%20Name'`.

@@ -148,6 +148,10 @@
         </div>
       </section>
 
+      <!-- Plugin search slot — streams plugin injects results here.
+           data-query is kept reactive so plugins can watch attribute changes. -->
+      <div id="aurora-search-slot" :data-query="library.searchQuery" />
+
     </div>
 
     <!-- Selection action bar -->

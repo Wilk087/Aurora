@@ -30,6 +30,16 @@ export const usePlayerStore = defineStore('player', () => {
   audioNext.preload = 'auto'
   audioNext.crossOrigin = 'anonymous'
 
+  // Stream bypass element — NOT connected to the AudioContext.
+  // External CDNs (YouTube, radio) don't send CORS headers, so once `audio` is
+  // wrapped by createMediaElementSource() the browser silences CORS-blocked media.
+  // This element plays HTTP/HTTPS plugin streams directly to hardware instead.
+  const audioStream = new Audio()
+  audioStream.preload = 'auto'
+  // Intentionally NO crossOrigin — external CDNs reject requests with an Origin header.
+  let usingStream = false
+  function activeAudio() { return usingStream ? audioStream : audio }
+
   // ── Subsonic stream preload system ─────────────────────────────────────
   // Two-tier cache:
   //  1. _urlCache   – resolved stream URLs for ALL subsonic tracks in the
@@ -277,10 +287,34 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
+  // ── Plugin URL resolvers ─────────────────────────────────────────────────
+  // Plugins can register an async resolver to override the stream URL for a track.
+  // This lets plugins re-fetch expiring URLs (e.g. YouTube CDN) on demand.
+  const _urlResolvers = new Map<string, (track: Track) => Promise<string | null>>()
+
+  function registerUrlResolver(id: string, fn: (track: Track) => Promise<string | null>) {
+    _urlResolvers.set(id, fn)
+  }
+
+  function unregisterUrlResolver(id: string) {
+    _urlResolvers.delete(id)
+  }
+
+  async function resolveTrackUrl(track: Track): Promise<string> {
+    for (const resolver of _urlResolvers.values()) {
+      try {
+        const result = await resolver(track)
+        if (result) return result
+      } catch { /* ignore resolver errors */ }
+    }
+    return track.path
+  }
+
   async function setOutputDevice(deviceId: string) {
     try {
       if ((audio as any).setSinkId) {
         await (audio as any).setSinkId(deviceId)
+        await (audioStream as any).setSinkId?.(deviceId)
         outputDeviceId.value = deviceId
         await window.api.mergeSettings({ outputDeviceId: deviceId })
       }
@@ -444,8 +478,8 @@ export const usePlayerStore = defineStore('player', () => {
         getStatsStore()?.recordPlay(currentTrack.value, audio.currentTime)
       }
     }
-    // Crossfade trigger
-    if (crossfadeEnabled.value && !isCrossfading && duration.value > 0 && isPlaying.value) {
+    // Crossfade trigger (skip for external streams — live/CDN sources)
+    if (crossfadeEnabled.value && !isCrossfading && !usingStream && duration.value > 0 && isPlaying.value) {
       const timeLeft = duration.value - audio.currentTime
       if (timeLeft > 0 && timeLeft <= crossfadeDuration.value + 0.2) {
         startCrossfade()
@@ -501,13 +535,67 @@ export const usePlayerStore = defineStore('player', () => {
     }, 2000)
   })
 
+  // ── audioStream event listeners (mirrors audio's, but reads from audioStream) ──
+  audioStream.addEventListener('timeupdate', () => {
+    currentTime.value = audioStream.currentTime
+    if (scrobblingEnabled && !scrobbleReported && currentTrack.value && duration.value > 30) {
+      const threshold = Math.min(duration.value * 0.5, 240)
+      if (audioStream.currentTime >= threshold) {
+        scrobbleReported = true
+        window.api.scrobbleTrack({
+          title: currentTrack.value.title,
+          artist: currentTrack.value.artist,
+          album: currentTrack.value.album,
+          duration: duration.value,
+          timestamp: Date.now(),
+        }).catch(() => {})
+      }
+    }
+    if (!statsReported && currentTrack.value && duration.value > 10) {
+      if (audioStream.currentTime >= duration.value * 0.5) {
+        statsReported = true
+        getStatsStore()?.recordPlay(currentTrack.value, audioStream.currentTime)
+      }
+    }
+    // No crossfade for streams (live/external sources)
+  })
+  audioStream.addEventListener('durationchange', () => { duration.value = audioStream.duration })
+  audioStream.addEventListener('ended', () => handleTrackEnd())
+  audioStream.addEventListener('playing', () => { isPlaying.value = true; isLoading.value = false; pluginBus.emit('play') })
+  audioStream.addEventListener('pause', () => { isPlaying.value = false; pluginBus.emit('pause') })
+  audioStream.addEventListener('waiting', () => { isLoading.value = true })
+  audioStream.addEventListener('canplay', () => { isLoading.value = false })
+  audioStream.addEventListener('error', () => {
+    if (!currentTrack.value) return
+    isLoading.value = false
+    isPlaying.value = false
+    const err = audioStream.error
+    const codes: Record<number, string> = {
+      1: 'Playback aborted',
+      2: 'Network error loading file',
+      3: 'Codec/decode error — format may not be supported',
+      4: 'Source not supported — file format not playable',
+    }
+    const msg = err ? (codes[err.code] || `Unknown error (code ${err.code})`) : 'Unknown playback error'
+    const trackName = currentTrack.value ? `${currentTrack.value.artist} - ${currentTrack.value.title}` : 'Unknown'
+    console.error(`Audio error for "${trackName}": ${msg}`)
+    playbackError.value = `Cannot play "${currentTrack.value?.title || 'track'}": ${msg}`
+    if (errorSkipTimeout) clearTimeout(errorSkipTimeout)
+    errorSkipTimeout = setTimeout(() => {
+      playbackError.value = null
+      if (queue.value.length > 1) next()
+    }, 2000)
+  })
+
   // ── Watchers ─────────────────────────────────────────────────────────────
   // Apply a quadratic curve so the slider feels more natural
   // (perceived loudness is logarithmic; linear volume is way too loud at the top)
   audio.volume = volume.value * volume.value
+  audioStream.volume = volume.value * volume.value
 
   watch(volume, (val) => {
     audio.volume = val * val
+    audioStream.volume = val * val
     if (isCrossfading) audioNext.volume = val * val
     if (val > 0 && isMuted.value) isMuted.value = false
     // Persist volume
@@ -516,6 +604,7 @@ export const usePlayerStore = defineStore('player', () => {
 
   watch(isMuted, (val) => {
     audio.muted = val
+    audioStream.muted = val
     if (isCrossfading) audioNext.muted = val
   })
 
@@ -524,10 +613,11 @@ export const usePlayerStore = defineStore('player', () => {
     if (s.volume !== undefined) {
       volume.value = s.volume
       audio.volume = s.volume * s.volume
+      audioStream.volume = s.volume * s.volume
     }
     if (s.shuffle === true) isShuffle.value = true
     if (s.repeatMode && ['off', 'all', 'one'].includes(s.repeatMode)) repeatMode.value = s.repeatMode
-    if (s.muted === true) { isMuted.value = true; audio.muted = true }
+    if (s.muted === true) { isMuted.value = true; audio.muted = true; audioStream.muted = true }
     if (s.lyricsOffset !== undefined) lyricsOffset.value = s.lyricsOffset
     if (typeof s.waveformEnabled === 'boolean') waveformEnabled.value = s.waveformEnabled
     if (typeof s.animatedCoversEnabled === 'boolean') animatedCoversEnabled.value = s.animatedCoversEnabled
@@ -557,15 +647,15 @@ export const usePlayerStore = defineStore('player', () => {
     navigator.mediaSession.setActionHandler('pause', () => pause())
     navigator.mediaSession.setActionHandler('previoustrack', () => previous())
     navigator.mediaSession.setActionHandler('nexttrack', () => next())
-    navigator.mediaSession.setActionHandler('stop', () => { pause(); audio.currentTime = 0 })
+    navigator.mediaSession.setActionHandler('stop', () => { pause(); activeAudio().currentTime = 0 })
     navigator.mediaSession.setActionHandler('seekto', (details) => {
       if (details.seekTime != null) seek(details.seekTime)
     })
     navigator.mediaSession.setActionHandler('seekbackward', (details) => {
-      seek(Math.max(0, audio.currentTime - (details.seekOffset || 10)))
+      seek(Math.max(0, activeAudio().currentTime - (details.seekOffset || 10)))
     })
     navigator.mediaSession.setActionHandler('seekforward', (details) => {
-      seek(Math.min(duration.value, audio.currentTime + (details.seekOffset || 10)))
+      seek(Math.min(duration.value, activeAudio().currentTime + (details.seekOffset || 10)))
     })
   }
 
@@ -584,7 +674,7 @@ export const usePlayerStore = defineStore('player', () => {
       try {
         navigator.mediaSession.setPositionState({
           duration: duration.value,
-          playbackRate: audio.playbackRate,
+          playbackRate: activeAudio().playbackRate,
           position: Math.min(currentTime.value, duration.value),
         })
       } catch { /* ignore invalid state errors */ }
@@ -592,9 +682,11 @@ export const usePlayerStore = defineStore('player', () => {
     // MPRIS position (send every timeupdate, the MPRIS module just stores the value)
     window.api.mprisSendPosition(currentTime.value)
   }
-  // Update position when time or duration changes
+  // Update position when time or duration changes (both elements)
   audio.addEventListener('timeupdate', updatePositionState)
   audio.addEventListener('durationchange', updatePositionState)
+  audioStream.addEventListener('timeupdate', updatePositionState)
+  audioStream.addEventListener('durationchange', updatePositionState)
 
   // Send volume changes to MPRIS
   watch(volume, (val) => {
@@ -617,8 +709,8 @@ export const usePlayerStore = defineStore('player', () => {
       case 'playPause': togglePlay(); break
       case 'next': next(); break
       case 'previous': previous(); break
-      case 'stop': pause(); audio.currentTime = 0; break
-      case 'seek': seek(Math.max(0, audio.currentTime + (data || 0))); window.api.mprisSendSeeked(audio.currentTime); break
+      case 'stop': pause(); activeAudio().currentTime = 0; break
+      case 'seek': seek(Math.max(0, activeAudio().currentTime + (data || 0))); window.api.mprisSendSeeked(activeAudio().currentTime); break
       case 'seekAbsolute': seek(data || 0); window.api.mprisSendSeeked(data || 0); break
       case 'volume': setVolume(data || 0); break
       case 'loop': {
@@ -709,6 +801,9 @@ export const usePlayerStore = defineStore('player', () => {
 
     // Resolve audio source
     if (track.source === 'subsonic' && track.path.startsWith('subsonic://')) {
+      // Clear stream element when switching back to a local/subsonic track
+      if (usingStream) { audioStream.pause(); audioStream.src = '' }
+      usingStream = false
       // Try the URL cache first (instant), fall back to live IPC resolve
       const cachedUrl = _getCachedUrl(track.id)
       if (cachedUrl) {
@@ -726,8 +821,24 @@ export const usePlayerStore = defineStore('player', () => {
         audio.load()
       })
     } else {
-      audio.src = window.api.getMediaUrl(track.path)
-      audio.load()
+      const isExternal = track.path.startsWith('http://') || track.path.startsWith('https://')
+      if (isExternal) {
+        // Route external streams through audioStream (NOT connected to AudioContext).
+        // External CDNs (YouTube, radio) don't send CORS headers, so using the
+        // AudioContext-connected `audio` element would silence playback.
+        // Ask plugins if they want to resolve/replace the URL (e.g. re-fetch expired YouTube CDN URLs).
+        const resolvedPath = await resolveTrackUrl(track)
+        if (!usingStream) { audio.pause(); audio.src = '' }
+        usingStream = true
+        audioStream.src = window.api.getMediaUrl(resolvedPath)
+        audioStream.load()
+      } else {
+        // Local file — use the main audio element connected to AudioContext
+        if (usingStream) { audioStream.pause(); audioStream.src = '' }
+        usingStream = false
+        audio.src = window.api.getMediaUrl(track.path)
+        audio.load()
+      }
     }
 
     // Update preload caches (resolve remaining URLs + shift buffer window)
@@ -738,13 +849,15 @@ export const usePlayerStore = defineStore('player', () => {
     statsReported = false
     if (scrobbleTimer) { clearTimeout(scrobbleTimer); scrobbleTimer = null }
 
-    // Generate waveform if enabled
+    // Generate waveform if enabled (skip for remote/stream URLs — infinite or unavailable)
     if (waveformEnabled.value) {
       if (track.source === 'subsonic' && track.path.startsWith('subsonic://')) {
         const songId = track.path.replace('subsonic://', '')
         generateSubsonicWaveform(songId)
-      } else {
+      } else if (!track.path.startsWith('http://') && !track.path.startsWith('https://')) {
         generateWaveform(track.path)
+      } else {
+        waveformData.value = []
       }
     }
 
@@ -819,7 +932,7 @@ export const usePlayerStore = defineStore('player', () => {
     }
     // LRC sync mode: pause at end so user can save their work
     if (lrcSyncMode.value) {
-      audio.currentTime = 0
+      activeAudio().currentTime = 0
       pause()
       return
     }
@@ -842,8 +955,8 @@ export const usePlayerStore = defineStore('player', () => {
     }
 
     if (repeatMode.value === 'one') {
-      audio.currentTime = 0
-      audio.play()
+      activeAudio().currentTime = 0
+      activeAudio().play()
     } else {
       next()
     }
@@ -874,6 +987,9 @@ export const usePlayerStore = defineStore('player', () => {
     }
     if (repeatMode.value === 'one') return // repeat-one doesn't crossfade
     const nextTrack = queue.value[nextIdx]
+    // Skip crossfade for external stream tracks (would be silenced by AudioContext CORS check)
+    const nextIsExternal = nextTrack.path.startsWith('http://') || nextTrack.path.startsWith('https://')
+    if (nextIsExternal && nextTrack.source !== 'subsonic') return
     isCrossfading = true
     cfNextTrack = nextTrack
     cfNextIndex = nextIdx
@@ -967,8 +1083,10 @@ export const usePlayerStore = defineStore('player', () => {
     if (waveformEnabled.value) {
       if (nextTrack.source === 'subsonic' && nextTrack.path.startsWith('subsonic://')) {
         generateSubsonicWaveform(nextTrack.path.replace('subsonic://', ''))
-      } else {
+      } else if (!nextTrack.path.startsWith('http://') && !nextTrack.path.startsWith('https://')) {
         generateWaveform(nextTrack.path)
+      } else {
+        waveformData.value = []
       }
     }
     if (scrobblingEnabled) {
@@ -990,15 +1108,15 @@ export const usePlayerStore = defineStore('player', () => {
     }
 
     try {
-      await audio.play()
-      if (isCrossfading) audioNext.play().catch(() => {})
+      await activeAudio().play()
+      if (isCrossfading && !usingStream) audioNext.play().catch(() => {})
     } catch (err) {
       console.error('Play error:', err)
     }
   }
 
   function pause() {
-    audio.pause()
+    activeAudio().pause()
     if (isCrossfading) audioNext.pause()
   }
 
@@ -1022,8 +1140,8 @@ export const usePlayerStore = defineStore('player', () => {
 
   async function previous() {
     cancelCrossfade()
-    if (audio.currentTime > 3) {
-      audio.currentTime = 0
+    if (activeAudio().currentTime > 3) {
+      activeAudio().currentTime = 0
       return
     }
     if (queue.value.length === 0) return
@@ -1032,7 +1150,7 @@ export const usePlayerStore = defineStore('player', () => {
     if (prevIdx < 0) {
       if (repeatMode.value === 'all') prevIdx = queue.value.length - 1
       else {
-        audio.currentTime = 0
+        activeAudio().currentTime = 0
         return
       }
     }
@@ -1042,7 +1160,7 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   function seek(time: number) {
-    audio.currentTime = time
+    activeAudio().currentTime = time
     currentTime.value = time
     pluginBus.emit('seek', time)
     sendDiscordUpdate()
@@ -1234,7 +1352,7 @@ export const usePlayerStore = defineStore('player', () => {
       const t = currentTrack.value
       if (t.source === 'subsonic' && t.path.startsWith('subsonic://')) {
         generateSubsonicWaveform(t.path.replace('subsonic://', ''))
-      } else {
+      } else if (!t.path.startsWith('http://') && !t.path.startsWith('https://')) {
         generateWaveform(t.path)
       }
     }
@@ -1481,6 +1599,8 @@ export const usePlayerStore = defineStore('player', () => {
     audioDevices,
     enumerateOutputDevices,
     setOutputDevice,
+    registerUrlResolver,
+    unregisterUrlResolver,
     // Lyrics offset
     lyricsOffset,
     setLyricsOffset,

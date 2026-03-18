@@ -28,7 +28,8 @@ function normalize(str: string): string {
 export const useLibraryStore = defineStore('library', () => {
   const localTracks = shallowRef<Track[]>([])
   const subsonicTracks = shallowRef<Track[]>([])
-  const tracks = computed<Track[]>(() => [...localTracks.value, ...subsonicTracks.value])
+  const pluginTracks = shallowRef<Track[]>([])
+  const tracks = computed<Track[]>(() => [...localTracks.value, ...subsonicTracks.value, ...pluginTracks.value])
   const folders = ref<string[]>([])
   const isScanning = ref(false)
   const libraryReady = ref(false)
@@ -258,6 +259,18 @@ export const useLibraryStore = defineStore('library', () => {
     subsonicTracks.value = []
   }
 
+  /** Add or replace plugin-injected tracks (e.g. saved stream URLs from plugins) */
+  function addPluginTracks(newTracks: Track[]) {
+    const existing = pluginTracks.value.filter(t => !newTracks.some(n => n.id === t.id))
+    pluginTracks.value = [...existing, ...newTracks.map(t => markRaw(t))]
+  }
+
+  /** Remove plugin-injected tracks by ID */
+  function removePluginTracks(ids: string[]) {
+    const set = new Set(ids)
+    pluginTracks.value = pluginTracks.value.filter(t => !set.has(t.id))
+  }
+
   /** Auto-load subsonic library if previously connected */
   async function autoLoadSubsonic() {
     try {
@@ -378,5 +391,7 @@ export const useLibraryStore = defineStore('library', () => {
     setSearchLyricsEnabled,
     mergeSubsonicTracks,
     clearSubsonicTracks,
+    addPluginTracks,
+    removePluginTracks,
   }
 })

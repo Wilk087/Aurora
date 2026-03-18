@@ -1650,6 +1650,7 @@ app.whenReady().then(async () => {
   // ── IPC: Track credits / extended metadata ──
   ipcMain.handle('track:get-credits', async (_, trackPath: string) => {
     try {
+      if (trackPath.startsWith('http://') || trackPath.startsWith('https://')) return null
       const mm = await import('music-metadata')
       const metadata = await mm.parseFile(trackPath)
       const c = metadata.common
@@ -2669,6 +2670,67 @@ app.whenReady().then(async () => {
   ipcMain.handle('plugins:ipc-invoke', async (_, channel: string, ...args: any[]) => {
     // This is intentionally unrestricted — plugins run at the user's own risk
     return await ipcMain.emit(channel, ...args)
+  })
+
+  // ── Plugin: yt-dlp stream extraction ──────────────────────────────────────
+  ipcMain.handle('plugin:ytdlp:check', async () => {
+    const { promisify } = await import('util')
+    const execFileAsync = promisify(execFile)
+    try {
+      const { stdout } = await execFileAsync('yt-dlp', ['--version'], { timeout: 5000 })
+      return { installed: true, version: stdout.trim() }
+    } catch {
+      return { installed: false, version: null }
+    }
+  })
+
+  ipcMain.handle('plugin:ytdlp:search', async (_, query: string, limit = 5) => {
+    const { promisify } = await import('util')
+    const execFileAsync = promisify(execFile)
+    const { stdout } = await execFileAsync(
+      'yt-dlp',
+      ['--flat-playlist', '--dump-single-json', `ytsearch${limit}:${query}`],
+      { timeout: 30000 },
+    )
+    const data = JSON.parse(stdout)
+    return (data.entries || []).map((e: any) => ({
+      id: e.id,
+      title: e.title || '',
+      duration: e.duration || 0,
+      uploader: e.uploader || e.channel || '',
+      thumbnail: e.thumbnail || `https://i.ytimg.com/vi/${e.id}/mqdefault.jpg`,
+      url: e.url || `https://www.youtube.com/watch?v=${e.id}`,
+    }))
+  })
+
+  ipcMain.handle('plugin:ytdlp:get-url', async (_, videoUrl: string) => {
+    const { promisify } = await import('util')
+    const execFileAsync = promisify(execFile)
+    const { stdout } = await execFileAsync(
+      'yt-dlp',
+      ['-f', 'ba[ext=m4a]/ba[ext=webm]/ba', '--get-url', videoUrl],
+      { timeout: 30000 },
+    )
+    return stdout.trim().split('\n')[0] || null
+  })
+
+  ipcMain.handle('plugin:ytdlp:get-info', async (_, videoUrl: string) => {
+    const { promisify } = await import('util')
+    const execFileAsync = promisify(execFile)
+    const { stdout } = await execFileAsync(
+      'yt-dlp',
+      ['--dump-json', '--no-playlist', videoUrl],
+      { timeout: 30000 },
+    )
+    const item = JSON.parse(stdout)
+    return {
+      id: item.id,
+      title: item.title || '',
+      duration: item.duration || 0,
+      uploader: item.uploader || item.channel || '',
+      thumbnail: item.thumbnail || `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`,
+      url: item.webpage_url || videoUrl,
+    }
   })
 
   app.on('activate', () => {
