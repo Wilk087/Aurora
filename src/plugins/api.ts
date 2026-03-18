@@ -25,10 +25,15 @@ import { useThemeStore } from '@/stores/theme'
 import { useToast } from '@/composables/useToast'
 import { parseLRC, findCurrentLine } from '@/utils/lrcParser'
 import { shallowRef } from 'vue'
-import type { PluginSidebarItem, PluginSettingField, PluginContextMenuItem } from '@/types/plugin'
+import type { PluginSidebarItem, PluginSettingField, PluginContextMenuItem, PluginAlbumContextMenuItem } from '@/types/plugin'
 
 /** Registry of sidebar items added by plugins */
 const _sidebarItems = new Map<string, PluginSidebarItem[]>()
+/** Reactive flat list consumed by Sidebar */
+export const pluginSidebarItems = shallowRef<PluginSidebarItem[]>([])
+function _syncSidebarItems() {
+  pluginSidebarItems.value = Array.from(_sidebarItems.values()).flat()
+}
 
 /** Registry of context menu items added by plugins */
 const _contextMenuItemsMap = new Map<string, PluginContextMenuItem[]>()
@@ -36,6 +41,14 @@ const _contextMenuItemsMap = new Map<string, PluginContextMenuItem[]>()
 export const pluginContextMenuItems = shallowRef<PluginContextMenuItem[]>([])
 function _syncContextMenuItems() {
   pluginContextMenuItems.value = Array.from(_contextMenuItemsMap.values()).flat()
+}
+
+/** Registry of album context menu items added by plugins */
+const _albumContextMenuItemsMap = new Map<string, PluginAlbumContextMenuItem[]>()
+/** Reactive flat list consumed by AlbumCard */
+export const pluginAlbumContextMenuItems = shallowRef<PluginAlbumContextMenuItem[]>([])
+function _syncAlbumContextMenuItems() {
+  pluginAlbumContextMenuItems.value = Array.from(_albumContextMenuItemsMap.values()).flat()
 }
 
 /** Registry of settings schemas registered at runtime by plugins */
@@ -223,9 +236,11 @@ export function createPluginAPI(pluginId: string) {
       },
       addSidebarItems(items: PluginSidebarItem[]) {
         _sidebarItems.set(pluginId, items)
+        _syncSidebarItems()
       },
       removeSidebarItems() {
         _sidebarItems.delete(pluginId)
+        _syncSidebarItems()
       },
       /**
        * Register context menu items that appear in the song right-click menu.
@@ -238,6 +253,79 @@ export function createPluginAPI(pluginId: string) {
       removeContextMenuItems() {
         _contextMenuItemsMap.delete(pluginId)
         _syncContextMenuItems()
+      },
+      /**
+       * Register context menu items that appear in the album card right-click menu.
+       * `onClick` receives the right-clicked album object `{ id, name, artist, year, tracks, coverArt }`.
+       */
+      addAlbumContextMenuItems(items: PluginAlbumContextMenuItem[]) {
+        _albumContextMenuItemsMap.set(pluginId, items)
+        _syncAlbumContextMenuItems()
+      },
+      removeAlbumContextMenuItems() {
+        _albumContextMenuItemsMap.delete(pluginId)
+        _syncAlbumContextMenuItems()
+      },
+      /**
+       * Observe album cards as they mount and unmount in the DOM.
+       * Useful for injecting custom badges or overlays directly onto album card elements.
+       *
+       * Each album card root element has a `data-album-id` attribute matching `album.id`
+       * from the library store. The cover art wrapper (first child div) is a good place
+       * to inject overlays — it is `position: relative`.
+       *
+       * @param callbacks.onMount  — called when a card element is added to the DOM
+       * @param callbacks.onUnmount — called when a card element is removed from the DOM
+       * @returns A cleanup function — call it in `onDeactivate` to stop observing.
+       *
+       * @example
+       * var stop = aurora.ui.observeAlbumCards({
+       *   onMount: function(el, albumId) {
+       *     var badge = document.createElement('div')
+       *     badge.className = 'my-badge'
+       *     el.querySelector('.album-cover-wrapper')?.appendChild(badge)
+       *   },
+       *   onUnmount: function(el, albumId) { /* element already removed from DOM *\/ }
+       * })
+       * // In onDeactivate:
+       * stop()
+       */
+      observeAlbumCards(callbacks: {
+        onMount?: (el: HTMLElement, albumId: string) => void
+        onUnmount?: (el: HTMLElement, albumId: string) => void
+      }): () => void {
+        const { onMount, onUnmount } = callbacks
+
+        function visit(node: Node, added: boolean) {
+          if (!(node instanceof HTMLElement)) return
+          if (node.classList.contains('album-card') && node.dataset.albumId) {
+            const id = node.dataset.albumId
+            if (added) onMount?.(node, id)
+            else onUnmount?.(node, id)
+          }
+          // Subtree (e.g. the whole grid being injected at once)
+          node.querySelectorAll<HTMLElement>('.album-card[data-album-id]').forEach(el => {
+            const id = el.dataset.albumId!
+            if (added) onMount?.(el, id)
+            else onUnmount?.(el, id)
+          })
+        }
+
+        const observer = new MutationObserver(mutations => {
+          for (const m of mutations) {
+            m.addedNodes.forEach(n => visit(n, true))
+            m.removedNodes.forEach(n => visit(n, false))
+          }
+        })
+
+        observer.observe(document.body, { childList: true, subtree: true })
+
+        // Process cards already in the DOM
+        document.querySelectorAll<HTMLElement>('.album-card[data-album-id]').forEach(el => {
+          if (el.dataset.albumId) onMount?.(el, el.dataset.albumId)
+        })
+
+        return () => observer.disconnect()
       },
       /**
        * Get a dedicated plugin slot container inside the PlayerBar.
@@ -261,6 +349,24 @@ export function createPluginAPI(pluginId: string) {
        */
       getImmersiveSettingsSlot(): HTMLElement | null {
         return document.getElementById('aurora-immersive-settings-slot')
+      },
+      /**
+       * Get the plugin slot in the album detail page header (next to Play / Add to Queue).
+       * The slot element has a `data-album-id` attribute that Vue keeps in sync with the
+       * currently viewed album. Use a MutationObserver to react to album navigation.
+       * Returns null when the album detail page is not currently mounted.
+       */
+      getAlbumDetailSlot(): HTMLElement | null {
+        return document.getElementById('aurora-album-detail-slot')
+      },
+      /**
+       * Navigate to an app route, e.g. `'/albums'`, `'/album/some-album-id'`, `'/artist/Artist%20Name'`.
+       * Uses the Vue Router instance — equivalent to `router.push(path)`.
+       */
+      navigate(path: string): void {
+        const r = (window as any).__auroraRouter
+        if (r) r.push(path)
+        else window.location.hash = '#' + path
       },
     },
 

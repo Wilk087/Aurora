@@ -276,7 +276,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
 import { usePlaylistStore, type PlaylistSortOrder } from '@/stores/playlist'
-import { getPluginSidebarItems } from '@/plugins/api'
+import { pluginSidebarItems } from '@/plugins/api'
 import { useSearchFocus } from '@/composables/useSearchFocus'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 const router = useRouter()
@@ -286,7 +286,7 @@ const player = usePlayerStore()
 const library = useLibraryStore()
 const playlistStore = usePlaylistStore()
 
-const pluginSidebarItems = computed(() => getPluginSidebarItems())
+// pluginSidebarItems is a reactive shallowRef imported from the plugin API
 
 // ── Delete confirmation dialog ─────────────────────────────────────────
 const deleteDialog = reactive({ show: false, playlistName: '', playlistId: '' })

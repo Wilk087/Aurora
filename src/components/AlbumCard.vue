@@ -1,7 +1,7 @@
 <template>
-  <div @click="$emit('click')" @contextmenu.prevent="openCtx" class="album-card group cursor-pointer">
+  <div @click="$emit('click')" @contextmenu.prevent="openCtx" class="album-card group cursor-pointer" :data-album-id="album.id">
     <div
-      class="relative aspect-square rounded-xl overflow-hidden bg-white/[0.06] mb-3 cover-shadow transition-transform group-hover:scale-[1.02]"
+      class="album-cover-wrapper relative aspect-square rounded-xl overflow-hidden bg-white/[0.06] mb-3 cover-shadow transition-transform group-hover:scale-[1.02]"
     >
       <img
         v-if="album.coverArt"
@@ -125,6 +125,58 @@
             </button>
           </div>
         </div>
+        <!-- Plugin-injected album context menu items -->
+        <template v-if="pluginAlbumContextMenuItems.length">
+          <div class="border-t border-white/[0.06] my-1" />
+          <template v-for="(item, idx) in pluginAlbumContextMenuItems" :key="item.label">
+            <div v-if="item.separator" class="border-t border-white/[0.06] my-1" />
+            <!-- Item with children — hover submenu -->
+            <div
+              v-if="item.children && item.children.length"
+              class="relative"
+              @mouseenter="openPluginSubmenu = idx"
+              @mouseleave="openPluginSubmenu = null"
+            >
+              <button class="w-full px-3.5 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2.5">
+                <svg v-if="item.icon" class="w-4 h-4 shrink-0 text-white/40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" />
+                </svg>
+                {{ item.label }}
+                <svg class="w-3 h-3 ml-auto shrink-0 text-white/30" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 18l6-6-6-6" />
+                </svg>
+              </button>
+              <div
+                v-if="openPluginSubmenu === idx"
+                class="absolute left-full top-0 ml-1 w-52 rounded-xl menu-panel py-1.5 shadow-2xl z-[110]"
+              >
+                <template v-for="child in item.children" :key="child.label">
+                  <div v-if="child.separator" class="border-t border-white/[0.06] my-1" />
+                  <button
+                    @click.stop="runPluginAlbumCtxItem(child)"
+                    class="w-full px-3.5 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2.5"
+                  >
+                    <svg v-if="child.icon" class="w-4 h-4 shrink-0 text-white/40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" :d="child.icon" />
+                    </svg>
+                    {{ child.label }}
+                  </button>
+                </template>
+              </div>
+            </div>
+            <!-- Regular item -->
+            <button
+              v-else
+              @click.stop="runPluginAlbumCtxItem(item)"
+              class="w-full px-3.5 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2.5"
+            >
+              <svg v-if="item.icon" class="w-4 h-4 shrink-0 text-white/40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" />
+              </svg>
+              {{ item.label }}
+            </button>
+          </template>
+        </template>
       </div>
     </Teleport>
   </div>
@@ -138,6 +190,8 @@ import { usePlaylistStore } from '@/stores/playlist'
 import { useToast } from '@/composables/useToast'
 import ArtistLinks from '@/components/ArtistLinks.vue'
 import type { Album } from '@/stores/library'
+import { pluginAlbumContextMenuItems } from '@/plugins/api'
+import type { PluginAlbumContextMenuItem } from '@/types/plugin'
 
 const props = defineProps<{ album: Album }>()
 
@@ -150,6 +204,7 @@ const toast = useToast()
 
 const showPlaylistSub = ref(false)
 const playlistSubmenuRef = ref<HTMLElement>()
+const openPluginSubmenu = ref<number | null>(null)
 
 /** True when this album's tracks are currently playing */
 const isThisAlbumPlaying = computed(() => {
@@ -219,6 +274,13 @@ async function createAndAddPlaylist() {
   toast.success(`Created "${name}" with ${props.album.tracks.length} tracks`)
   showPlaylistSub.value = false
   showCtx.value = false
+}
+
+function runPluginAlbumCtxItem(item: PluginAlbumContextMenuItem) {
+  showCtx.value = false
+  try { item.onClick(props.album) } catch (err) {
+    console.error('[Aurora] Plugin album context menu item error:', err)
+  }
 }
 
 async function addToPlaylist(playlistId: string) {

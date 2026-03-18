@@ -375,6 +375,12 @@ Interact with the UI.
 | `toast.error(msg)` | Show an error toast notification |
 | `addSidebarItems(items)` | Add items to the sidebar (see below) |
 | `removeSidebarItems()` | Remove all sidebar items added by this plugin |
+| `addContextMenuItems(items)` | Add items to the song row right-click menu (see below) |
+| `removeContextMenuItems()` | Remove all song context menu items added by this plugin |
+| `addAlbumContextMenuItems(items)` | Add items to the album card right-click menu (see below) |
+| `removeAlbumContextMenuItems()` | Remove all album context menu items added by this plugin |
+| `observeAlbumCards(callbacks)` | Watch album card elements mount/unmount in the DOM — for injecting overlays (see below) |
+| `navigate(path)` | Navigate to an app route, e.g. `'/albums'`, `'/album/some-id'`, `'/artist/Name'` |
 | `getPlayerBarSlot(position?)` | Get a DOM element slot in the player bar (`'left'` or `'right'`, default `'right'`) |
 | `getImmersiveSlot(position?)` | Get a DOM slot in the fullscreen view (`'right'` or `'modern-right'`) |
 | `getImmersiveSettingsSlot()` | Get a DOM slot in the fullscreen settings panel |
@@ -392,6 +398,73 @@ aurora.ui.addSidebarItems([
   }
 ])
 ```
+
+#### Song context menu items
+
+Add custom actions to the track right-click menu. `onClick` receives the right-clicked track plus any other currently selected tracks. Use `separator: true` to render a divider line before an item.
+
+```javascript
+aurora.ui.addContextMenuItems([
+  {
+    label: 'My Action',
+    icon: 'M12 4.5v15m7.5-7.5h-15',  // SVG path d attribute (24x24 viewBox)
+    separator: true,                  // optional: render a divider before this item
+    onClick: function (tracks) {
+      tracks.forEach(function (t) { console.log(t.title) })
+    }
+  }
+])
+```
+
+#### Album context menu items
+
+Add custom actions to the album card right-click menu. `onClick` receives the `Album` object `{ id, name, artist, year, tracks, coverArt }`. Supports the same `separator` and `icon` fields as song context menu items.
+
+```javascript
+aurora.ui.addAlbumContextMenuItems([
+  {
+    label: 'My Album Action',
+    icon: 'M9 9h6M9 12h6M9 15h4',  // SVG path d attribute
+    separator: true,
+    onClick: function (album) {
+      console.log('Right-clicked:', album.name, 'by', album.artist)
+    }
+  }
+])
+```
+
+Always call `aurora.ui.removeAlbumContextMenuItems()` in `onDeactivate`.
+
+#### Observing album cards
+
+Use `aurora.ui.observeAlbumCards` to inject custom DOM overlays (badges, icons, etc.) directly onto album card elements as they mount and unmount in the grid.
+
+Each album card's root element has a `data-album-id` attribute matching `album.id` from the library store. The cover art wrapper has the class `album-cover-wrapper` and is `position: relative`, making it ideal for absolute-positioned overlays.
+
+```javascript
+var stopObserver = null
+
+exports.onActivate = function () {
+  stopObserver = aurora.ui.observeAlbumCards({
+    onMount: function (cardEl, albumId) {
+      var badge = document.createElement('div')
+      badge.style.cssText = 'position:absolute;top:6px;left:6px;z-index:10;padding:2px 8px;border-radius:100px;background:rgba(34,197,94,0.85);color:#000;font-size:11px;'
+      badge.textContent = '✓'
+      var cover = cardEl.querySelector('.album-cover-wrapper')
+      if (cover) cover.appendChild(badge)
+    },
+    onUnmount: function (cardEl, albumId) {
+      // cardEl is already removed from the DOM; no cleanup needed
+    }
+  })
+}
+
+exports.onDeactivate = function () {
+  if (stopObserver) stopObserver()
+}
+```
+
+`observeAlbumCards` immediately calls `onMount` for any album cards already in the DOM, then uses a `MutationObserver` to handle cards added or removed later (e.g. as the user navigates or filters). Returns a cleanup function — call it in `onDeactivate`.
 
 #### DOM slots
 

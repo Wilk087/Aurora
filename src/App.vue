@@ -79,6 +79,7 @@ const { focusSearch } = useSearchFocus()
 ;(window as any).__auroraPlaylistStore = playlistStore
 ;(window as any).__auroraStatsStore = statsStore
 ;(window as any).__auroraFavoritesStore = favoritesStore
+;(window as any).__auroraRouter = router
 
 const dynamicColor = ref<string | null>(null)
 const isWindowMaximized = ref(false)
