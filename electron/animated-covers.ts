@@ -22,7 +22,7 @@ import { logger } from './logger'
 // Primary storefront is derived from the system locale (e.g. 'gb', 'de', 'us').
 // Falls back to 'us' if the locale can't be determined.
 // FALLBACK_STOREFRONTS are tried in order when the primary yields no result.
-const FALLBACK_STOREFRONTS = ['gb', 'us', 'au', 'de', 'jp', 'fr']
+const FALLBACK_STOREFRONTS = ['us', 'gb', 'au', 'de', 'jp', 'fr']
 
 function getPrimaryStorefront(): string {
   const country = app.getLocaleCountryCode()
@@ -108,7 +108,13 @@ function fetchText(url: string, headers: Record<string, string> = {}): Promise<s
       }
       let data = ''
       res.on('data', (c) => (data += c))
-      res.on('end', () => resolve(data))
+      res.on('end', () => {
+        if (res.statusCode && res.statusCode >= 400) {
+          reject(new Error(`HTTP ${res.statusCode}`))
+        } else {
+          resolve(data)
+        }
+      })
       res.on('error', reject)
     })
     req.on('error', reject)
@@ -205,7 +211,10 @@ function extractVideoUrl(ev: NonNullable<AppleMusicAlbum['attributes']['editoria
 }
 
 async function searchAppleMusic(token: string, storefront: string, term: string): Promise<AppleMusicAlbum[]> {
-  const url = `https://amp-api.music.apple.com/v1/catalog/${storefront}/search?types=albums&term=${encodeURIComponent(term)}&limit=25&extend=editorialVideo`
+  // Note: do NOT include extend=editorialVideo here — Apple's search endpoint silently
+  // returns 0 results when that parameter is present. We fetch editorial video separately
+  // via fetchEditorialVideo() once we have a matching album ID.
+  const url = `https://amp-api.music.apple.com/v1/catalog/${storefront}/search?types=albums&term=${encodeURIComponent(term)}&limit=25`
   const raw = await fetchText(url, {
     Authorization: `Bearer ${token}`,
     Origin: 'https://music.apple.com',
@@ -214,7 +223,22 @@ async function searchAppleMusic(token: string, storefront: string, term: string)
   return data?.results?.albums?.data || []
 }
 
-function findMatch(albums: AppleMusicAlbum[], normAlbum: string, normArtist: string, artistParts: string[]): string | null {
+async function fetchEditorialVideo(token: string, storefront: string, albumId: string): Promise<string | null> {
+  try {
+    const url = `https://amp-api.music.apple.com/v1/catalog/${storefront}/albums/${albumId}?extend=editorialVideo`
+    const raw = await fetchText(url, {
+      Authorization: `Bearer ${token}`,
+      Origin: 'https://music.apple.com',
+    })
+    const data = JSON.parse(raw)
+    const ev = data?.data?.[0]?.attributes?.editorialVideo
+    return ev ? extractVideoUrl(ev) : null
+  } catch {
+    return null
+  }
+}
+
+function findMatchId(albums: AppleMusicAlbum[], normAlbum: string, normArtist: string, artistParts: string[]): string | null {
   function artistMatch(aArtist: string): boolean {
     return aArtist === normArtist
       || aArtist.includes(normArtist)
@@ -226,22 +250,21 @@ function findMatch(albums: AppleMusicAlbum[], normAlbum: string, normArtist: str
   for (const a of albums) {
     if (normalizeStr(a.attributes.name) !== normAlbum) continue
     if (!artistMatch(normalizeStr(a.attributes.artistName))) continue
-    if (a.attributes.editorialVideo) {
-      const url = extractVideoUrl(a.attributes.editorialVideo)
-      if (url) return url
-    }
+    return a.id
   }
 
   // Pass 2: contains match — handles minor name variations (remaster tags, subtitles, etc.)
+  // Guard: only allow reverse containment (our name contains the AM name) when the AM name
+  // is at least 40% of the word count of our name — prevents "SOS" from matching "SOS Deluxe: LANA"
   for (const a of albums) {
     const aName = normalizeStr(a.attributes.name)
-    const nameMatch = aName.includes(normAlbum) || normAlbum.includes(aName)
+    const aWords = aName.split(' ').length
+    const normWords = normAlbum.split(' ').length
+    const nameMatch = aName.includes(normAlbum)
+      || (normAlbum.includes(aName) && aWords / normWords >= 0.4)
     if (!nameMatch) continue
     if (!artistMatch(normalizeStr(a.attributes.artistName))) continue
-    if (a.attributes.editorialVideo) {
-      const url = extractVideoUrl(a.attributes.editorialVideo)
-      if (url) return url
-    }
+    return a.id
   }
 
   return null
@@ -251,13 +274,21 @@ async function searchStorefront(token: string, storefront: string, album: string
   normAlbum: string, normArtist: string, artistParts: string[]): Promise<string | null> {
   // Query 1: combined "album artist" — best ranking
   const combined = await searchAppleMusic(token, storefront, `${album} ${artist}`)
-  const hit1 = findMatch(combined, normAlbum, normArtist, artistParts)
-  if (hit1) return hit1
+  const id1 = findMatchId(combined, normAlbum, normArtist, artistParts)
+  if (id1) {
+    const url = await fetchEditorialVideo(token, storefront, id1)
+    if (url) return url
+  }
 
   // Query 2: album-only fallback — catches cases where combined buries the result
   const albumOnly = await searchAppleMusic(token, storefront, album)
-  const hit2 = findMatch(albumOnly, normAlbum, normArtist, artistParts)
-  return hit2
+  const id2 = findMatchId(albumOnly, normAlbum, normArtist, artistParts)
+  if (id2 && id2 !== id1) {
+    const url = await fetchEditorialVideo(token, storefront, id2)
+    if (url) return url
+  }
+
+  return null
 }
 
 async function searchAnimatedCover(album: string, artist: string): Promise<string | null> {
@@ -268,19 +299,16 @@ async function searchAnimatedCover(album: string, artist: string): Promise<strin
     .split(/[,;&]|\bfeat\.?\b|\bft\.?\b|\bwith\b/i)
     .map(s => s.trim()).filter(Boolean)
 
-  // Try the user's own storefront first
+  // Build ordered storefront list: user's locale first, then fallbacks (skip duplicates)
   const primary = getPrimaryStorefront()
-  const hit = await searchStorefront(token, primary, album, artist, normAlbum, normArtist, artistParts)
-  if (hit) return hit
+  const storefronts = [primary, ...FALLBACK_STOREFRONTS.filter(sf => sf !== primary)]
 
-  // Fall back through other major storefronts (skip primary if already tried)
-  for (const sf of FALLBACK_STOREFRONTS) {
-    if (sf === primary) continue
+  for (const sf of storefronts) {
     try {
-      const fallbackHit = await searchStorefront(token, sf, album, artist, normAlbum, normArtist, artistParts)
-      if (fallbackHit) {
-        logger.debug(`Animated cover for "${album}" found in storefront "${sf}" (primary: "${primary}")`)
-        return fallbackHit
+      const hit = await searchStorefront(token, sf, album, artist, normAlbum, normArtist, artistParts)
+      if (hit) {
+        if (sf !== primary) logger.debug(`Animated cover for "${album}" found in storefront "${sf}" (primary: "${primary}")`)
+        return hit
       }
     } catch {
       // Non-fatal — try next storefront
