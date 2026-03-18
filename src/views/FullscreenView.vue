@@ -1342,9 +1342,10 @@ function startSonarLoop() {
   lastSonarSpawn = 0
 
   function draw(timestamp: number) {
+    if (!canvas) return
     const w = canvas.width = canvas.clientWidth * (window.devicePixelRatio > 1 ? 2 : 1)
     const h = canvas.height = canvas.clientHeight * (window.devicePixelRatio > 1 ? 2 : 1)
-    ctx.clearRect(0, 0, w, h)
+    ctx!.clearRect(0, 0, w, h)
 
     // Origin: left-center for modern, center for artwork
     const isModern = immersiveStyle.value === 'modern'
@@ -1383,20 +1384,20 @@ function startSonarLoop() {
       const alpha = ripple.intensity * (1 - progress) * (1 - progress)
       const ci = rc[(Math.floor(ripple.age / 1000) % 3) + 1]
 
-      ctx.beginPath()
-      ctx.arc(ripple.x, ripple.y, radius, 0, Math.PI * 2)
-      ctx.strokeStyle = `rgba(${ci.r},${ci.g},${ci.b},${alpha})`
-      ctx.lineWidth = 30 + 20 * (1 - progress)
-      ctx.filter = 'blur(15px)'
-      ctx.stroke()
-      ctx.filter = 'none'
+      ctx!.beginPath()
+      ctx!.arc(ripple.x, ripple.y, radius, 0, Math.PI * 2)
+      ctx!.strokeStyle = `rgba(${ci.r},${ci.g},${ci.b},${alpha})`
+      ctx!.lineWidth = 30 + 20 * (1 - progress)
+      ctx!.filter = 'blur(15px)'
+      ctx!.stroke()
+      ctx!.filter = 'none'
 
       // Inner glow
-      ctx.beginPath()
-      ctx.arc(ripple.x, ripple.y, radius * 0.95, 0, Math.PI * 2)
-      ctx.strokeStyle = `rgba(${ci.r},${ci.g},${ci.b},${alpha * 0.4})`
-      ctx.lineWidth = 60 + 30 * (1 - progress)
-      ctx.stroke()
+      ctx!.beginPath()
+      ctx!.arc(ripple.x, ripple.y, radius * 0.95, 0, Math.PI * 2)
+      ctx!.strokeStyle = `rgba(${ci.r},${ci.g},${ci.b},${alpha * 0.4})`
+      ctx!.lineWidth = 60 + 30 * (1 - progress)
+      ctx!.stroke()
     }
     sonarRipples = sonarRipples.filter(r => r.age / r.maxAge <= 1)
 
@@ -1423,9 +1424,10 @@ function startGrainLoop() {
     }
     lastFrame = timestamp
 
+    if (!canvas) return
     const w = canvas.width = Math.ceil(canvas.clientWidth / 3)
     const h = canvas.height = Math.ceil(canvas.clientHeight / 3)
-    const imageData = ctx.createImageData(w, h)
+    const imageData = ctx!.createImageData(w, h)
     const data = imageData.data
 
     for (let i = 0; i < data.length; i += 4) {
@@ -1435,7 +1437,7 @@ function startGrainLoop() {
       data[i + 2] = v
       data[i + 3] = 255
     }
-    ctx.putImageData(imageData, 0, 0)
+    ctx!.putImageData(imageData, 0, 0)
     grainFrameId = requestAnimationFrame(draw)
   }
   grainFrameId = requestAnimationFrame(draw)
