@@ -19,9 +19,12 @@ import { URL } from 'url'
 import { logger } from './logger'
 
 // ── Config ──────────────────────────────────────────────────────────────────
-// Storefront is derived from the system locale at runtime (e.g. 'gb', 'de', 'us').
+// Primary storefront is derived from the system locale (e.g. 'gb', 'de', 'us').
 // Falls back to 'us' if the locale can't be determined.
-function getStorefront(): string {
+// FALLBACK_STOREFRONTS are tried in order when the primary yields no result.
+const FALLBACK_STOREFRONTS = ['gb', 'us', 'au', 'de', 'jp', 'fr']
+
+function getPrimaryStorefront(): string {
   const country = app.getLocaleCountryCode()
   return country ? country.toLowerCase() : 'us'
 }
@@ -201,8 +204,8 @@ function extractVideoUrl(ev: NonNullable<AppleMusicAlbum['attributes']['editoria
     || null
 }
 
-async function searchAppleMusic(token: string, term: string): Promise<AppleMusicAlbum[]> {
-  const url = `https://amp-api.music.apple.com/v1/catalog/${getStorefront()}/search?types=albums&term=${encodeURIComponent(term)}&limit=25&extend=editorialVideo`
+async function searchAppleMusic(token: string, storefront: string, term: string): Promise<AppleMusicAlbum[]> {
+  const url = `https://amp-api.music.apple.com/v1/catalog/${storefront}/search?types=albums&term=${encodeURIComponent(term)}&limit=25&extend=editorialVideo`
   const raw = await fetchText(url, {
     Authorization: `Bearer ${token}`,
     Origin: 'https://music.apple.com',
@@ -244,6 +247,19 @@ function findMatch(albums: AppleMusicAlbum[], normAlbum: string, normArtist: str
   return null
 }
 
+async function searchStorefront(token: string, storefront: string, album: string, artist: string,
+  normAlbum: string, normArtist: string, artistParts: string[]): Promise<string | null> {
+  // Query 1: combined "album artist" — best ranking
+  const combined = await searchAppleMusic(token, storefront, `${album} ${artist}`)
+  const hit1 = findMatch(combined, normAlbum, normArtist, artistParts)
+  if (hit1) return hit1
+
+  // Query 2: album-only fallback — catches cases where combined buries the result
+  const albumOnly = await searchAppleMusic(token, storefront, album)
+  const hit2 = findMatch(albumOnly, normAlbum, normArtist, artistParts)
+  return hit2
+}
+
 async function searchAnimatedCover(album: string, artist: string): Promise<string | null> {
   const token = await getAppleMusicToken()
   const normAlbum = normalizeStr(album)
@@ -252,19 +268,26 @@ async function searchAnimatedCover(album: string, artist: string): Promise<strin
     .split(/[,;&]|\bfeat\.?\b|\bft\.?\b|\bwith\b/i)
     .map(s => s.trim()).filter(Boolean)
 
-  // Pass 1: combined "album artist" query — usually the best ranking
-  const combined = await searchAppleMusic(token, `${album} ${artist}`)
-  const hit1 = findMatch(combined, normAlbum, normArtist, artistParts)
-  if (hit1) return hit1
+  // Try the user's own storefront first
+  const primary = getPrimaryStorefront()
+  const hit = await searchStorefront(token, primary, album, artist, normAlbum, normArtist, artistParts)
+  if (hit) return hit
 
-  // Pass 2: album-only query — catches cases where combined query buries the result
-  if (combined.length > 0) {
-    const albumOnly = await searchAppleMusic(token, album)
-    const hit2 = findMatch(albumOnly, normAlbum, normArtist, artistParts)
-    if (hit2) return hit2
+  // Fall back through other major storefronts (skip primary if already tried)
+  for (const sf of FALLBACK_STOREFRONTS) {
+    if (sf === primary) continue
+    try {
+      const fallbackHit = await searchStorefront(token, sf, album, artist, normAlbum, normArtist, artistParts)
+      if (fallbackHit) {
+        logger.debug(`Animated cover for "${album}" found in storefront "${sf}" (primary: "${primary}")`)
+        return fallbackHit
+      }
+    } catch {
+      // Non-fatal — try next storefront
+    }
   }
 
-  logger.debug(`No animated cover found for "${album}" by "${artist}" (checked ${combined.length} combined results)`)
+  logger.debug(`No animated cover found for "${album}" by "${artist}" across all storefronts`)
   return null
 }
 
