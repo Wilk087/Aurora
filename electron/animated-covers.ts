@@ -11,7 +11,7 @@
 
 import { ipcMain, app } from 'electron'
 import { join } from 'path'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { get as httpsGet } from 'https'
 import { request as httpRequest } from 'http'
 import { createHash } from 'crypto'
@@ -19,9 +19,15 @@ import { URL } from 'url'
 import { logger } from './logger'
 
 // ── Config ──────────────────────────────────────────────────────────────────
-const STOREFRONT = 'us' // Apple Music storefront
+// Storefront is derived from the system locale at runtime (e.g. 'gb', 'de', 'us').
+// Falls back to 'us' if the locale can't be determined.
+function getStorefront(): string {
+  const country = app.getLocaleCountryCode()
+  return country ? country.toLowerCase() : 'us'
+}
 const TOKEN_MAX_AGE = 12 * 60 * 60 * 1000 // 12 hours
-const NEGATIVE_CACHE_TTL = 7 * 24 * 60 * 60 * 1000 // 7 days
+const NEGATIVE_CACHE_TTL = 7 * 24 * 60 * 60 * 1000 // 7 days — confirmed no cover
+const NETWORK_ERROR_CACHE_TTL = 30 * 60 * 1000     // 30 min — transient network errors
 const URL_CACHE_TTL = 24 * 60 * 60 * 1000 // 24 hours — HLS URLs expire
 
 // ── State ───────────────────────────────────────────────────────────────────
@@ -68,8 +74,12 @@ function saveNegativeCache() {
 
 function isNegativelyCached(key: string): boolean {
   const ts = negativeLookups[key]
-  if (!ts) return false
-  if (Date.now() - ts > NEGATIVE_CACHE_TTL) {
+  if (ts === undefined) return false
+  const now = Date.now()
+  // Negative timestamp = network/API error (short TTL)
+  // Positive timestamp = confirmed no cover (long TTL)
+  const ttl = ts < 0 ? NETWORK_ERROR_CACHE_TTL : NEGATIVE_CACHE_TTL
+  if (now - Math.abs(ts) > ttl) {
     delete negativeLookups[key]
     return false
   }
@@ -153,6 +163,19 @@ async function getAppleMusicToken(): Promise<string> {
   throw new Error('Could not extract Apple Music bearer token')
 }
 
+// ── Normalise strings for lenient comparison ────────────────────────────────
+function normalizeStr(s: string): string {
+  return s
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // strip diacritics (é→e, ü→u, …)
+    .toLowerCase()
+    .replace(/^the\s+/, '')          // strip leading "The " / "the "
+    .replace(/['']/g, "'")           // curly → straight apostrophe
+    .replace(/[–—]/g, '-')           // em/en dash → hyphen
+    .replace(/[^\w\s'-]/g, ' ')      // remove remaining punctuation
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 // ── Search Apple Music catalog ──────────────────────────────────────────────
 interface AppleMusicAlbum {
   id: string
@@ -163,56 +186,85 @@ interface AppleMusicAlbum {
       motionSquareVideo1x1?: { video: string }
       motionDetailSquare?: { video: string }
       motionDetailTall?: { video: string }
+      motionDetailTallVideo?: { video: string }
+      motionSquareVideo?: { video: string }
     }
   }
 }
 
-async function searchAnimatedCover(album: string, artist: string): Promise<string | null> {
-  const token = await getAppleMusicToken()
-  const term = encodeURIComponent(`${album} ${artist}`)
-  const url = `https://amp-api.music.apple.com/v1/catalog/${STOREFRONT}/search?types=albums&term=${term}&limit=10&extend=editorialVideo`
+function extractVideoUrl(ev: NonNullable<AppleMusicAlbum['attributes']['editorialVideo']>): string | null {
+  return ev.motionSquareVideo1x1?.video
+    || ev.motionDetailSquare?.video
+    || ev.motionDetailTall?.video
+    || ev.motionDetailTallVideo?.video
+    || ev.motionSquareVideo?.video
+    || null
+}
 
+async function searchAppleMusic(token: string, term: string): Promise<AppleMusicAlbum[]> {
+  const url = `https://amp-api.music.apple.com/v1/catalog/${getStorefront()}/search?types=albums&term=${encodeURIComponent(term)}&limit=25&extend=editorialVideo`
   const raw = await fetchText(url, {
     Authorization: `Bearer ${token}`,
     Origin: 'https://music.apple.com',
   })
-
   const data = JSON.parse(raw)
-  const albums: AppleMusicAlbum[] = data?.results?.albums?.data || []
+  return data?.results?.albums?.data || []
+}
 
-  // Find best match
-  const normalizedAlbum = album.trim().toLowerCase()
-  const normalizedArtist = artist.trim().toLowerCase()
-  // Split multi-artist strings for partial matching (e.g. "Metro Boomin" in "Metro Boomin, Swae Lee")
-  const artistParts = normalizedArtist.split(/[,;&]|\bfeat\.?\b|\bft\.?\b|\bwith\b/i).map(s => s.trim()).filter(Boolean)
+function findMatch(albums: AppleMusicAlbum[], normAlbum: string, normArtist: string, artistParts: string[]): string | null {
+  function artistMatch(aArtist: string): boolean {
+    return aArtist === normArtist
+      || aArtist.includes(normArtist)
+      || normArtist.includes(aArtist)
+      || artistParts.some(p => p.length > 2 && (aArtist.includes(p) || p.includes(aArtist)))
+  }
 
+  // Pass 1: exact album name — avoids picking anniversary/deluxe editions over the original
   for (const a of albums) {
-    const aName = a.attributes.name.trim().toLowerCase()
-    const aArtist = a.attributes.artistName.trim().toLowerCase()
-
-    // Check name match (exact or contains)
-    const nameMatch = aName === normalizedAlbum ||
-      aName.includes(normalizedAlbum) ||
-      normalizedAlbum.includes(aName)
-
-    // Check artist match: full string match, contains, or any part matches
-    const artistMatch = aArtist === normalizedArtist ||
-      aArtist.includes(normalizedArtist) ||
-      normalizedArtist.includes(aArtist) ||
-      artistParts.some(part => part.length > 2 && (aArtist.includes(part) || part.includes(aArtist)))
-
-    if (nameMatch && artistMatch) {
-      const ev = a.attributes.editorialVideo
-      if (ev) {
-        // Prefer square video, fallback to other formats
-        const videoUrl = ev.motionSquareVideo1x1?.video
-          || ev.motionDetailSquare?.video
-          || ev.motionDetailTall?.video
-        if (videoUrl) return videoUrl
-      }
+    if (normalizeStr(a.attributes.name) !== normAlbum) continue
+    if (!artistMatch(normalizeStr(a.attributes.artistName))) continue
+    if (a.attributes.editorialVideo) {
+      const url = extractVideoUrl(a.attributes.editorialVideo)
+      if (url) return url
     }
   }
 
+  // Pass 2: contains match — handles minor name variations (remaster tags, subtitles, etc.)
+  for (const a of albums) {
+    const aName = normalizeStr(a.attributes.name)
+    const nameMatch = aName.includes(normAlbum) || normAlbum.includes(aName)
+    if (!nameMatch) continue
+    if (!artistMatch(normalizeStr(a.attributes.artistName))) continue
+    if (a.attributes.editorialVideo) {
+      const url = extractVideoUrl(a.attributes.editorialVideo)
+      if (url) return url
+    }
+  }
+
+  return null
+}
+
+async function searchAnimatedCover(album: string, artist: string): Promise<string | null> {
+  const token = await getAppleMusicToken()
+  const normAlbum = normalizeStr(album)
+  const normArtist = normalizeStr(artist)
+  const artistParts = normArtist
+    .split(/[,;&]|\bfeat\.?\b|\bft\.?\b|\bwith\b/i)
+    .map(s => s.trim()).filter(Boolean)
+
+  // Pass 1: combined "album artist" query — usually the best ranking
+  const combined = await searchAppleMusic(token, `${album} ${artist}`)
+  const hit1 = findMatch(combined, normAlbum, normArtist, artistParts)
+  if (hit1) return hit1
+
+  // Pass 2: album-only query — catches cases where combined query buries the result
+  if (combined.length > 0) {
+    const albumOnly = await searchAppleMusic(token, album)
+    const hit2 = findMatch(albumOnly, normAlbum, normArtist, artistParts)
+    if (hit2) return hit2
+  }
+
+  logger.debug(`No animated cover found for "${album}" by "${artist}" (checked ${combined.length} combined results)`)
   return null
 }
 
@@ -251,8 +303,9 @@ async function getAnimatedCover(album: string, artist: string): Promise<string |
     return videoUrl
   } catch (err) {
     logger.error(`Failed to fetch animated cover for "${album}" by "${artist}":`, err)
-    // Cache negative result on error too (to avoid hammering API)
-    negativeLookups[key] = Date.now()
+    // Network/transient error: cache with negative timestamp (short 30-min TTL)
+    // so a temporary outage doesn't block the album for 7 days
+    negativeLookups[key] = -Date.now()
     saveNegativeCache()
     return null
   }
