@@ -78,6 +78,7 @@ const { focusSearch } = useSearchFocus()
 ;(window as any).__auroraLibStore = library
 ;(window as any).__auroraPlaylistStore = playlistStore
 ;(window as any).__auroraStatsStore = statsStore
+;(window as any).__auroraFavoritesStore = favoritesStore
 
 const dynamicColor = ref<string | null>(null)
 const isWindowMaximized = ref(false)

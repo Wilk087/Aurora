@@ -1339,6 +1339,13 @@ export const usePlayerStore = defineStore('player', () => {
         const raw = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
         return raw ? `rgb(${raw})` : undefined
       })(),
+      isFavorite: (() => {
+        if (!currentTrack.value) return false
+        const favStore = (window as any).__auroraFavoritesStore
+        if (!favStore) return false
+        const ids: Set<string> | undefined = favStore.ids?.value
+        return ids ? ids.has(currentTrack.value.id) : false
+      })(),
     })
   }
 
@@ -1411,6 +1418,23 @@ export const usePlayerStore = defineStore('player', () => {
         const lib = getLibStore()
         const track = lib.tracks.find((t: Track) => t.id === data?.trackId)
         if (track) playLater(track)
+        break
+      }
+      case 'playPlaylist': {
+        const playlistStore = (window as any).__auroraPlaylistStore
+        if (!playlistStore) break
+        const tracks = playlistStore.getPlaylistTracks(data?.playlistId)
+        if (tracks.length > 0) {
+          if (data?.shuffle) isShuffle.value = true
+          playAll(tracks, 0)
+        }
+        break
+      }
+      case 'toggleFavorite': {
+        const favStore = (window as any).__auroraFavoritesStore
+        if (favStore && data?.trackId) {
+          favStore.toggle(data.trackId)
+        }
         break
       }
     }

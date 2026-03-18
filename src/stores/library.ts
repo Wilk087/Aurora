@@ -315,8 +315,40 @@ export const useLibraryStore = defineStore('library', () => {
         id: p.id,
         name: p.name,
         trackCount: p.trackIds.length,
+        coverArt: p.customImage || null,
       }))
       window.api.sendRemoteResponse('getPlaylists', playlistData)
+    }
+
+    if (requestType.startsWith('getPlaylistTracks:')) {
+      const playlistId = requestType.slice('getPlaylistTracks:'.length)
+      const playlistStore = (window as any).__auroraPlaylistStore
+      const trackData = playlistStore ? playlistStore.getPlaylistTracks(playlistId).map((t: Track) => ({
+        id: t.id,
+        title: t.title,
+        artist: t.artist,
+        album: t.album,
+        albumArtist: t.albumArtist,
+        coverArt: t.coverArt,
+        duration: t.duration,
+        trackNumber: t.track,
+      })) : []
+      window.api.sendRemoteResponse(requestType, trackData)
+    }
+
+    if (requestType === 'getFavorites') {
+      const favoritesStore = (window as any).__auroraFavoritesStore
+      const trackData = favoritesStore ? favoritesStore.favoriteTracks.map((t: Track) => ({
+        id: t.id,
+        title: t.title,
+        artist: t.artist,
+        album: t.album,
+        albumArtist: t.albumArtist,
+        coverArt: t.coverArt,
+        duration: t.duration,
+        trackNumber: t.track,
+      })) : []
+      window.api.sendRemoteResponse('getFavorites', trackData)
     }
   })
 

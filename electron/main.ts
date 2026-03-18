@@ -1038,6 +1038,12 @@ if (process.platform === 'linux') {
   // file picker (GNOME, KDE, etc.) instead of the old GTK3 chooser widget.
   app.commandLine.appendSwitch('gtk-version', '4')
 
+  if (isWayland) {
+    // hls.js uses MediaSource with hardware H.264 decoding, which crashes the
+    // Wayland GPU sub-process. Forcing software decode prevents the crash.
+    app.commandLine.appendSwitch('disable-accelerated-video-decode')
+  }
+
   logger.info(`Display server: ${isWayland ? 'Wayland' : 'X11'} (WAYLAND_DISPLAY=${waylandDisplay ?? 'unset'}, XDG_SESSION_TYPE=${sessionType ?? 'unset'}, DISPLAY=${process.env.DISPLAY ?? 'unset'})`)
 }
 

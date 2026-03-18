@@ -36,13 +36,14 @@
       }
     ],
     "fileAssociations": [
-      {
-        "ext": ["mp3", "flac", "ogg", "opus", "wav", "m4a", "aac", "wma"],
-        "name": "Audio File",
-        "description": "Audio file",
-        "mimeType": "audio/mpeg",
-        "role": "Viewer"
-      }
+      { "ext": "mp3", "name": "MP3 Audio", "mimeType": "audio/mpeg", "role": "Viewer" },
+      { "ext": "flac", "name": "FLAC Audio", "mimeType": "audio/flac", "role": "Viewer" },
+      { "ext": "ogg", "name": "OGG Audio", "mimeType": "audio/ogg", "role": "Viewer" },
+      { "ext": "opus", "name": "Opus Audio", "mimeType": "audio/opus", "role": "Viewer" },
+      { "ext": "wav", "name": "WAV Audio", "mimeType": "audio/wav", "role": "Viewer" },
+      { "ext": "m4a", "name": "M4A Audio", "mimeType": "audio/mp4", "role": "Viewer" },
+      { "ext": "aac", "name": "AAC Audio", "mimeType": "audio/aac", "role": "Viewer" },
+      { "ext": "wma", "name": "WMA Audio", "mimeType": "audio/x-ms-wma", "role": "Viewer" }
     ],
     "linux": {
       "target": [

@@ -46,6 +46,7 @@ export interface RemoteState {
   queue: any[]
   currentIndex: number
   accent?: string
+  isFavorite?: boolean
 }
 
 // ── Security: PIN + trusted device tokens ──────────────────────────────────
@@ -305,6 +306,8 @@ export function startRemoteServer(win: BrowserWindow, getDataPath: () => string)
   app.get('/api/tracks', (_req, res) => requestFromRenderer('getTracks', res))
   app.get('/api/albums', (_req, res) => requestFromRenderer('getAlbums', res))
   app.get('/api/playlists', (_req, res) => requestFromRenderer('getPlaylists', res))
+  app.get('/api/playlists/:id/tracks', (req, res) => requestFromRenderer(`getPlaylistTracks:${req.params.id}`, res))
+  app.get('/api/favorites', (_req, res) => requestFromRenderer('getFavorites', res))
   app.get('/api/state', (_req, res) => res.json(currentState))
 
   // ── REST API: Playback commands ──────────────────────────────────────
@@ -334,6 +337,18 @@ export function startRemoteServer(win: BrowserWindow, getDataPath: () => string)
   // Queue management
   app.post('/api/play-next', (req, res) => { sendCommand('playNext', { trackId: req.body.trackId }); res.json({ ok: true }) })
   app.post('/api/play-later', (req, res) => { sendCommand('playLater', { trackId: req.body.trackId }); res.json({ ok: true }) })
+
+  // Playlist playback
+  app.post('/api/play-playlist', (req, res) => {
+    sendCommand('playPlaylist', { playlistId: req.body.playlistId, shuffle: req.body.shuffle })
+    res.json({ ok: true })
+  })
+
+  // Favorites
+  app.post('/api/favorite/toggle', (req, res) => {
+    sendCommand('toggleFavorite', { trackId: req.body.trackId })
+    res.json({ ok: true })
+  })
 
   // ── HTTP + WebSocket server ──────────────────────────────────────────
   httpServer = createServer(app)
@@ -612,6 +627,16 @@ function getWebUI(): string {
     background: var(--accent); border-radius: 50%; cursor: pointer;
   }
 
+  /* Heart button */
+  .heart-btn {
+    background: none; border: none; color: #fff; cursor: pointer;
+    opacity: .5; transition: opacity .15s, color .15s; padding: .25rem;
+    display: flex; align-items: center;
+  }
+  .heart-btn:active { transform: scale(.9); }
+  .heart-btn.active { color: #f43f5e; opacity: 1; }
+  .heart-btn svg { width: 22px; height: 22px; fill: currentColor; }
+
   /* Bottom nav */
   .bottom-nav {
     display: flex; border-top: 1px solid #1a1a1e;
@@ -701,10 +726,15 @@ function getWebUI(): string {
       <div class="no-cover" id="noCover">♪</div>
       <img id="cover" style="display:none" alt="">
     </div>
-    <div class="track-info">
-      <div class="track-title" id="title">Not playing</div>
-      <div class="track-artist" id="artist"></div>
-      <div class="track-album" id="album"></div>
+    <div class="track-info" style="display:flex;align-items:center;gap:.5rem;justify-content:center">
+      <div>
+        <div class="track-title" id="title">Not playing</div>
+        <div class="track-artist" id="artist"></div>
+        <div class="track-album" id="album"></div>
+      </div>
+      <button class="heart-btn" id="heartBtn" onclick="toggleFav()" title="Favorite">
+        <svg viewBox="0 0 24 24"><path id="heartIcon" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+      </button>
     </div>
     <div class="progress-wrap">
       <div class="progress-bar" id="pbar">
@@ -756,6 +786,15 @@ function getWebUI(): string {
       Queue
     </button>
   </div>
+  <!-- Playlist drill-down view (child of player-screen) -->
+  <div style="display:none;position:fixed;inset:0;background:#0a0a0e;z-index:60;flex-direction:column" id="playlistView">
+    <div class="lib-header">
+      <button class="lib-back" onclick="closePlaylist()">&larr;</button>
+      <span id="playlistViewTitle" style="font-weight:600;font-size:.95rem;flex:1;padding:0 .5rem"></span>
+      <button class="auth-btn" style="padding:.4rem .8rem;font-size:.75rem" onclick="playCurrentPlaylist()">Play All</button>
+    </div>
+    <div class="lib-list" id="playlistTrackList"></div>
+  </div>
 </div>
 
 <!-- Library View -->
@@ -767,6 +806,8 @@ function getWebUI(): string {
   <div class="lib-tabs">
     <button class="lib-tab active" id="tabSongs" onclick="switchTab('songs')">Songs</button>
     <button class="lib-tab" id="tabAlbums" onclick="switchTab('albums')">Albums</button>
+    <button class="lib-tab" id="tabPlaylists" onclick="switchTab('playlists')">Playlists</button>
+    <button class="lib-tab" id="tabFavorites" onclick="switchTab('favorites')">Favorites</button>
   </div>
   <div class="lib-list" id="libList"></div>
 </div>
@@ -784,7 +825,8 @@ function getWebUI(): string {
 <script>
 const API='',WS_URL='ws://'+location.host;
 let ws,state={},token=localStorage.getItem('aurora_token'),
-    tracks=[],albums=[],libTab='songs';
+    tracks=[],albums=[],playlists=[],favoriteTracks=[],libTab='songs',
+    openPlaylistId=null,openPlaylistName='';
 function authParam(){return token?'&token='+encodeURIComponent(token):''}
 
 // ── Auth ────────────────────────────────────────────────────────────────
@@ -836,6 +878,9 @@ function updateUI(s){
   document.getElementById('title').textContent=t?t.title:'Not playing';
   document.getElementById('artist').textContent=t?t.artist:'';
   document.getElementById('album').textContent=t?t.album:'';
+  const hb=document.getElementById('heartBtn');
+  hb.classList.toggle('active',!!s.isFavorite);
+  hb.style.display=t?'flex':'none';
   const img=document.getElementById('cover'),nc=document.getElementById('noCover');
   if(t&&t.coverArt){
     const src=t.coverArt.startsWith('http')?t.coverArt:API+'/api/cover?path='+encodeURIComponent(t.coverArt)+authParam();
@@ -852,6 +897,14 @@ function updateUI(s){
   document.getElementById('volSlider').value=Math.round(s.volume*100);
   if(s.accent)document.documentElement.style.setProperty('--accent',s.accent);
   updateQueue();
+}
+
+function toggleFav(){
+  if(!state.currentTrack)return;
+  cmd('toggleFavorite',{trackId:state.currentTrack.id});
+  // Optimistic toggle
+  state.isFavorite=!state.isFavorite;
+  document.getElementById('heartBtn').classList.toggle('active',!!state.isFavorite);
 }
 
 // ── Progress seek ───────────────────────────────────────────────────────
@@ -873,19 +926,32 @@ async function loadLibrary(){
   if(!token)return;
   try{
     const h={'Authorization':'Bearer '+token};
-    const[tr,al]=await Promise.all([
+    const[tr,al,pl]=await Promise.all([
       fetch(API+'/api/tracks',{headers:h}).then(r=>r.ok?r.json():[]),
       fetch(API+'/api/albums',{headers:h}).then(r=>r.ok?r.json():[]),
+      fetch(API+'/api/playlists',{headers:h}).then(r=>r.ok?r.json():[]),
     ]);
-    tracks=tr;albums=al;renderLib();
+    tracks=tr;albums=al;playlists=pl;renderLib();
+  }catch(e){console.error(e)}
+}
+
+async function loadFavorites(){
+  if(!token)return;
+  try{
+    const h={'Authorization':'Bearer '+token};
+    favoriteTracks=await fetch(API+'/api/favorites',{headers:h}).then(r=>r.ok?r.json():[]);
+    renderLib();
   }catch(e){console.error(e)}
 }
 
 function switchTab(t){
   libTab=t;
-  document.getElementById('tabSongs').classList.toggle('active',t==='songs');
-  document.getElementById('tabAlbums').classList.toggle('active',t==='albums');
-  renderLib();
+  ['songs','albums','playlists','favorites'].forEach(tab=>{
+    const el=document.getElementById('tab'+tab.charAt(0).toUpperCase()+tab.slice(1));
+    if(el)el.classList.toggle('active',tab===t);
+  });
+  if(t==='favorites'&&favoriteTracks.length===0)loadFavorites();
+  else renderLib();
 }
 function filterLib(){renderLib()}
 function coverUrl(ca){
@@ -906,7 +972,7 @@ function renderLib(){
         +'<div class="lib-info"><div class="lib-title">'+esc(t.title)+'</div><div class="lib-sub">'+esc(t.artist)+'</div></div>';
       el.appendChild(d);
     });
-  }else{
+  }else if(libTab==='albums'){
     const f=q?albums.filter(a=>(a.name+a.artist).toLowerCase().includes(q)):albums;
     f.forEach(a=>{
       const d=document.createElement('div');d.className='lib-item';
@@ -916,7 +982,59 @@ function renderLib(){
         +'<div class="lib-info"><div class="lib-title">'+esc(a.name)+'</div><div class="lib-sub">'+esc(a.artist)+' · '+a.trackCount+' tracks</div></div>';
       el.appendChild(d);
     });
+  }else if(libTab==='playlists'){
+    const f=q?playlists.filter(p=>p.name.toLowerCase().includes(q)):playlists;
+    f.forEach(p=>{
+      const d=document.createElement('div');d.className='lib-item';
+      d.onclick=()=>openPlaylist(p);
+      const c=coverUrl(p.coverArt);
+      d.innerHTML=(c?'<img class="lib-cover" src="'+c+'" loading="lazy">':'<div class="lib-cover" style="display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.2);font-size:1.3rem">♫</div>')
+        +'<div class="lib-info"><div class="lib-title">'+esc(p.name)+'</div><div class="lib-sub">'+p.trackCount+' tracks</div></div>';
+      el.appendChild(d);
+    });
+  }else if(libTab==='favorites'){
+    const f=q?favoriteTracks.filter(t=>(t.title+t.artist+t.album).toLowerCase().includes(q)):favoriteTracks;
+    if(f.length===0&&!q){
+      el.innerHTML='<div style="padding:2rem;text-align:center;opacity:.4;font-size:.9rem">No favorites yet</div>';
+      return;
+    }
+    f.forEach(t=>{
+      const d=document.createElement('div');d.className='lib-item';
+      d.onclick=()=>{cmd('playTrack',{trackId:t.id});showView('player')};
+      const c=coverUrl(t.coverArt);
+      d.innerHTML=(c?'<img class="lib-cover" src="'+c+'" loading="lazy">':'<div class="lib-cover"></div>')
+        +'<div class="lib-info"><div class="lib-title">'+esc(t.title)+'</div><div class="lib-sub">'+esc(t.artist)+'</div></div>';
+      el.appendChild(d);
+    });
   }
+}
+
+// ── Playlist drill-down ─────────────────────────────────────────────────
+async function openPlaylist(p){
+  openPlaylistId=p.id;openPlaylistName=p.name;
+  document.getElementById('playlistViewTitle').textContent=p.name;
+  document.getElementById('playlistTrackList').innerHTML='<div style="padding:1rem;opacity:.4;font-size:.85rem">Loading...</div>';
+  document.getElementById('playlistView').style.display='flex';
+  try{
+    const h={'Authorization':'Bearer '+token};
+    const tracks=await fetch(API+'/api/playlists/'+encodeURIComponent(p.id)+'/tracks',{headers:h}).then(r=>r.ok?r.json():[]);
+    const el=document.getElementById('playlistTrackList');el.innerHTML='';
+    tracks.forEach((t,i)=>{
+      const d=document.createElement('div');d.className='lib-item';
+      d.onclick=()=>{cmd('playPlaylist',{playlistId:openPlaylistId});cmd('playFromQueue',{index:i});showView('player')};
+      const c=coverUrl(t.coverArt);
+      d.innerHTML=(c?'<img class="lib-cover" src="'+c+'" loading="lazy">':'<div class="lib-cover"></div>')
+        +'<div class="lib-info"><div class="lib-title">'+esc(t.title)+'</div><div class="lib-sub">'+esc(t.artist)+'</div></div>';
+      el.appendChild(d);
+    });
+    if(tracks.length===0)el.innerHTML='<div style="padding:2rem;text-align:center;opacity:.4;font-size:.9rem">Empty playlist</div>';
+  }catch(e){document.getElementById('playlistTrackList').innerHTML='<div style="padding:1rem;color:#f87171;font-size:.85rem">Failed to load tracks</div>'}
+}
+function closePlaylist(){document.getElementById('playlistView').style.display='none'}
+function playCurrentPlaylist(){
+  if(!openPlaylistId)return;
+  cmd('playPlaylist',{playlistId:openPlaylistId});
+  closePlaylist();showView('player');
 }
 
 // ── Queue ───────────────────────────────────────────────────────────────
