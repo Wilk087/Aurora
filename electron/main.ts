@@ -15,7 +15,7 @@ import {
   getStreamUrl, getCoverArtUrl,
 } from './subsonic'
 import { startRemoteServer, stopRemoteServer, registerRemoteIPC, isRemoteEnabled } from './remote'
-import { registerAnimatedCoverIPC } from './animated-covers'
+import { registerAnimatedCoverIPC, getAlbumArtworkUrl } from './animated-covers'
 import { logger, installGlobalLogHandlers, getLogPath } from './logger'
 
 // Install global error handlers and write startup info
@@ -54,7 +54,7 @@ async function initDiscordRPC(clientId?: string) {
 }
 
 // ── Album art URL lookup (for Discord RPC) ────────────────────────────────
-const albumArtCache = new Map<string, string | null>()
+// Delegated to animated-covers.ts (Apple Music catalog, same token + multi-storefront logic)
 
 function fetchJSON(url: string, retries = 2): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -116,27 +116,7 @@ function compareVersions(a: string, b: string): number {
 }
 
 async function getAlbumArtUrl(artist: string, album: string): Promise<string | null> {
-  const cacheKey = `${artist}---${album}`.toLowerCase()
-  if (albumArtCache.has(cacheKey)) return albumArtCache.get(cacheKey)!
-
-  try {
-    const query = encodeURIComponent(`${artist} ${album}`)
-    const url = `https://itunes.apple.com/search?term=${query}&entity=album&limit=3`
-    const raw = await fetchJSON(url)
-    const data = JSON.parse(raw)
-
-    if (data.results && data.results.length > 0) {
-      // Get the highest resolution artwork (replace 100x100 with 512x512)
-      const artUrl = data.results[0].artworkUrl100?.replace('100x100bb', '512x512bb') || null
-      albumArtCache.set(cacheKey, artUrl)
-      return artUrl
-    }
-  } catch (err) {
-    logger.error('Album art lookup error:', err)
-  }
-
-  albumArtCache.set(cacheKey, null)
-  return null
+  return getAlbumArtworkUrl(artist, album)
 }
 
 async function updateDiscordPresence(data: {

@@ -14,6 +14,8 @@ export interface PluginManifest {
   main: string
   /** Optional CSS file injected into the renderer */
   style?: string
+  /** Minimum Aurora version required (semver, e.g. "2.7.0") */
+  minAuroraVersion?: string
   /** Lifecycle hooks the plugin wants */
   hooks?: PluginHook[]
   /** Optional schema describing user-facing settings */

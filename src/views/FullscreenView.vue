@@ -1478,6 +1478,14 @@ watch(() => player.pauseAnimatedOnBlur, (enabled) => {
   }
 })
 
+// Exit immersive view when the queue is cleared (no track to show)
+watch(() => player.currentTrack, (track) => {
+  if (!track) {
+    window.api.exitFullscreen()
+    router.back()
+  }
+})
+
 onMounted(async () => {
   window.api.enterFullscreen()
   document.addEventListener('keydown', onKeydown)

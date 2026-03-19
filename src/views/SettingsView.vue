@@ -1190,8 +1190,13 @@
                 <div class="flex items-center gap-2">
                   <p class="text-sm font-medium text-white truncate">{{ manifest.name }}</p>
                   <span class="text-[10px] text-white/20 shrink-0">v{{ manifest.version }}</span>
+                  <span
+                    v-if="pluginNeedsNewerAurora(manifest.minAuroraVersion)"
+                    class="text-[10px] font-medium text-amber-400/80 bg-amber-400/10 px-1.5 py-0.5 rounded shrink-0"
+                    :title="`Requires Aurora v${manifest.minAuroraVersion} or newer (installed: v${appVersion})`"
+                  >requires v{{ manifest.minAuroraVersion }}+</span>
                 </div>
-                <p v-if="manifest.description" class="text-xs text-white/30 mt-0.5 truncate">{{ manifest.description }}</p>
+                <p v-if="manifest.description" class="text-xs text-white/30 mt-0.5">{{ manifest.description }}</p>
                 <p class="text-[10px] text-white/20 mt-0.5">by {{ manifest.author }}</p>
               </div>
 
@@ -1413,6 +1418,22 @@ const syncStore = useSyncStore()
 const toast = useToast()
 
 const appVersion = __APP_VERSION__
+
+function compareVersions(a: string, b: string): number {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const va = pa[i] || 0
+    const vb = pb[i] || 0
+    if (va !== vb) return va - vb
+  }
+  return 0
+}
+
+function pluginNeedsNewerAurora(minVersion?: string): boolean {
+  if (!minVersion) return false
+  return compareVersions(appVersion, minVersion) < 0
+}
 
 // ── Sync ────────────────────────────────────────────────────────────────
 const syncConfig = ref<SyncConfig>({ enabled: false, folder: '', syncPlaylists: true, syncFavorites: true, syncStats: true })

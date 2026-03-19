@@ -191,6 +191,7 @@ interface AppleMusicAlbum {
   attributes: {
     name: string
     artistName: string
+    artwork?: { url: string; width?: number; height?: number }
     editorialVideo?: {
       motionSquareVideo1x1?: { video: string }
       motionDetailSquare?: { video: string }
@@ -378,6 +379,57 @@ function clearCache() {
   saveUrlCache()
   negativeLookups = {}
   saveNegativeCache()
+}
+
+// ── Album artwork URL lookup (for Discord RPC) ───────────────────────────────
+// In-memory cache shared with the Discord RPC layer
+const artworkUrlCache = new Map<string, string | null>()
+
+/**
+ * Look up a 512×512 album artwork URL via the Apple Music catalog.
+ * Uses the same token, normalization, and multi-storefront logic as animated covers.
+ * Returns null if not found or on error.
+ */
+export async function getAlbumArtworkUrl(artist: string, album: string): Promise<string | null> {
+  const cacheKey = `${artist}---${album}`.toLowerCase()
+  if (artworkUrlCache.has(cacheKey)) return artworkUrlCache.get(cacheKey)!
+
+  try {
+    const token = await getAppleMusicToken()
+    const normAlbum = normalizeStr(album)
+    const normArtist = normalizeStr(artist)
+    const artistParts = normArtist
+      .split(/[,;&]|\bfeat\.?\b|\bft\.?\b|\bwith\b/i)
+      .map(s => s.trim()).filter(Boolean)
+
+    const primary = getPrimaryStorefront()
+    const storefronts = [primary, ...FALLBACK_STOREFRONTS.filter(sf => sf !== primary)]
+
+    for (const sf of storefronts) {
+      try {
+        // Combined search first, then album-only fallback
+        for (const term of [`${album} ${artist}`, album]) {
+          const results = await searchAppleMusic(token, sf, term)
+          const matchId = findMatchId(results, normAlbum, normArtist, artistParts)
+          if (!matchId) continue
+          const match = results.find(r => r.id === matchId)
+          const artTemplate = match?.attributes.artwork?.url
+          if (artTemplate) {
+            const artUrl = artTemplate.replace('{w}', '512').replace('{h}', '512')
+            artworkUrlCache.set(cacheKey, artUrl)
+            return artUrl
+          }
+        }
+      } catch {
+        // Non-fatal — try next storefront
+      }
+    }
+  } catch (err) {
+    logger.error('Discord album art lookup error:', err)
+  }
+
+  artworkUrlCache.set(cacheKey, null)
+  return null
 }
 
 // ── IPC Registration ────────────────────────────────────────────────────────
