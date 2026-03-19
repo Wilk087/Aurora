@@ -83,6 +83,11 @@ export interface PluginContextMenuItem {
   icon?: string
   /** If true, a separator line is rendered before this item */
   separator?: boolean
+  /**
+   * Child items — renders this item as a hover-triggered submenu instead of a direct action.
+   * When children are present, `onClick` is ignored.
+   */
+  children?: PluginContextMenuItem[]
   /** Called with the right-clicked track plus any other currently selected tracks */
   onClick: (tracks: Track[]) => void
 }

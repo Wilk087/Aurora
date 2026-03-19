@@ -381,6 +381,19 @@ export function createPluginAPI(pluginId: string) {
         if (r) r.push(path)
         else window.location.hash = '#' + path
       },
+      /**
+       * Open a URL in the system default browser.
+       */
+      openExternal(url: string): void {
+        window.api.openExternal(url)
+      },
+      /**
+       * Copy text to the system clipboard.
+       * Returns a Promise that resolves when done.
+       */
+      copyToClipboard(text: string): Promise<void> {
+        return navigator.clipboard.writeText(text)
+      },
     },
 
     // ── Settings (declared schema, persisted per-plugin) ─────────────────

@@ -381,6 +381,8 @@ Interact with the UI.
 | `removeAlbumContextMenuItems()` | Remove all album context menu items added by this plugin |
 | `observeAlbumCards(callbacks)` | Watch album card elements mount/unmount in the DOM — for injecting overlays (see below) |
 | `navigate(path)` | Navigate to an app route, e.g. `'/albums'`, `'/album/some-id'`, `'/artist/Name'` |
+| `openExternal(url)` | Open a URL in the system default browser |
+| `copyToClipboard(text)` | Copy text to the system clipboard — returns a `Promise<void>` |
 | `getPlayerBarSlot(position?)` | Get a DOM element slot in the player bar (`'left'` or `'right'`, default `'right'`) |
 | `getImmersiveSlot(position?)` | Get a DOM slot in the fullscreen view (`'right'` or `'modern-right'`) |
 | `getImmersiveSettingsSlot()` | Get a DOM slot in the fullscreen settings panel |
@@ -401,7 +403,7 @@ aurora.ui.addSidebarItems([
 
 #### Song context menu items
 
-Add custom actions to the track right-click menu. `onClick` receives the right-clicked track plus any other currently selected tracks. Use `separator: true` to render a divider line before an item.
+Add custom actions to the track right-click menu. `onClick` receives the right-clicked track plus any other currently selected tracks. Use `separator: true` to render a divider line before an item. Use `children` to create a hover-triggered submenu — when present, `onClick` is ignored.
 
 ```javascript
 aurora.ui.addContextMenuItems([
@@ -412,6 +414,22 @@ aurora.ui.addContextMenuItems([
     onClick: function (tracks) {
       tracks.forEach(function (t) { console.log(t.title) })
     }
+  },
+  // Submenu example
+  {
+    label: 'Share',
+    icon: 'M18 16.08c...',
+    children: [
+      {
+        label: 'Copy link',
+        onClick: function (tracks) { aurora.ui.copyToClipboard('https://example.com/' + tracks[0].title) }
+      },
+      {
+        label: 'Open in browser',
+        onClick: function (tracks) { aurora.ui.openExternal('https://example.com') }
+      }
+    ],
+    onClick: function () {}
   }
 ])
 ```

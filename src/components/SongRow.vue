@@ -251,17 +251,54 @@
         <!-- Plugin-injected context menu items -->
         <template v-if="pluginContextMenuItems.length">
           <div class="border-t border-[var(--border)] my-1" />
-          <button
-            v-for="item in pluginContextMenuItems"
-            :key="item.label"
-            @click.stop="runPluginCtxItem(item)"
-            class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5"
-          >
-            <svg v-if="item.icon" class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" />
-            </svg>
-            {{ item.label }}
-          </button>
+          <template v-for="(item, idx) in pluginContextMenuItems" :key="item.label">
+            <div v-if="item.separator" class="border-t border-[var(--border)] my-1" />
+            <!-- Item with children — hover submenu -->
+            <div
+              v-if="item.children && item.children.length"
+              class="relative"
+              @mouseenter="openPluginSubmenu = idx"
+              @mouseleave="openPluginSubmenu = null"
+            >
+              <button class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5">
+                <svg v-if="item.icon" class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" />
+                </svg>
+                {{ item.label }}
+                <svg class="w-3 h-3 ml-auto shrink-0 opacity-30" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 18l6-6-6-6" />
+                </svg>
+              </button>
+              <div
+                v-if="openPluginSubmenu === idx"
+                class="absolute left-full top-0 ml-1 w-52 rounded-xl menu-panel py-1.5 shadow-2xl z-[110]"
+              >
+                <template v-for="child in item.children" :key="child.label">
+                  <div v-if="child.separator" class="border-t border-[var(--border)] my-1" />
+                  <button
+                    @click.stop="runPluginCtxItem(child)"
+                    class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5"
+                  >
+                    <svg v-if="child.icon" class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" :d="child.icon" />
+                    </svg>
+                    {{ child.label }}
+                  </button>
+                </template>
+              </div>
+            </div>
+            <!-- Regular item -->
+            <button
+              v-else
+              @click.stop="runPluginCtxItem(item)"
+              class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5"
+            >
+              <svg v-if="item.icon" class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" />
+              </svg>
+              {{ item.label }}
+            </button>
+          </template>
         </template>
       </div>
     </Teleport>
@@ -401,6 +438,7 @@ import { useFavoritesStore } from '@/stores/favorites'
 import { formatTime } from '@/utils/formatTime'
 import ArtistLinks from '@/components/ArtistLinks.vue'
 import { pluginContextMenuItems } from '@/plugins/api'
+import type { PluginContextMenuItem } from '@/types/plugin'
 
 const props = defineProps<{
   track: Track
@@ -436,6 +474,7 @@ const menuPos = ref({ top: 0, left: 0 })
 // Context menu state
 const showCtx = ref(false)
 const ctxPos = ref({ top: 0, left: 0 })
+const openPluginSubmenu = ref<number | null>(null)
 const ctxStyle = computed(() => ({
   top: ctxPos.value.top + 'px',
   left: ctxPos.value.left + 'px',
@@ -570,8 +609,9 @@ async function showCredits() {
   }
 }
 
-function runPluginCtxItem(item: { onClick: (tracks: Track[]) => void }) {
+function runPluginCtxItem(item: PluginContextMenuItem) {
   showCtx.value = false
+  openPluginSubmenu.value = null
   const tracks = props.selected && props.selectedTracks && props.selectedTracks.length > 0
     ? props.selectedTracks
     : [props.track]
