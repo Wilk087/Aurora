@@ -955,6 +955,9 @@ export const usePlayerStore = defineStore('player', () => {
     }
 
     if (repeatMode.value === 'one') {
+      scrobbleReported = false
+      statsReported = false
+      if (scrobbleTimer) { clearTimeout(scrobbleTimer); scrobbleTimer = null }
       activeAudio().currentTime = 0
       activeAudio().play()
     } else {
