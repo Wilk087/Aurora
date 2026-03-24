@@ -50,7 +50,6 @@
     <!-- Synced lyrics -->
     <div
       v-else
-      ref="lyricsContainer"
       class="lyrics-scroll w-full max-w-2xl px-16 overflow-y-auto fs-mask"
       style="max-height: 100%"
     >
@@ -69,7 +68,16 @@
         ]"
       >
         <p class="text-[2.5rem] font-extrabold leading-snug">
-          <template v-if="line.text">{{ line.text }}</template>
+          <!-- Enhanced LRC: word-by-word highlight for the active line -->
+          <template v-if="line.words && i === currentLineIndex">
+            <span
+              v-for="(word, wi) in line.words"
+              :key="wi"
+              class="transition-colors duration-200"
+              :class="wi <= currentWordIndex ? 'text-white' : 'text-white/20'"
+            >{{ wi < line.words.length - 1 ? word.text + ' ' : word.text }}</span>
+          </template>
+          <template v-else-if="line.text">{{ line.text }}</template>
           <span v-else class="inline-flex items-center gap-2 opacity-50">
             <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>
             <span class="text-xl tracking-[0.3em]">···</span>
@@ -134,7 +142,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, inject } from 'vue'
 import { usePlayerStore } from '@/stores/player'
-import { parseLRC, findCurrentLine, type LyricLine } from '@/utils/lrcParser'
+import { parseLRC, findCurrentLine, findCurrentWord, type LyricLine } from '@/utils/lrcParser'
 import LyricsCard from '@/components/LyricsCard.vue'
 import LrcSyncer from '@/components/LrcSyncer.vue'
 
@@ -146,7 +154,7 @@ const plainLyricsText = ref('')
 const loading = ref(false)
 const searchingOnline = ref(false)
 const currentLineIndex = ref(-1)
-const lyricsContainer = ref<HTMLElement | null>(null)
+const currentWordIndex = ref(-1)
 const lineRefs = ref<Record<number, HTMLElement>>({})
 const showSyncer = ref(false)
 
@@ -206,15 +214,21 @@ watch(
   { immediate: true },
 )
 
-// Highlight current line (apply lyrics offset: positive = earlier = add to time)
+// Highlight current line and word (apply lyrics offset: positive = earlier = add to time)
 watch(
   () => player.currentTime,
   (time) => {
     if (lyrics.value.length === 0) return
-    const idx = findCurrentLine(lyrics.value, time + player.lyricsOffset)
+    const adjusted = time + player.lyricsOffset
+    const idx = findCurrentLine(lyrics.value, adjusted)
     if (idx !== currentLineIndex.value) {
       currentLineIndex.value = idx
       scrollToLine(idx)
+    }
+    if (idx >= 0 && lyrics.value[idx].words) {
+      currentWordIndex.value = findCurrentWord(lyrics.value[idx].words!, adjusted)
+    } else {
+      currentWordIndex.value = -1
     }
   },
 )

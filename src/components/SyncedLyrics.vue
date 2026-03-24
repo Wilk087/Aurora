@@ -61,17 +61,30 @@
         :ref="(el) => { if (el) lineRefs[i] = el as HTMLElement }"
         @click="seekToLine(i)"
         @click.right.prevent="toggleSelectLine(i)"
-        class="lyric-line py-2 cursor-pointer transition-all duration-500 ease-out relative"
-        :class="[getLyricClass(i), selectedLines.has(i) ? 'ring-1 ring-accent/40 rounded-lg bg-accent/10' : '']"
+        class="sl-lyric-line py-2 cursor-pointer relative text-center"
+        :class="[
+          i === currentLineIndex ? 'is-active'
+            : Math.abs(i - currentLineIndex) === 1 ? 'is-near'
+            : Math.abs(i - currentLineIndex) === 2 ? 'is-far'
+            : 'is-hidden',
+          selectedLines.has(i) ? 'ring-1 ring-accent/40 rounded-lg !bg-accent/10' : ''
+        ]"
       >
-        <p class="text-center leading-relaxed" :class="getLyricTextClass(i)">
-          <template v-if="line.text">{{ line.text }}</template>
-          <span v-else class="inline-flex items-center gap-1.5 opacity-60">
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>
-            <span class="text-sm tracking-widest">···</span>
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>
-          </span>
-        </p>
+        <!-- Enhanced LRC: word-by-word highlight for the active line -->
+        <template v-if="line.words && i === currentLineIndex">
+          <span
+            v-for="(word, wi) in line.words"
+            :key="wi"
+            class="transition-colors duration-200"
+            :class="wi <= currentWordIndex ? 'text-white' : 'text-white/20'"
+          >{{ wi < line.words.length - 1 ? word.text + ' ' : word.text }}</span>
+        </template>
+        <span v-else-if="line.text">{{ line.text }}</span>
+        <span v-else class="inline-flex items-center gap-1.5 opacity-60">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>
+          <span class="text-sm tracking-widest">···</span>
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>
+        </span>
         <!-- Selection indicator -->
         <div v-if="selectedLines.has(i)" class="absolute left-1 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-accent" />
       </div>
@@ -131,7 +144,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { usePlayerStore } from '@/stores/player'
-import { parseLRC, findCurrentLine, type LyricLine } from '@/utils/lrcParser'
+import { parseLRC, findCurrentLine, findCurrentWord, type LyricLine } from '@/utils/lrcParser'
 import LyricsCard from '@/components/LyricsCard.vue'
 import LrcSyncer from '@/components/LrcSyncer.vue'
 
@@ -142,6 +155,7 @@ const plainLyricsText = ref('')
 const loading = ref(false)
 const searchingOnline = ref(false)
 const currentLineIndex = ref(-1)
+const currentWordIndex = ref(-1)
 const lyricsContainer = ref<HTMLElement | null>(null)
 const lineRefs = ref<Record<number, HTMLElement>>({})
 const showSyncer = ref(false)
@@ -206,15 +220,21 @@ watch(
   { immediate: true },
 )
 
-// Highlight current line (apply lyrics offset: positive = earlier = add to time)
+// Highlight current line and word (apply lyrics offset: positive = earlier = add to time)
 watch(
   () => player.currentTime,
   (time) => {
     if (lyrics.value.length === 0) return
-    const idx = findCurrentLine(lyrics.value, time + player.lyricsOffset)
+    const adjusted = time + player.lyricsOffset
+    const idx = findCurrentLine(lyrics.value, adjusted)
     if (idx !== currentLineIndex.value) {
       currentLineIndex.value = idx
       scrollToLine(idx)
+    }
+    if (idx >= 0 && lyrics.value[idx].words) {
+      currentWordIndex.value = findCurrentWord(lyrics.value[idx].words!, adjusted)
+    } else {
+      currentWordIndex.value = -1
     }
   },
 )
@@ -233,19 +253,6 @@ function seekToLine(index: number) {
   if (index >= 0 && index < lyrics.value.length) {
     player.seek(lyrics.value[index].time)
   }
-}
-
-function getLyricClass(index: number): string {
-  if (index === currentLineIndex.value) return 'opacity-100 scale-100'
-  const d = Math.abs(index - currentLineIndex.value)
-  if (d === 1) return 'opacity-40'
-  if (d === 2) return 'opacity-25'
-  return 'opacity-15'
-}
-
-function getLyricTextClass(index: number): string {
-  if (index === currentLineIndex.value) return 'text-2xl font-bold text-white text-glow'
-  return 'text-lg font-medium text-white/60 hover:text-white/40'
 }
 
 // ── Lyrics selection & card ──────────────────────────────────────────
@@ -307,6 +314,29 @@ watch(() => player.currentTrack?.path, () => {
 .lyrics-scroll::-webkit-scrollbar {
   display: none;
 }
+
+/* ── Lyric lines — color-only transitions, no scale (avoids multi-line weirdness) ── */
+.sl-lyric-line {
+  transition: color 0.35s ease-out;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.55;
+  color: rgba(255, 255, 255, 0.10);
+}
+.sl-lyric-line.is-active {
+  color: white;
+  text-shadow: 0 0 28px rgba(139, 92, 246, 0.22);
+}
+.sl-lyric-line.is-near {
+  color: rgba(255, 255, 255, 0.42);
+}
+.sl-lyric-line.is-far {
+  color: rgba(255, 255, 255, 0.20);
+}
+.sl-lyric-line.is-hidden {
+  color: rgba(255, 255, 255, 0.08);
+}
+
 .slide-up-enter-active,
 .slide-up-leave-active {
   transition: all 0.25s ease;

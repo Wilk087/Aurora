@@ -23,7 +23,7 @@ import { usePlaylistStore } from '@/stores/playlist'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useThemeStore } from '@/stores/theme'
 import { useToast } from '@/composables/useToast'
-import { parseLRC, findCurrentLine } from '@/utils/lrcParser'
+import { parseLRC, findCurrentLine, findCurrentWord, isEnhancedLrc } from '@/utils/lrcParser'
 import { shallowRef } from 'vue'
 import type { PluginSidebarItem, PluginSettingField, PluginContextMenuItem, PluginAlbumContextMenuItem } from '@/types/plugin'
 
@@ -188,6 +188,10 @@ export function createPluginAPI(pluginId: string) {
        * currently active line. Returns -1 if before the first line.
        */
       findCurrentLine,
+      /** Find the active word index within a line's words array at the given time. */
+      findCurrentWord,
+      /** Returns true if the LRC content contains enhanced word-level timestamps. */
+      isEnhancedLrc,
       /** Current lyrics timing offset in seconds (positive = lyrics earlier). */
       get offset() { return player.lyricsOffset },
       /** Set the lyrics timing offset (persisted to settings). */
