@@ -298,6 +298,11 @@ contextBridge.exposeInMainWorld('api', {
   pluginsOpenFolder: (): Promise<void> => ipcRenderer.invoke('plugins:open-folder'),
   pluginsIpcInvoke: (channel: string, ...args: any[]): Promise<any> => ipcRenderer.invoke(channel, ...args),
   pluginsIpcSend: (channel: string, ...args: any[]) => ipcRenderer.send(channel, ...args),
+  onPluginEvent: (channel: string, callback: (...args: any[]) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, ...args: any[]) => callback(...args)
+    ipcRenderer.on(channel, handler)
+    return () => ipcRenderer.removeListener(channel, handler)
+  },
 
   // Playlist custom image — uses a DOM file input so Chromium routes through
   // XDG portals on Linux, giving the proper system-native file picker.

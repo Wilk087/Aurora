@@ -289,6 +289,7 @@ interface Window {
     pluginsOpenFolder: () => Promise<void>
     pluginsIpcInvoke: (channel: string, ...args: any[]) => Promise<any>
     pluginsIpcSend: (channel: string, ...args: any[]) => void
+    onPluginEvent: (channel: string, callback: (...args: any[]) => void) => () => void
     // Playlist custom image
     openImageDialog: () => Promise<string | null>
     setPlaylistCustomImage: (id: string, imagePath: string | null) => Promise<Playlist | null>

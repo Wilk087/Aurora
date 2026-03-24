@@ -501,6 +501,9 @@ export function createPluginAPI(pluginId: string) {
     ipc: {
       invoke: (channel: string, ...args: any[]) => window.api.pluginsIpcInvoke(channel, ...args),
       send: (channel: string, ...args: any[]) => window.api.pluginsIpcSend(channel, ...args),
+      /** Listen for events sent from the main process. Returns an unsubscribe function. */
+      on: (channel: string, callback: (...args: any[]) => void) =>
+        window.api.onPluginEvent(channel, callback),
     },
 
     // ── Utility ──────────────────────────────────────────────────────────
