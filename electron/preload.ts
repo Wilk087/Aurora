@@ -41,6 +41,10 @@ contextBridge.exposeInMainWorld('api', {
   listAlsaDevices: (): Promise<{ id: string; name: string; label: string }[]> =>
     ipcRenderer.invoke('audio:list-alsa-devices'),
 
+  // App paths
+  getAppPaths: (): Promise<{ config: string; data: string; cache: string; state: string }> =>
+    ipcRenderer.invoke('app:get-paths'),
+
   // Settings
   getSettings: () => ipcRenderer.invoke('settings:get'),
   saveSettings: (settings: any) => ipcRenderer.invoke('settings:set', settings),

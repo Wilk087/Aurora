@@ -53,6 +53,23 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4.5M9 9H4.5M9 9 3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5 5.25 5.25" />
               </svg>
             </button>
+            <!-- Mini Player tutorial -->
+            <TutorialPopup
+              class="no-drag"
+              tutorial-key="mini-player"
+              title="Mini Player"
+              description="A compact window that stays out of your way while you work."
+              :items="[
+                { label: 'Cover mode', description: 'Album art fills the window; controls fade in on hover.' },
+                { label: 'Lyrics mode', description: 'Scrolling synced lyrics with a semi-transparent background.' },
+                { label: 'Compact mode', description: 'Minimal single-line bar with track info and controls.' },
+                { label: 'Always on top', description: 'The mini player floats above other windows by default.' },
+              ]"
+              :hotkeys="[
+                { keys: ['Space'], description: 'Play / pause' },
+                { keys: ['←', '→'], description: 'Previous / next track' },
+              ]"
+            />
             <!-- Exit mini -->
             <button @click="exitMini" class="overlay-btn no-drag" title="Full player">
               <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
@@ -442,6 +459,7 @@ import { usePlayerStore } from '@/stores/player'
 import { useFavoritesStore } from '@/stores/favorites'
 import { parseLRC, findCurrentLine, type LyricLine } from '@/utils/lrcParser'
 import Hls from 'hls.js'
+import TutorialPopup from '@/components/TutorialPopup.vue'
 
 type MiniMode = 'compact' | 'cover' | 'lyrics'
 

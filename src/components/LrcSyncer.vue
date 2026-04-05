@@ -3,7 +3,9 @@
   <Transition name="fade">
     <div
       v-if="visible"
-      class="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md"
+      ref="containerRef"
+      tabindex="-1"
+      class="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md outline-none"
       data-lrc-syncer-active
       @keydown="onKeyDown"
     >
@@ -19,6 +21,25 @@
             </p>
           </div>
           <div class="flex items-center gap-2">
+            <!-- Sync Lyrics tutorial -->
+            <TutorialPopup
+              tutorial-key="lrc-syncer"
+              title="Sync Lyrics"
+              description="Stamp timestamps onto each line (or word) as your track plays through."
+              :items="[
+                { label: 'Standard LRC', description: 'One timestamp per line — works with most players.' },
+                { label: 'Enhanced LRC', description: 'Word-level timestamps for karaoke-style highlighting.' },
+                { label: 'Instrumental breaks', description: 'Mark sections without vocals using the Tab key.' },
+                { label: 'Undo', description: 'Remove the last stamp with Ctrl+Z if you mis-timed it.' },
+              ]"
+              :hotkeys="[
+                { keys: ['Space'], description: 'Stamp current line / word' },
+                { keys: ['Tab'], description: 'Add instrumental break' },
+                { keys: ['←', '→'], description: 'Seek back / forward 2 s' },
+                { keys: ['Ctrl', 'Z'], description: 'Undo last stamp' },
+                { keys: ['Esc'], description: 'Close without saving' },
+              ]"
+            />
             <!-- ELRC mode toggle -->
             <button
               @click="toggleElrcMode"
@@ -225,9 +246,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { useToast } from '@/composables/useToast'
+import TutorialPopup from '@/components/TutorialPopup.vue'
 
 // ── Standard LRC types ────────────────────────────────────────────────
 interface SyncLine {
@@ -263,6 +285,7 @@ const toast = useToast()
 
 // ── Shared state ──────────────────────────────────────────────────────
 const saving = ref(false)
+const containerRef = ref<HTMLElement | null>(null)
 const scrollContainer = ref<HTMLElement | null>(null)
 const lineElRefs = ref<Record<number, HTMLElement>>({})
 
@@ -571,8 +594,8 @@ function onKeyDown(e: KeyboardEvent) {
     e.preventDefault(); seekBack()
   } else if (e.code === 'ArrowRight') {
     e.preventDefault(); seekForward()
-  } else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') {
-    e.preventDefault(); handleUndo()
+  } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+    e.preventDefault(); e.stopPropagation(); handleUndo()
   } else if (e.code === 'Escape') {
     e.preventDefault(); close()
   }
@@ -638,12 +661,13 @@ async function saveLrc() {
 
 function close() { emit('close') }
 
-function globalKeyHandler(e: KeyboardEvent) {
-  if (props.visible) onKeyDown(e)
-}
-
-onMounted(() => { window.addEventListener('keydown', globalKeyHandler) })
-onBeforeUnmount(() => { window.removeEventListener('keydown', globalKeyHandler) })
+// Focus the overlay container whenever the syncer opens so that keyboard
+// events go directly to the div via @keydown rather than relying on a
+// global window listener (which compositor-level shortcuts can beat on KDE).
+watch(
+  () => props.visible,
+  (val) => { if (val) nextTick(() => containerRef.value?.focus()) },
+)
 </script>
 
 <style scoped>

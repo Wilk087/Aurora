@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, protocol, net, shell, screen } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, protocol, net, shell, screen, Menu } from 'electron'
 import { join, extname, basename, dirname } from 'path'
 import { readdir, readFile, writeFile, rename, mkdir, stat, rm, copyFile, unlink, appendFile } from 'fs/promises'
 import { existsSync, createReadStream, readFileSync, watch as fsWatch } from 'fs'
@@ -16,7 +16,12 @@ import {
 } from './subsonic'
 import { startRemoteServer, stopRemoteServer, registerRemoteIPC, isRemoteEnabled } from './remote'
 import { registerAnimatedCoverIPC, getAlbumArtworkUrl } from './animated-covers'
-import { logger, installGlobalLogHandlers, getLogPath } from './logger'
+import { logger, installGlobalLogHandlers, initLogger, getLogPath } from './logger'
+import { getAppPaths } from './paths'
+
+// Compute XDG-compliant paths and initialise the logger before anything else
+const appPaths = getAppPaths()
+initLogger(appPaths.state)
 
 // Install global error handlers and write startup info
 installGlobalLogHandlers()
@@ -293,13 +298,20 @@ const AUDIO_EXTENSIONS = new Set([
   '.mp3', '.flac', '.ogg', '.opus', '.wav', '.m4a', '.aac', '.wma', '.alac',
 ])
 
-const userDataPath = app.getPath('userData')
-const storePath = join(userDataPath, 'library.json')
-const coverCachePath = join(userDataPath, 'cover-cache')
-const settingsPath = join(userDataPath, 'settings.json')
-const playlistsPath = join(userDataPath, 'playlists.json')
-const artistCachePath = join(userDataPath, 'artist-cache.json')
-const waveformCachePath = join(userDataPath, 'waveform-cache.json')
+// ── XDG Base Directory paths ───────────────────────────────────────────────
+// On Linux these fan out across ~/.config / ~/.local/share / ~/.cache / ~/.local/state.
+// On other platforms all four dirs equal Electron's userData.
+const configPath   = appPaths.config   // settings.json
+const dataPath     = appPaths.data     // library, playlists, favorites, stats, themes, plugins…
+const cachePath    = appPaths.cache    // cover-cache, waveform-cache, artist-cache, tmp
+// appPaths.state is used by the logger (aurora.log)
+
+const settingsPath      = join(configPath, 'settings.json')
+const storePath         = join(dataPath,   'library.json')
+const playlistsPath     = join(dataPath,   'playlists.json')
+const coverCachePath    = join(cachePath,  'cover-cache')
+const artistCachePath   = join(cachePath,  'artist-cache.json')
+const waveformCachePath = join(cachePath,  'waveform-cache.json')
 
 // ── Artist info disk cache ─────────────────────────────────────────────────
 let artistInfoCache: Record<string, { data: any; ts: number }> = {}
@@ -477,7 +489,7 @@ async function mergeSettingsFile(partial: Record<string, any>): Promise<void> {
 }
 
 // ── Auto-export / backup ───────────────────────────────────────────────────
-const defaultExportPath = join(userDataPath, 'backups')
+const defaultExportPath = join(dataPath, 'backups')
 let autoExportTimer: ReturnType<typeof setTimeout> | null = null
 
 function scheduleAutoExport() {
@@ -556,7 +568,7 @@ async function performImport(importPath: string): Promise<{ settings: boolean; f
 }
 
 // ── Favorites persistence ──────────────────────────────────────────────────
-const favoritesPath = join(userDataPath, 'favorites.json')
+const favoritesPath = join(dataPath, 'favorites.json')
 let favoriteIds: string[] = []
 let favoriteMeta: Record<string, TrackMetaSnapshot> = {}
 let favoritesUpdatedAt = 0
@@ -1002,10 +1014,21 @@ if (!gotLock) {
   })
 }
 
+// ── Remove default menu to prevent accelerator interference ───────────────
+// The default Electron application menu registers Ctrl+Z/X/C/V etc. at the
+// OS level.  On KDE those can be consumed before the renderer sees the keydown
+// event.  Since Aurora is a frameless app with its own UI, the menu bar is
+// unused anyway.
+Menu.setApplicationMenu(null)
+
 // ── Linux display server detection (must run before app.whenReady) ─────────
 // Use ozone-platform-hint=auto so Electron 28 picks Wayland or X11 automatically.
 // We still log which session type was detected for debugging purposes.
 if (process.platform === 'linux') {
+  // Force all GTK file-chooser dialogs to go through the XDG desktop portal
+  // (xdg-desktop-portal-kde / -gnome) so the native KDE/GNOME picker is used
+  // consistently instead of whichever GTK widget Electron happens to load.
+  process.env.GTK_USE_PORTAL = '1'
   const waylandDisplay = process.env.WAYLAND_DISPLAY
   const sessionType = process.env.XDG_SESSION_TYPE
   const isWayland = !!waylandDisplay || sessionType === 'wayland'
@@ -1027,8 +1050,59 @@ if (process.platform === 'linux') {
   logger.info(`Display server: ${isWayland ? 'Wayland' : 'X11'} (WAYLAND_DISPLAY=${waylandDisplay ?? 'unset'}, XDG_SESSION_TYPE=${sessionType ?? 'unset'}, DISPLAY=${process.env.DISPLAY ?? 'unset'})`)
 }
 
+// ── XDG migration ─────────────────────────────────────────────────────────
+// On Linux, data that used to live entirely in the config dir (~/.config/aurora-player)
+// is migrated to the proper XDG directories on first run with the new layout.
+async function migrateToXdg(): Promise<void> {
+  if (process.platform !== 'linux') return
+
+  const oldBase = app.getPath('userData') // ~/.config/aurora-player (unchanged)
+
+  // Nothing to do if new paths == old path (e.g. XDG_DATA_HOME == ~/.config)
+  if (appPaths.data === oldBase && appPaths.cache === oldBase) return
+
+  // [source-subpath, dest-dir] pairs to attempt moving
+  const moves: [string, string][] = [
+    // data
+    ['library.json',     appPaths.data],
+    ['playlists.json',   appPaths.data],
+    ['favorites.json',   appPaths.data],
+    ['backups',          appPaths.data],
+    ['stats',            appPaths.data],
+    ['themes',           appPaths.data],
+    ['plugins',          appPaths.data],
+    ['plugin-settings',  appPaths.data],
+    ['plugin-data',      appPaths.data],
+    // cache
+    ['cover-cache',      appPaths.cache],
+    ['waveform-cache.json', appPaths.cache],
+    ['artist-cache.json',   appPaths.cache],
+    // state (logs are written to the new location from the start; only rotate old ones)
+    ['aurora.log',     appPaths.state],
+    ['aurora.log.1',   appPaths.state],
+    ['aurora.log.2',   appPaths.state],
+  ]
+
+  for (const [name, destDir] of moves) {
+    const src = join(oldBase, name)
+    const dest = join(destDir, name)
+    if (!existsSync(src) || existsSync(dest)) continue
+    try {
+      await mkdir(destDir, { recursive: true })
+      await rename(src, dest)
+      logger.info(`XDG migration: moved ${name} → ${destDir}`)
+    } catch (err: any) {
+      // EXDEV = cross-device rename (different filesystems) — log and skip
+      logger.warn(`XDG migration: could not move ${name}: ${err?.message}`)
+    }
+  }
+}
+
 // ── App lifecycle ──────────────────────────────────────────────────────────
 app.whenReady().then(async () => {
+  // Migrate existing data to XDG directories (no-op on first run or non-Linux)
+  await migrateToXdg()
+
   // Register localfile:// protocol to serve local files with range-request
   // support so that <audio> seeking works correctly.
   const mimeByExt: Record<string, string> = {
@@ -1255,6 +1329,14 @@ app.whenReady().then(async () => {
     }
     return online
   })
+
+  // ── IPC: App paths (for Settings display) ──
+  ipcMain.handle('app:get-paths', () => ({
+    config: appPaths.config,
+    data:   appPaths.data,
+    cache:  appPaths.cache,
+    state:  appPaths.state,
+  }))
 
   // ── IPC: Settings ──
   ipcMain.handle('settings:get', async () => await loadSettings())
@@ -1802,7 +1884,7 @@ app.whenReady().then(async () => {
       const execFileAsync = promisify(execFile)
 
       // Download the stream to a temp file first (avoids ffmpeg HTTPS/protocol issues)
-      const tmpDir = join(userDataPath, 'tmp')
+      const tmpDir = join(cachePath, 'tmp')
       if (!existsSync(tmpDir)) await mkdir(tmpDir, { recursive: true })
       tmpFile = join(tmpDir, `waveform-${songId}`)
 
@@ -2232,7 +2314,7 @@ app.whenReady().then(async () => {
   })
 
   // ── IPC: Stats ──
-  const statsDir = join(userDataPath, 'stats')
+  const statsDir = join(dataPath, 'stats')
   const deviceIdPath = join(statsDir, 'device-id.txt')
 
   async function getOrCreateDeviceId(): Promise<string> {
@@ -2240,7 +2322,7 @@ app.whenReady().then(async () => {
     if (existsSync(deviceIdPath)) {
       return (await readFile(deviceIdPath, 'utf-8')).trim()
     }
-    const id = createHash('md5').update(userDataPath + Date.now()).digest('hex').slice(0, 12)
+    const id = createHash('md5').update(dataPath + Date.now()).digest('hex').slice(0, 12)
     await writeFile(deviceIdPath, id, 'utf-8')
     return id
   }
@@ -2422,7 +2504,7 @@ app.whenReady().then(async () => {
   })
 
   // ── IPC: Themes ──
-  const themesDir = join(userDataPath, 'themes')
+  const themesDir = join(dataPath, 'themes')
 
   ipcMain.handle('themes:get-all', async () => {
     try {
@@ -2472,8 +2554,8 @@ app.whenReady().then(async () => {
   })()
 
   // ── IPC: Plugins ──
-  const pluginsDir = join(userDataPath, 'plugins')
-  const pluginSettingsDir = join(userDataPath, 'plugin-settings')
+  const pluginsDir = join(dataPath, 'plugins')
+  const pluginSettingsDir = join(dataPath, 'plugin-settings')
 
   // Map from manifest id → actual folder name on disk
   const pluginFolderMap = new Map<string, string>()
@@ -2714,7 +2796,7 @@ app.whenReady().then(async () => {
   })
 
   // ── IPC: WhisperX ELRC plugin ──────────────────────────────────────────────
-  const whisperxDataDir = join(userDataPath, 'plugin-data', 'whisperx')
+  const whisperxDataDir = join(dataPath, 'plugin-data', 'whisperx')
   const whisperxVenvPython = process.platform === 'win32'
     ? join(whisperxDataDir, 'venv', 'Scripts', 'python.exe')
     : join(whisperxDataDir, 'venv', 'bin', 'python3')

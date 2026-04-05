@@ -14,7 +14,7 @@
       {
         packages.default = pkgs.buildNpmPackage rec {
           pname = "aurora-player";
-          version = "2.7.0-dev";
+          version = "2.7.0";
 
           src = ./.;
 
@@ -83,7 +83,7 @@
 
           meta = with pkgs.lib; {
             description = "A beautiful local music player for Linux";
-            license = licenses.mit;
+            license = licenses.gpl3Plus;
             platforms = platforms.linux;
             mainProgram = "aurora-player";
           };

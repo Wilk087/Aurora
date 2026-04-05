@@ -52,6 +52,24 @@
         class="absolute top-0 right-0 flex items-center gap-2 p-6 z-20 fs-fade"
         :class="idle ? 'fs-idle' : ''"
       >
+        <!-- Immersive Player tutorial -->
+        <TutorialPopup
+          tutorial-key="immersive-player"
+          title="Immersive Player"
+          description="A full-screen experience built around your music and artwork."
+          :items="[
+            { label: 'Layout styles', description: 'Switch between Default, Modern, and Artwork layouts via the settings panel.' },
+            { label: 'Animated backgrounds', description: 'Choose from Lava Lamp, Sonar Ripple, or Cinematic Grain.' },
+            { label: 'Vibrant mode', description: 'Blends translucent UI elements with the album colors.' },
+            { label: 'Settings panel', description: 'Click the palette icon in the bottom bar to customise the view.' },
+          ]"
+          :hotkeys="[
+            { keys: ['Esc'], description: 'Exit immersive player' },
+            { keys: ['Space'], description: 'Play / pause' },
+            { keys: ['←', '→'], description: 'Previous / next track' },
+            { keys: ['↑', '↓'], description: 'Volume up / down' },
+          ]"
+        />
         <button
           @click="showQueue = !showQueue"
           class="w-10 h-10 flex items-center justify-center rounded-full transition-colors"
@@ -780,6 +798,7 @@ import IOSSlider from '@/components/IOSSlider.vue'
 import ArtistLinks from '@/components/ArtistLinks.vue'
 import Hls from 'hls.js'
 import { setImmersiveActive, updateImmersiveSettings, immersiveState } from '@/plugins/immersiveState'
+import TutorialPopup from '@/components/TutorialPopup.vue'
 
 const router = useRouter()
 const player = usePlayerStore()

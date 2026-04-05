@@ -29,15 +29,15 @@
           {{ line || '\u00A0' }}
         </p>
       </div>
-      <div class="text-center">
+      <div class="flex flex-col items-center gap-4">
         <span
-          class="inline-block px-4 py-1.5 mb-4 rounded-full text-xs font-medium tracking-wide"
+          class="px-4 py-1.5 rounded-full text-xs font-medium tracking-wide"
           :class="isLightBackground ? 'bg-black/[0.1] text-black/50' : 'bg-white/[0.08] text-white/50'"
         >These lyrics aren't synced yet</span>
         <button
           v-if="player.currentTrack?.source !== 'subsonic'"
           @click="showSyncer = true"
-          class="px-6 py-3 rounded-full bg-accent hover:bg-accent-hover text-base font-medium text-white transition-colors inline-flex items-center gap-2"
+          class="px-6 py-3 rounded-full bg-accent hover:bg-accent-hover text-base font-medium text-white transition-colors flex items-center gap-2"
         >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />

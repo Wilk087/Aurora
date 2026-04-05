@@ -22,8 +22,23 @@ let logPath = ''
 let initialized = false
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Explicitly initialise the logger with a directory path.
+ * Call this from the main process before installGlobalLogHandlers() so that
+ * logs land in the correct XDG state directory on Linux.
+ */
+export function initLogger(stateDir: string): void {
+  if (initialized) return
+  mkdirSync(stateDir, { recursive: true })
+  logPath = join(stateDir, 'aurora.log')
+  initialized = true
+  rotate()
+}
+
 function ensureInit() {
   if (initialized) return
+  // Fallback: use Electron's userData (non-Linux or called before initLogger)
   const dataPath = app.getPath('userData')
   mkdirSync(dataPath, { recursive: true })
   logPath = join(dataPath, 'aurora.log')
@@ -116,7 +131,7 @@ export function installGlobalLogHandlers() {
   logger.info(`Electron: ${process.versions.electron}`)
   logger.info(`Chrome: ${process.versions.chrome}`)
   logger.info(`Node: ${process.versions.node}`)
-  logger.info(`User data: ${app.getPath('userData')}`)
+  logger.info(`Log path:  ${logPath}`)
   logger.info('─'.repeat(60))
 }
 

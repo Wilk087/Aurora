@@ -1,6 +1,6 @@
 {
   "name": "aurora-player",
-  "version": "2.7.0-dev",
+  "version": "2.7.0",
   "private": true,
   "description": "A beautiful local music player for Linux and Windows",
   "author": {
@@ -15,6 +15,8 @@
     "dist": "npm run build && electron-builder --linux",
     "dist:pacman": "npm run build && electron-builder --linux pacman",
     "dist:appimage": "npm run build && electron-builder --linux AppImage",
+    "dist:deb": "npm run build && electron-builder --linux deb",
+    "dist:rpm": "npm run build && electron-builder --linux rpm",
     "dist:win": "npm run build && electron-builder --win",
     "dist:all": "npm run build && electron-builder --linux --win"
   },
@@ -48,7 +50,9 @@
     "linux": {
       "target": [
         "pacman",
-        "AppImage"
+        "AppImage",
+        "deb",
+        "rpm"
       ],
       "icon": "build/icons",
       "category": "Audio",
@@ -105,6 +109,34 @@
         "gstreamer",
         "gst-plugins-base",
         "gst-plugins-good"
+      ]
+    },
+    "deb": {
+      "depends": [
+        "libgtk-3-0",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libsecret-1-0",
+        "libgstreamer1.0-0",
+        "gstreamer1.0-plugins-base",
+        "gstreamer1.0-plugins-good"
+      ]
+    },
+    "rpm": {
+      "depends": [
+        "gtk3",
+        "nss",
+        "libXScrnSaver",
+        "libXtst",
+        "xdg-utils",
+        "at-spi2-atk",
+        "libsecret",
+        "gstreamer1",
+        "gstreamer1-plugins-base",
+        "gstreamer1-plugins-good"
       ]
     }
   },
