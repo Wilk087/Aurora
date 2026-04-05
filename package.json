@@ -51,8 +51,7 @@
       "target": [
         "pacman",
         "AppImage",
-        "deb",
-        "rpm"
+        "deb"
       ],
       "icon": "build/icons",
       "category": "Audio",
