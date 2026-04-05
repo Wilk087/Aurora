@@ -126,6 +126,7 @@
       ]
     },
     "rpm": {
+      "compression": "xz",
       "depends": [
         "gtk3",
         "nss",
