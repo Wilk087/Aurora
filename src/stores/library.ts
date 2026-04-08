@@ -41,8 +41,9 @@ export const useLibraryStore = defineStore('library', () => {
   const searchLyricsEnabled = ref(false)
   const separateSoundtracks = ref(true)
   const includeSinglesInAlbums = ref(false)
+  const soundtrackTags = ref<string[]>(['soundtrack'])
 
-  const SOUNDTRACK_TAGS = new Set(['soundtrack', 'game ost', 'anime ost', 'film score', 'tv show', 'video game'])
+  const soundtrackTagSet = computed(() => new Set(soundtrackTags.value))
 
   // ── Computed ─────────────────────────────────────────────────────────────
   const albums = computed<Album[]>(() => {
@@ -88,7 +89,7 @@ export const useLibraryStore = defineStore('library', () => {
       if (!separateSoundtracks.value) return true
       const key = `${album.name}---${album.artist}`
       const tags = tagsStore.getAlbumTags(key)
-      return !tags.some(tag => SOUNDTRACK_TAGS.has(tag))
+      return !tags.some(tag => soundtrackTagSet.value.has(tag))
     })
   })
 
@@ -218,6 +219,7 @@ export const useLibraryStore = defineStore('library', () => {
     searchLyricsEnabled.value = settings.searchLyricsEnabled === true
     separateSoundtracks.value = settings.separateSoundtracks !== false
     includeSinglesInAlbums.value = settings.includeSinglesInAlbums === true
+    soundtrackTags.value = parseTagList(settings.soundtrackTags, ['soundtrack'])
     libraryReady.value = true
 
     // Auto-load subsonic library if configured
@@ -237,6 +239,29 @@ export const useLibraryStore = defineStore('library', () => {
   function setIncludeSinglesInAlbums(enabled: boolean) {
     includeSinglesInAlbums.value = enabled
     window.api.mergeSettings({ includeSinglesInAlbums: enabled })
+  }
+
+  function parseTagList(input: unknown, fallback: string[]): string[] {
+    if (Array.isArray(input)) {
+      const normalized = input
+        .map(v => String(v).toLowerCase().trim())
+        .filter(Boolean)
+      return normalized.length > 0 ? Array.from(new Set(normalized)) : fallback
+    }
+    if (typeof input === 'string') {
+      const normalized = input
+        .split(',')
+        .map(v => v.toLowerCase().trim())
+        .filter(Boolean)
+      return normalized.length > 0 ? Array.from(new Set(normalized)) : fallback
+    }
+    return fallback
+  }
+
+  function setSoundtrackTags(tags: string[]) {
+    const normalized = parseTagList(tags, ['soundtrack'])
+    soundtrackTags.value = normalized
+    window.api.mergeSettings({ soundtrackTags: normalized })
   }
 
   async function addFolder() {
@@ -418,6 +443,7 @@ export const useLibraryStore = defineStore('library', () => {
     searchLyricsEnabled,
     separateSoundtracks,
     includeSinglesInAlbums,
+    soundtrackTags,
     albums,
     visibleAlbums,
     filteredAlbums,
@@ -436,6 +462,7 @@ export const useLibraryStore = defineStore('library', () => {
     setSearchLyricsEnabled,
     setSeparateSoundtracks,
     setIncludeSinglesInAlbums,
+    setSoundtrackTags,
     mergeSubsonicTracks,
     clearSubsonicTracks,
     addPluginTracks,

@@ -140,7 +140,11 @@ onMounted(async () => {
   await library.loadLibrary()
   await playlistStore.loadPlaylists()
   await favoritesStore.load()
-  tagsStore.load()
+  await tagsStore.load()
+
+  if (settings.autoTagAlbumsFromApi === true) {
+    tagsStore.autoTagAlbumsFromFetchedData().catch(() => {})
+  }
 
   // Init sync (non-blocking — pull after data loaded)
   await syncStore.loadConfig()

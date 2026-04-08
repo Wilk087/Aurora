@@ -40,7 +40,7 @@
         <path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z" />
       </svg>
       <h2 class="text-xl font-semibold text-white/60 mb-2">No soundtracks yet</h2>
-      <p class="text-sm text-white/30 mb-2">Tag albums as "soundtrack", "game ost", "anime ost", etc.</p>
+      <p class="text-sm text-white/30 mb-2">Tag albums with soundtrack tags from Settings → Album Display.</p>
       <p class="text-xs text-white/20">Right-click any album → Manage Tags</p>
     </div>
 
@@ -70,19 +70,30 @@
           @click="$router.push(`/album/${item.album.id}`)"
           @play="player.playAll(item.album.tracks)"
         />
-        <!-- Tag chips under the card -->
-        <div class="mt-1 flex flex-wrap gap-1 px-0.5">
+        <!-- Compact soundtrack tags under the card -->
+        <div class="mt-1 px-0.5 relative">
           <button
-            v-for="tag in item.tags"
-            :key="tag"
-            @click.stop="toggleTag(tag)"
-            class="px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors"
-            :class="activeTag === tag
-              ? 'bg-accent/20 text-accent'
-              : 'bg-white/[0.06] text-white/30 hover:text-white/50'"
+            @click.stop="openTagMenuAlbum = openTagMenuAlbum === item.album.id ? null : item.album.id"
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors bg-white/[0.06] text-white/40 hover:text-white/70"
           >
-            {{ tag }}
+            <span>{{ item.tags[0] }}</span>
+            <span v-if="item.tags.length > 1" class="text-white/30">+{{ item.tags.length - 1 }}</span>
           </button>
+          <div
+            v-if="openTagMenuAlbum === item.album.id"
+            class="absolute left-0 top-full mt-1 z-20 w-44 rounded-lg menu-panel p-1.5 shadow-2xl"
+            @click.stop
+          >
+            <button
+              v-for="tag in item.tags"
+              :key="tag"
+              @click="openTagMenuAlbum = null; toggleTag(tag)"
+              class="w-full px-2 py-1.5 text-left text-xs rounded-md transition-colors"
+              :class="activeTag === tag ? 'bg-accent/20 text-accent' : 'text-white/60 hover:text-white hover:bg-white/[0.06]'"
+            >
+              {{ tag }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -102,6 +113,7 @@ const tagsStore = useTagsStore()
 const player = usePlayerStore()
 const viewRoot = ref<HTMLElement | null>(null)
 const activeTag = ref<string | null>(null)
+const openTagMenuAlbum = ref<string | null>(null)
 
 // ── Scroll memory ────────────────────────
 let savedScrollTop = 0
@@ -118,20 +130,23 @@ onBeforeRouteLeave(() => {
 
 /** All albums that have at least one album-level tag */
 const soundtrackTaggedAlbums = computed(() => {
+  const soundtrackSet = new Set(library.soundtrackTags)
   return library.albums
     .map(album => {
       const key = `${album.name}---${album.artist}`
       const tags = tagsStore.getAlbumTags(key)
       return { album, tags }
     })
-    .filter(item => item.tags.length > 0)
+    .filter(item => item.tags.some(t => soundtrackSet.has(t)))
 })
 
 /** All unique tags currently on albums, sorted */
 const soundtrackTags = computed(() => {
   const set = new Set<string>()
   for (const item of soundtrackTaggedAlbums.value) {
-    for (const t of item.tags) set.add(t)
+    for (const t of item.tags) {
+      if (library.soundtrackTags.includes(t)) set.add(t)
+    }
   }
   return Array.from(set).sort()
 })

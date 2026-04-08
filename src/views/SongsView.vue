@@ -4,7 +4,7 @@
     <div class="flex items-center justify-between mb-6">
       <div>
         <h1 class="text-3xl font-bold text-white mb-1">Songs</h1>
-        <p class="text-sm text-white/40">{{ library.filteredTracks.length }} songs<span v-if="library.searchQuery"> matching "{{ library.searchQuery }}"</span></p>
+        <p class="text-sm text-white/40">{{ filteredTracksByTag.length }} songs<span v-if="library.searchQuery"> matching "{{ library.searchQuery }}"</span></p>
       </div>
 
       <div class="flex items-center gap-2">
@@ -56,9 +56,28 @@
       </div>
     </div>
 
+    <div v-if="tagsStore.allTags.length > 0" class="flex items-center gap-2 mb-4 flex-wrap">
+      <button
+        @click="activeTrackTag = null"
+        class="px-2.5 py-1 rounded-full text-xs transition-colors"
+        :class="activeTrackTag === null ? 'bg-accent/20 text-accent' : 'bg-white/[0.06] text-white/40 hover:text-white/70'"
+      >
+        All tags
+      </button>
+      <button
+        v-for="tag in tagsStore.allTags"
+        :key="tag"
+        @click="activeTrackTag = activeTrackTag === tag ? null : tag"
+        class="px-2.5 py-1 rounded-full text-xs transition-colors"
+        :class="activeTrackTag === tag ? 'bg-accent/20 text-accent' : 'bg-white/[0.06] text-white/40 hover:text-white/70'"
+      >
+        {{ tag }}
+      </button>
+    </div>
+
     <!-- No search results -->
     <div
-      v-if="library.searchQuery && library.sortedTracks.length === 0"
+      v-if="library.searchQuery && filteredTracksByTag.length === 0"
       class="flex flex-col items-center justify-center py-20"
     >
       <svg class="w-16 h-16 text-white/[0.06] mb-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -101,7 +120,7 @@
     </div>
 
     <!-- Song list -->
-    <div v-if="library.filteredTracks.length > 0" class="flex flex-col flex-1 min-h-0">
+    <div v-if="filteredTracksByTag.length > 0" class="flex flex-col flex-1 min-h-0">
       <!-- Column headers -->
       <div class="flex items-center gap-3 px-4 py-2 mb-1 border-b border-white/[0.06] shrink-0">
         <div class="w-8 text-center text-[10px] text-white/30 font-medium">#</div>
@@ -132,7 +151,7 @@
       <!-- Virtual scrolled tracks -->
       <VirtualScroller
         ref="virtualScrollerRef"
-        :items="library.sortedTracks"
+        :items="filteredTracksByTag"
         :item-height="56"
         key-field="id"
         container-height="100%"
@@ -170,13 +189,22 @@ import { onBeforeRouteLeave } from 'vue-router'
 import { useLibraryStore, type SortOrder } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { useSelection } from '@/composables/useSelection'
+import { useTagsStore } from '@/stores/tags'
 import SongRow from '@/components/SongRow.vue'
 import VirtualScroller from '@/components/VirtualScroller.vue'
 import SelectionBar from '@/components/SelectionBar.vue'
 
 const library = useLibraryStore()
 const player = usePlayerStore()
-const selection = useSelection(() => library.sortedTracks)
+const tagsStore = useTagsStore()
+const activeTrackTag = ref<string | null>(null)
+
+const filteredTracksByTag = computed(() => {
+  if (!activeTrackTag.value) return library.sortedTracks
+  return library.sortedTracks.filter(track => tagsStore.getTrackTags(track.id).includes(activeTrackTag.value!))
+})
+
+const selection = useSelection(() => filteredTracksByTag.value)
 
 const showSortMenu = ref(false)
 const sortDropdownRef = ref<HTMLElement | null>(null)
@@ -223,7 +251,7 @@ function onClickOutside(e: MouseEvent) {
 }
 
 function playTrack(index: number) {
-  player.playAll(library.sortedTracks, index)
+  player.playAll(filteredTracksByTag.value, index)
 }
 
 function onPlayNextSelected() {
@@ -249,7 +277,7 @@ function onKeyDown(e: KeyboardEvent) {
   if (e.key === 'Escape' && selection.hasSelection.value) {
     selection.clearSelection()
   }
-  if ((e.ctrlKey || e.metaKey) && e.key === 'a' && library.sortedTracks.length > 0) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'a' && filteredTracksByTag.value.length > 0) {
     e.preventDefault()
     selection.selectAll()
   }

@@ -22,6 +22,7 @@ import { useLibraryStore } from '@/stores/library'
 import { usePlaylistStore } from '@/stores/playlist'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useThemeStore } from '@/stores/theme'
+import { useTagsStore } from '@/stores/tags'
 import { useToast } from '@/composables/useToast'
 import { parseLRC, findCurrentLine, findCurrentWord, isEnhancedLrc } from '@/utils/lrcParser'
 import { shallowRef } from 'vue'
@@ -87,6 +88,7 @@ export function createPluginAPI(pluginId: string) {
   const playlists = usePlaylistStore()
   const favorites = useFavoritesStore()
   const theme = useThemeStore()
+  const tags = useTagsStore()
   const toast = useToast()
 
   return {
@@ -141,6 +143,20 @@ export function createPluginAPI(pluginId: string) {
       get ids() { return favorites.ids },
       isFavorite: favorites.isFavorite.bind(favorites),
       toggle: favorites.toggle.bind(favorites),
+    },
+
+    // ── Tags ─────────────────────────────────────────────────────────────
+    tags: {
+      get all() { return tags.allTags },
+      getTrack(trackId: string) { return tags.getTrackTags(trackId) },
+      getAlbum(albumKey: string) { return tags.getAlbumTags(albumKey) },
+      albumKey(albumName: string, albumArtist: string) { return tags.albumKey(albumName, albumArtist) },
+      setTrack(ids: string[], values: string[]) { return tags.setTrackTags(ids, values) },
+      setAlbum(albumKeys: string[], values: string[]) { return tags.setAlbumTags(albumKeys, values) },
+      addTrack(ids: string[], values: string[]) { return tags.addTrackTags(ids, values) },
+      addAlbum(albumKeys: string[], values: string[]) { return tags.addAlbumTags(albumKeys, values) },
+      removeTrack(ids: string[], values: string[]) { return tags.removeTrackTags(ids, values) },
+      removeAlbum(albumKeys: string[], values: string[]) { return tags.removeAlbumTags(albumKeys, values) },
     },
 
     // ── Theme ────────────────────────────────────────────────────────────

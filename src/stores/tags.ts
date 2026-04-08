@@ -140,6 +140,63 @@ export const useTagsStore = defineStore('tags', () => {
     sync(data)
   }
 
+  function normalizeTagList(input: string[]): string[] {
+    return Array.from(new Set(input.map(t => t.toLowerCase().trim()).filter(Boolean)))
+  }
+
+  /**
+   * Auto-tag albums from metadata and fetched artist info.
+   * Strategy: use album/track genre tags first; if none exist, fall back to fetched artist tags.
+   * Existing album tags are preserved.
+   */
+  async function autoTagAlbumsFromFetchedData(): Promise<{ tagged: number; skipped: number }> {
+    const library = useLibraryStore()
+    const artistTagCache = new Map<string, string[]>()
+    let tagged = 0
+    let skipped = 0
+
+    for (const album of library.albums) {
+      const key = `${album.name}---${album.artist}`
+      if (getAlbumTags(key).length > 0) {
+        skipped++
+        continue
+      }
+
+      const genreTags = normalizeTagList(
+        album.tracks.flatMap(track =>
+          (track.genre || '')
+            .split(/[,/;]+/)
+            .map(v => v.trim())
+            .filter(Boolean),
+        ),
+      )
+
+      let tagsToApply = genreTags
+      if (tagsToApply.length === 0) {
+        const artistName = album.artist
+        if (!artistTagCache.has(artistName)) {
+          try {
+            const info = await window.api.getArtistInfo(artistName)
+            artistTagCache.set(artistName, normalizeTagList(info?.tags ?? []))
+          } catch {
+            artistTagCache.set(artistName, [])
+          }
+        }
+        tagsToApply = artistTagCache.get(artistName) ?? []
+      }
+
+      if (tagsToApply.length === 0) {
+        skipped++
+        continue
+      }
+
+      await setAlbumTags([key], tagsToApply)
+      tagged++
+    }
+
+    return { tagged, skipped }
+  }
+
   return {
     trackTags,
     albumTags,
@@ -157,6 +214,7 @@ export const useTagsStore = defineStore('tags', () => {
     addAlbumTags,
     removeTrackTags,
     removeAlbumTags,
+    autoTagAlbumsFromFetchedData,
   }
 })
 

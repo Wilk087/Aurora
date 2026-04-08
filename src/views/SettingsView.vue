@@ -152,6 +152,42 @@
             />
           </button>
         </div>
+
+        <div class="px-4 py-3 rounded-xl bg-white/[0.05]">
+          <p class="text-sm text-white/80 mb-1">Soundtrack Tags</p>
+          <p class="text-xs text-white/30 mb-3">Comma-separated tags considered soundtrack-only (used in Albums split and Soundtracks view)</p>
+          <div class="flex items-center gap-2">
+            <input
+              v-model="soundtrackTagsInput"
+              type="text"
+              placeholder="soundtrack, game ost"
+              class="flex-1 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white/80 placeholder:text-white/20 outline-none focus:border-accent/40 transition-colors"
+            />
+            <button
+              @click="saveSoundtrackTags"
+              class="px-4 py-2 rounded-lg bg-accent hover:bg-accent-hover text-sm font-medium text-white transition-colors"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">Auto-tag Albums from Fetched Data</p>
+            <p class="text-xs text-white/30 mt-0.5">Use genre metadata, if none is found, apply fetched artist tags (this might be inaccurate, use at your own risk)</p>
+          </div>
+          <button
+            @click="toggleAutoTagAlbums"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="autoTagAlbumsFromApi ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
+              :class="autoTagAlbumsFromApi ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
       </div>
     </section>
 
@@ -1683,6 +1719,8 @@ const exportPath = ref('')
 const exportDefaultPath = ref('')
 const exporting = ref(false)
 const importing = ref(false)
+const autoTagAlbumsFromApi = ref(false)
+const soundtrackTagsInput = ref('soundtrack')
 
 // Remote Control
 const remoteEnabled = ref(false)
@@ -1771,6 +1809,8 @@ onMounted(async () => {
   autoExport.value = settings.autoExport !== false // default true
   exportPath.value = settings.exportPath || ''
   exportDefaultPath.value = await window.api.exportGetDefaultPath()
+  autoTagAlbumsFromApi.value = settings.autoTagAlbumsFromApi === true
+  soundtrackTagsInput.value = (library.soundtrackTags?.length ? library.soundtrackTags.join(', ') : 'soundtrack')
 
   // Enumerate audio devices
   player.enumerateOutputDevices()
@@ -2111,6 +2151,28 @@ async function toggleAutoExport() {
   autoExport.value = !autoExport.value
   await window.api.mergeSettings({ autoExport: autoExport.value })
   toast.success(`Auto-export ${autoExport.value ? 'enabled' : 'disabled'}`)
+}
+
+async function toggleAutoTagAlbums() {
+  autoTagAlbumsFromApi.value = !autoTagAlbumsFromApi.value
+  await window.api.mergeSettings({ autoTagAlbumsFromApi: autoTagAlbumsFromApi.value })
+  if (autoTagAlbumsFromApi.value) {
+    const tagsStore = (await import('@/stores/tags')).useTagsStore()
+    const result = await tagsStore.autoTagAlbumsFromFetchedData()
+    toast.success(`Auto-tagged ${result.tagged} album${result.tagged !== 1 ? 's' : ''}`)
+  } else {
+    toast.success('Auto-tagging disabled')
+  }
+}
+
+function saveSoundtrackTags() {
+  const tags = soundtrackTagsInput.value
+    .split(',')
+    .map(v => v.toLowerCase().trim())
+    .filter(Boolean)
+  library.setSoundtrackTags(tags.length > 0 ? tags : ['soundtrack'])
+  soundtrackTagsInput.value = (library.soundtrackTags.length > 0 ? library.soundtrackTags : ['soundtrack']).join(', ')
+  toast.success('Soundtrack tags updated')
 }
 
 async function chooseExportPath() {

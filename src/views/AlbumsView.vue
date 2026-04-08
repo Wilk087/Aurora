@@ -3,7 +3,7 @@
     <div class="flex items-center justify-between mb-6">
       <div>
         <h1 class="text-3xl font-bold text-white mb-1">Albums</h1>
-        <p class="text-sm text-white/40">{{ library.filteredAlbums.length }} albums<span v-if="library.searchQuery"> matching "{{ library.searchQuery }}"</span></p>
+        <p class="text-sm text-white/40">{{ filteredAlbumsByTag.length }} albums<span v-if="library.searchQuery"> matching "{{ library.searchQuery }}"</span></p>
       </div>
 
       <div class="flex items-center gap-2">
@@ -55,9 +55,28 @@
       </div>
     </div>
 
+    <div v-if="tagsStore.allTags.length > 0" class="flex items-center gap-2 mb-4 flex-wrap">
+      <button
+        @click="activeAlbumTag = null"
+        class="px-2.5 py-1 rounded-full text-xs transition-colors"
+        :class="activeAlbumTag === null ? 'bg-accent/20 text-accent' : 'bg-white/[0.06] text-white/40 hover:text-white/70'"
+      >
+        All tags
+      </button>
+      <button
+        v-for="tag in tagsStore.allTags"
+        :key="tag"
+        @click="activeAlbumTag = activeAlbumTag === tag ? null : tag"
+        class="px-2.5 py-1 rounded-full text-xs transition-colors"
+        :class="activeAlbumTag === tag ? 'bg-accent/20 text-accent' : 'bg-white/[0.06] text-white/40 hover:text-white/70'"
+      >
+        {{ tag }}
+      </button>
+    </div>
+
     <!-- No search results -->
     <div
-      v-if="library.searchQuery && library.filteredAlbums.length === 0"
+      v-if="library.searchQuery && filteredAlbumsByTag.length === 0"
       class="flex flex-col items-center justify-center py-20"
     >
       <svg class="w-16 h-16 text-white/[0.06] mb-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -106,7 +125,7 @@
       class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5"
     >
       <AlbumCard
-        v-for="album in library.filteredAlbums"
+        v-for="album in filteredAlbumsByTag"
         :key="album.id"
         :album="album"
         @click="$router.push(`/album/${album.id}`)"
@@ -117,14 +136,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, onActivated } from 'vue'
+import { ref, onMounted, onUnmounted, onActivated, computed } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { useLibraryStore, type AlbumSortOrder } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
+import { useTagsStore } from '@/stores/tags'
 import AlbumCard from '@/components/AlbumCard.vue'
 
 const library = useLibraryStore()
 const player = usePlayerStore()
+const tagsStore = useTagsStore()
+const activeAlbumTag = ref<string | null>(null)
+
+const filteredAlbumsByTag = computed(() => {
+  if (!activeAlbumTag.value) return library.filteredAlbums
+  return library.filteredAlbums.filter((album) => {
+    const key = `${album.name}---${album.artist}`
+    return tagsStore.getAlbumTags(key).includes(activeAlbumTag.value!)
+  })
+})
 
 const showSortMenu = ref(false)
 const sortDropdownRef = ref<HTMLElement | null>(null)
