@@ -46,6 +46,14 @@
     <!-- Context menu -->
     <Teleport to="body">
       <div v-if="showCtx" class="fixed inset-0 z-[90]" @click="showCtx = false" @contextmenu.prevent="showCtx = false" />
+      <TagDialog
+        :show="showTagDialog"
+        type="album"
+        :ids="[albumKey]"
+        :label="album.name"
+        @close="showTagDialog = false"
+        @saved="showTagDialog = false"
+      />
       <div
         v-if="showCtx"
         class="fixed z-[100] w-48 rounded-xl menu-panel py-1.5 shadow-2xl"
@@ -135,17 +143,7 @@
             </button>
           </div>
         </div>
-        <!-- Tag Dialog -->
-    <TagDialog
-      :show="showTagDialog"
-      type="album"
-      :ids="[albumKey]"
-      :label="album.name"
-      @close="showTagDialog = false"
-      @saved="showTagDialog = false"
-    />
-
-    <!-- Plugin-injected album context menu items -->
+        <!-- Plugin-injected album context menu items -->
         <template v-if="pluginAlbumContextMenuItems.length">
           <div class="border-t border-white/[0.06] my-1" />
           <template v-for="(item, idx) in pluginAlbumContextMenuItems" :key="item.label">

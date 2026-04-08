@@ -2026,9 +2026,13 @@ app.whenReady().then(async () => {
 
   // ── IPC: Artist info (MusicBrainz + Wikipedia summary) ──
   ipcMain.handle('artist:get-info', async (_, artistName: string) => {
-    // Check disk cache first (7-day TTL)
+    // Check disk cache first. Entries without an image expire much faster
+    // so we can pick up images that become available later.
     const cached = artistInfoCache[artistName]
-    if (cached && Date.now() - cached.ts < 7 * 24 * 60 * 60 * 1000) {
+    const age = cached ? Date.now() - cached.ts : Infinity
+    const ttlWithImage = 7 * 24 * 60 * 60 * 1000
+    const ttlWithoutImage = 6 * 60 * 60 * 1000
+    if (cached && age < (cached.data?.imageUrl ? ttlWithImage : ttlWithoutImage)) {
       return cached.data
     }
 

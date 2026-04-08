@@ -27,9 +27,9 @@
           <!-- Current tags -->
           <div class="mb-4">
             <p class="text-[10px] font-semibold uppercase tracking-wider text-white/30 mb-2">Current Tags</p>
-            <div v-if="currentTags.length > 0" class="flex flex-wrap gap-1.5">
+            <div v-if="workingTags.length > 0" class="flex flex-wrap gap-1.5">
               <button
-                v-for="tag in currentTags"
+                v-for="tag in workingTags"
                 :key="tag"
                 @click="removeTag(tag)"
                 class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-accent/15 text-accent border border-accent/25 hover:bg-red-500/15 hover:text-red-400 hover:border-red-500/25 transition-colors group"
@@ -114,7 +114,7 @@
           <!-- Actions -->
           <div class="flex items-center justify-between gap-3 pt-2 border-t border-white/[0.06]">
             <button
-              v-if="currentTags.length > 0"
+              v-if="workingTags.length > 0"
               @click="clearAll"
               class="px-3 py-1.5 rounded-lg text-xs text-red-400/70 hover:text-red-400 hover:bg-white/[0.04] transition-colors"
             >
@@ -144,7 +144,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
-import { useTagsStore } from '@/stores/tags'
+import { COMMON_TAGS, useTagsStore } from '@/stores/tags'
 import { useLibraryStore } from '@/stores/library'
 import { useToast } from '@/composables/useToast'
 
@@ -170,8 +170,6 @@ const inputRef = ref<HTMLInputElement>()
 const inputValue = ref('')
 const mbTags = ref<string[]>([])
 
-/** Tags that are on ALL selected items */
-const currentTags = ref<string[]>([])
 /** Working set: starts from common tags, mutated during session */
 const workingTags = ref<string[]>([])
 
@@ -205,8 +203,8 @@ const suggestions = computed<string[]>(() => {
   const base = props.type === 'track'
     ? tagsStore.suggestedTrackTags(props.ids)
     : tagsStore.suggestedAlbumTags(props.ids)
-  // Merge in MusicBrainz tags, dedup
-  const merged = new Set([...base, ...mbTags.value])
+  // Merge in MusicBrainz and starter tags, dedup
+  const merged = new Set([...base, ...mbTags.value, ...COMMON_TAGS])
   return Array.from(merged).sort()
 })
 
@@ -225,7 +223,6 @@ const filteredSuggestions = computed(() => {
 watch(() => props.show, (v) => {
   if (v) {
     const tags = getExistingTags()
-    currentTags.value = [...tags]
     workingTags.value = [...tags]
     inputValue.value = ''
     mbTags.value = []

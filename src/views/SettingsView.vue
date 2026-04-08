@@ -116,6 +116,45 @@
       </div>
     </section>
 
+    <section v-show="activeTab === 'general'" class="mb-8">
+      <h2 class="text-lg font-semibold text-white mb-4">Album Display</h2>
+      <div class="space-y-4">
+        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">Separate Soundtracks from Albums</p>
+            <p class="text-xs text-white/30 mt-0.5">Hide soundtrack-tagged albums from Albums view and keep them in Soundtracks/Search</p>
+          </div>
+          <button
+            @click="library.setSeparateSoundtracks(!library.separateSoundtracks)"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="library.separateSoundtracks ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
+              :class="library.separateSoundtracks ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
+
+        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">Show Singles in Albums View</p>
+            <p class="text-xs text-white/30 mt-0.5">When disabled, one-track albums are hidden from Albums and still searchable</p>
+          </div>
+          <button
+            @click="library.setIncludeSinglesInAlbums(!library.includeSinglesInAlbums)"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="library.includeSinglesInAlbums ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
+              :class="library.includeSinglesInAlbums ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
+      </div>
+    </section>
+
     <!-- ── Discord Rich Presence ──────────────────────────────────── -->
     <section v-show="activeTab === 'integrations'" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Discord Rich Presence</h2>

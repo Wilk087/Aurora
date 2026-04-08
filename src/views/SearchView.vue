@@ -44,11 +44,11 @@
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-xs font-semibold uppercase tracking-widest text-white/40">Albums</h2>
           <button
-            v-if="library.filteredAlbums.length > MAX_ALBUMS"
+            v-if="library.searchAlbums.length > MAX_ALBUMS"
             @click="router.push('/albums')"
             class="text-xs text-accent hover:underline transition-colors"
           >
-            See all {{ library.filteredAlbums.length }} →
+            See all {{ library.searchAlbums.length }} →
           </button>
         </div>
         <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
@@ -204,7 +204,7 @@ const filteredPlaylists = computed(() => {
 })
 
 const topSongs = computed(() => library.filteredTracks.slice(0, MAX_SONGS))
-const topAlbums = computed(() => library.filteredAlbums.slice(0, MAX_ALBUMS))
+const topAlbums = computed(() => library.searchAlbums.slice(0, MAX_ALBUMS))
 const topArtists = computed(() => filteredArtists.value.slice(0, MAX_ARTISTS))
 const topPlaylists = computed(() => filteredPlaylists.value.slice(0, MAX_PLAYLISTS))
 

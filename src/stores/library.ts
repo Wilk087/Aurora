@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, shallowRef, computed, markRaw } from 'vue'
 import { splitArtists } from '@/utils/splitArtists'
+import { useTagsStore } from './tags'
 
 export type SortOrder = 'title' | 'artist' | 'album' | 'year' | 'duration'
 export type AlbumSortOrder = 'name' | 'artist' | 'year' | 'tracks'
@@ -38,6 +39,10 @@ export const useLibraryStore = defineStore('library', () => {
   const sortOrder = ref<SortOrder>('title')
   const albumSortOrder = ref<AlbumSortOrder>('name')
   const searchLyricsEnabled = ref(false)
+  const separateSoundtracks = ref(true)
+  const includeSinglesInAlbums = ref(false)
+
+  const SOUNDTRACK_TAGS = new Set(['soundtrack', 'game ost', 'anime ost', 'film score', 'tv show', 'video game'])
 
   // ── Computed ─────────────────────────────────────────────────────────────
   const albums = computed<Album[]>(() => {
@@ -76,8 +81,30 @@ export const useLibraryStore = defineStore('library', () => {
     }
   })
 
+  const visibleAlbums = computed<Album[]>(() => {
+    const tagsStore = useTagsStore()
+    return albums.value.filter((album) => {
+      if (!includeSinglesInAlbums.value && album.tracks.length <= 1) return false
+      if (!separateSoundtracks.value) return true
+      const key = `${album.name}---${album.artist}`
+      const tags = tagsStore.getAlbumTags(key)
+      return !tags.some(tag => SOUNDTRACK_TAGS.has(tag))
+    })
+  })
+
   const filteredAlbums = computed<Album[]>(() => {
-    if (!searchQuery.value) return albums.value
+    if (!searchQuery.value) return visibleAlbums.value
+    const q = normalize(searchQuery.value)
+    return visibleAlbums.value.filter(
+      (a) =>
+        normalize(a.name).includes(q) ||
+        normalize(a.artist).includes(q) ||
+        a.tracks.some((t) => normalize(t.title).includes(q)),
+    )
+  })
+
+  const searchAlbums = computed<Album[]>(() => {
+    if (!searchQuery.value) return []
     const q = normalize(searchQuery.value)
     return albums.value.filter(
       (a) =>
@@ -189,6 +216,8 @@ export const useLibraryStore = defineStore('library', () => {
     localTracks.value = rawTracks.map((t: Track) => markRaw(t))
     folders.value = rawFolders
     searchLyricsEnabled.value = settings.searchLyricsEnabled === true
+    separateSoundtracks.value = settings.separateSoundtracks !== false
+    includeSinglesInAlbums.value = settings.includeSinglesInAlbums === true
     libraryReady.value = true
 
     // Auto-load subsonic library if configured
@@ -198,6 +227,16 @@ export const useLibraryStore = defineStore('library', () => {
   function setSearchLyricsEnabled(enabled: boolean) {
     searchLyricsEnabled.value = enabled
     window.api.mergeSettings({ searchLyricsEnabled: enabled })
+  }
+
+  function setSeparateSoundtracks(enabled: boolean) {
+    separateSoundtracks.value = enabled
+    window.api.mergeSettings({ separateSoundtracks: enabled })
+  }
+
+  function setIncludeSinglesInAlbums(enabled: boolean) {
+    includeSinglesInAlbums.value = enabled
+    window.api.mergeSettings({ includeSinglesInAlbums: enabled })
   }
 
   async function addFolder() {
@@ -377,8 +416,12 @@ export const useLibraryStore = defineStore('library', () => {
     sortOrder,
     albumSortOrder,
     searchLyricsEnabled,
+    separateSoundtracks,
+    includeSinglesInAlbums,
     albums,
+    visibleAlbums,
     filteredAlbums,
+    searchAlbums,
     artists,
     filteredTracks,
     sortedTracks,
@@ -391,6 +434,8 @@ export const useLibraryStore = defineStore('library', () => {
     setSortOrder,
     setAlbumSortOrder,
     setSearchLyricsEnabled,
+    setSeparateSoundtracks,
+    setIncludeSinglesInAlbums,
     mergeSubsonicTracks,
     clearSubsonicTracks,
     addPluginTracks,
