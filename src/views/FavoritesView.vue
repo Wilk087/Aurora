@@ -103,7 +103,7 @@ import VirtualScroller from '@/components/VirtualScroller.vue'
 const favorites = useFavoritesStore()
 const player = usePlayerStore()
 const selection = useSelection(() => favorites.favoriteTracks)
-const virtualScrollerRef = ref<InstanceType<typeof VirtualScroller> | null>(null)
+const virtualScrollerRef = ref<{ containerRef?: HTMLElement | null } | null>(null)
 
 // ── Scroll memory ────────────────────────
 let savedScrollTop = 0

@@ -163,71 +163,85 @@
 
     <!-- Create playlist dialog -->
     <Teleport to="body">
-      <div
-        v-if="showCreateDialog"
-        class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60"
-        @click.self="showCreateDialog = false"
-      >
-        <div class="w-96 rounded-xl menu-panel p-6 shadow-2xl">
-          <h2 class="text-lg font-bold mb-4">New Playlist</h2>
-          <input
-            v-model="newPlaylistName"
-            ref="nameInput"
-            @keydown.enter="createPlaylist"
-            placeholder="Playlist name"
-            class="w-full px-4 py-2.5 rounded-lg bg-white/[0.06] border border-white/10 text-sm text-white placeholder-white/30 focus:outline-none focus:border-accent transition-colors"
-          />
-          <div class="flex justify-end gap-3 mt-4">
-            <button @click="showCreateDialog = false" class="px-4 py-2 rounded-lg text-sm text-white/60 hover:text-white transition-colors">Cancel</button>
-            <button @click="createPlaylist" :disabled="!newPlaylistName.trim()" class="px-4 py-2 rounded-lg text-sm font-medium bg-accent hover:bg-accent-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors">Create</button>
+      <Transition name="fade">
+        <div v-if="showCreateDialog" class="fixed inset-0 z-[80] bg-black/50" @click="showCreateDialog = false" />
+      </Transition>
+      <Transition name="dialog-slide">
+        <div v-if="showCreateDialog" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[90] w-[360px] max-w-[90vw] rounded-2xl bg-[#12121f]/95 backdrop-blur-2xl border border-white/[0.08] shadow-2xl">
+          <div class="p-6">
+            <h2 class="text-base font-semibold mb-4">New Playlist</h2>
+            <input
+              v-model="newPlaylistName"
+              ref="nameInput"
+              @keydown.enter="createPlaylist"
+              @keydown.escape="showCreateDialog = false"
+              placeholder="Playlist name…"
+              class="ctx-input w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors"
+            />
+            <div class="flex justify-end gap-3 mt-4">
+              <button @click="showCreateDialog = false" class="px-4 py-2 rounded-lg text-sm text-white/50 hover:text-white hover:bg-white/[0.06] transition-colors">Cancel</button>
+              <button @click="createPlaylist" :disabled="!newPlaylistName.trim()" class="px-5 py-2 rounded-lg text-sm font-medium bg-accent hover:bg-accent-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors">Create</button>
+            </div>
           </div>
         </div>
-      </div>
+      </Transition>
     </Teleport>
 
     <!-- Context menu -->
     <Teleport to="body">
-      <div v-if="contextPlaylist" class="fixed inset-0 z-[100]" @click="contextPlaylist = null">
-        <div
-          class="fixed z-[101] w-52 rounded-xl menu-panel py-1.5 shadow-2xl"
-          :style="{ top: contextY + 'px', left: contextX + 'px' }"
-          @click.stop
+      <div v-if="contextPlaylist" class="fixed inset-0 z-[90]" @click="contextPlaylist = null" @contextmenu.prevent="contextPlaylist = null" />
+      <div
+        v-if="contextPlaylist"
+        class="fixed z-[100] w-52 rounded-xl menu-panel py-1.5 shadow-2xl"
+        :style="contextPos"
+        @click.stop
+      >
+        <button @click="playContextPlaylist(false)" class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5">
+          <svg class="w-4 h-4 shrink-0 opacity-50" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+          Play
+        </button>
+        <button @click="playContextPlaylist(true)" class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5">
+          <svg class="w-4 h-4 shrink-0 opacity-50" fill="currentColor" viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" /></svg>
+          Shuffle
+        </button>
+        <div class="border-t border-[var(--border)] my-1" />
+        <button
+          v-if="contextPlaylist.smart"
+          @click="startEditRules"
+          class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5"
         >
-          <button @click="playContextPlaylist(false)" class="w-full px-4 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2">
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-            Play
-          </button>
-          <button @click="playContextPlaylist(true)" class="w-full px-4 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2">
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z" /></svg>
-            Shuffle
-          </button>
-          <div class="border-t border-white/[0.06] my-1" />
-          <button
-            v-if="contextPlaylist.smart"
-            @click="startEditRules"
-            class="w-full px-4 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
-            Edit Rules
-          </button>
-          <button v-if="!contextPlaylist.smart" @click="startRename" class="w-full px-4 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors">Rename</button>
-          <button @click="confirmDelete" class="w-full px-4 py-2 text-left text-sm text-red-400 hover:text-red-300 hover:bg-white/[0.06] transition-colors">Delete</button>
-        </div>
+          <svg class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+          Edit Rules
+        </button>
+        <button v-if="!contextPlaylist.smart" @click="startRename" class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5">
+          <svg class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" /></svg>
+          Rename
+        </button>
+        <div class="border-t border-[var(--border)] my-1" />
+        <button @click="confirmDelete" class="w-full px-3.5 py-2 text-left text-sm text-red-400 hover:text-red-300 hover:bg-white/[0.06] transition-colors flex items-center gap-2.5">
+          <svg class="w-4 h-4 shrink-0 opacity-60" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+          Delete
+        </button>
       </div>
     </Teleport>
 
     <!-- Rename dialog -->
     <Teleport to="body">
-      <div v-if="showRenameDialog" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60" @click.self="showRenameDialog = false">
-        <div class="w-96 rounded-xl menu-panel p-6 shadow-2xl">
-          <h2 class="text-lg font-bold mb-4">Rename Playlist</h2>
-          <input v-model="renameValue" ref="renameInput" @keydown.enter="doRename" class="w-full px-4 py-2.5 rounded-lg bg-white/[0.06] border border-white/10 text-sm text-white focus:outline-none focus:border-accent transition-colors" />
-          <div class="flex justify-end gap-3 mt-4">
-            <button @click="showRenameDialog = false" class="px-4 py-2 rounded-lg text-sm text-white/60 hover:text-white transition-colors">Cancel</button>
-            <button @click="doRename" :disabled="!renameValue.trim()" class="px-4 py-2 rounded-lg text-sm font-medium bg-accent hover:bg-accent-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors">Save</button>
+      <Transition name="fade">
+        <div v-if="showRenameDialog" class="fixed inset-0 z-[80] bg-black/50" @click="showRenameDialog = false" />
+      </Transition>
+      <Transition name="dialog-slide">
+        <div v-if="showRenameDialog" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[90] w-[360px] max-w-[90vw] rounded-2xl bg-[#12121f]/95 backdrop-blur-2xl border border-white/[0.08] shadow-2xl">
+          <div class="p-6">
+            <h2 class="text-base font-semibold mb-4">Rename Playlist</h2>
+            <input v-model="renameValue" ref="renameInput" @keydown.enter="doRename" @keydown.escape="showRenameDialog = false" class="ctx-input w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors" />
+            <div class="flex justify-end gap-3 mt-4">
+              <button @click="showRenameDialog = false" class="px-4 py-2 rounded-lg text-sm text-white/50 hover:text-white hover:bg-white/[0.06] transition-colors">Cancel</button>
+              <button @click="doRename" :disabled="!renameValue.trim()" class="px-5 py-2 rounded-lg text-sm font-medium bg-accent hover:bg-accent-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors">Save</button>
+            </div>
           </div>
         </div>
-      </div>
+      </Transition>
     </Teleport>
 
     <!-- Smart Playlist Dialog (create + edit) -->
@@ -244,6 +258,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onActivated, nextTick } from 'vue'
 import { onBeforeRouteLeave, useRouter } from 'vue-router'
+import { menuPosition } from '@/utils/menuPosition'
 import { usePlaylistStore, type PlaylistSortOrder } from '@/stores/playlist'
 import { usePlayerStore } from '@/stores/player'
 import { useToast } from '@/composables/useToast'
@@ -275,8 +290,7 @@ const editingSmartPlaylist = ref<{ id: string; name: string; rules: SmartPlaylis
 const newPlaylistName = ref('')
 const nameInput = ref<HTMLInputElement>()
 const contextPlaylist = ref<Playlist | null>(null)
-const contextX = ref(0)
-const contextY = ref(0)
+const contextPos = ref<Record<string, string>>({})
 const showRenameDialog = ref(false)
 const renameValue = ref('')
 const renameInput = ref<HTMLInputElement>()
@@ -325,8 +339,9 @@ function playPlaylist(id: string) {
 }
 
 function openContextMenu(playlist: Playlist, event?: MouseEvent) {
-  contextX.value = event ? Math.min(event.clientX, window.innerWidth - 220) : window.innerWidth / 2
-  contextY.value = event ? Math.min(event.clientY, window.innerHeight - 200) : window.innerHeight / 2
+  contextPos.value = event
+    ? menuPosition(event.clientX, event.clientY, 220, 220)
+    : { top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }
   contextPlaylist.value = playlist
 }
 

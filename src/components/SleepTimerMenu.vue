@@ -38,13 +38,13 @@
 
           <!-- Options -->
           <template v-if="!showCustom">
-            <button @click="set('song')" class="menu-item">
+            <button @click="set('song')" class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5">
               <svg class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z" />
               </svg>
               After this song
             </button>
-            <button @click="set('album')" class="menu-item">
+            <button @click="set('album')" class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5">
               <svg class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6z" />
               </svg>
@@ -53,30 +53,30 @@
 
             <div class="border-t border-[var(--border)] my-1" />
 
-            <button @click="setTime(15)" class="menu-item">
+            <button @click="setTime(15)" class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5">
               <svg class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               15 minutes
             </button>
-            <button @click="setTime(30)" class="menu-item">
+            <button @click="setTime(30)" class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5">
               <svg class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               30 minutes
             </button>
-            <button @click="setTime(45)" class="menu-item">
+            <button @click="setTime(45)" class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5">
               <svg class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               45 minutes
             </button>
-            <button @click="setTime(60)" class="menu-item">
+            <button @click="setTime(60)" class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5">
               <svg class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               60 minutes
             </button>
-            <button @click="setTime(90)" class="menu-item">
+            <button @click="setTime(90)" class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5">
               <svg class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               90 minutes
             </button>
 
             <div class="border-t border-[var(--border)] my-1" />
 
-            <button @click="showCustom = true" class="menu-item">
+            <button @click="showCustom = true" class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5">
               <svg class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" /></svg>
               Custom time...
             </button>
@@ -93,7 +93,7 @@
                 min="1"
                 max="999"
                 placeholder="e.g. 120"
-                class="custom-input flex-1 rounded-lg px-3 py-1.5 text-sm outline-none transition-colors"
+                class="ctx-input flex-1 rounded-lg px-3 py-1.5 text-sm outline-none transition-colors"
                 @keydown.enter="applyCustom"
                 @keydown.escape="showCustom = false"
               />
@@ -176,26 +176,7 @@ function formatRemaining(seconds: number): string {
 </script>
 
 <style scoped>
-.custom-input {
-  background: rgb(var(--app-text) / 0.06);
-  border: 1px solid var(--border);
-  color: rgb(var(--app-text) / 0.85);
-}
-.custom-input::placeholder {
-  color: rgb(var(--app-text) / 0.30);
-}
-.custom-input:focus {
-  border-color: rgb(var(--accent) / 0.5);
-}
-.menu-item {
-  @apply w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5;
-  color: rgb(var(--app-text) / 0.70);
-}
-.menu-item:hover {
-  color: rgb(var(--app-text) / 0.90);
-  background: rgb(var(--app-text) / 0.06);
-}
-
+/* .ctx-item and .ctx-input are global in main.css */
 .menu-back-btn { color: rgb(var(--app-text) / 0.40); }
 .menu-back-btn:hover { color: rgb(var(--app-text) / 0.65); }
 

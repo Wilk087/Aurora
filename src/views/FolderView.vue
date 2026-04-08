@@ -182,14 +182,14 @@
       >
         <button
           @click.stop="playFolderPath(folderCtx.path)"
-          class="w-full px-3.5 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2.5"
+          class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5"
         >
           <svg class="w-4 h-4 shrink-0 text-white/40" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
           Play Folder
         </button>
         <button
           @click.stop="selectFolderTracks(folderCtx.path); folderCtx.show = false"
-          class="w-full px-3.5 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2.5"
+          class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5"
         >
           <svg class="w-4 h-4 shrink-0 text-white/40" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
           Select All Tracks
@@ -201,7 +201,7 @@
             v-for="item in pluginContextMenuItems"
             :key="item.label"
             @click.stop="runFolderPluginItem(item, folderCtx.path)"
-            class="w-full px-3.5 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2.5"
+            class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5"
           >
             <svg v-if="item.icon" class="w-4 h-4 shrink-0 text-white/40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" :d="item.icon" />
@@ -216,6 +216,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { menuPosition } from '@/utils/menuPosition'
 import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { useSelection } from '@/composables/useSelection'
@@ -295,12 +296,8 @@ function selectFolderTracks(folderPath: string) {
 const folderCtx = ref({ show: false, x: 0, y: 0, path: '' })
 
 function openFolderCtxMenu(e: MouseEvent, path: string) {
-  folderCtx.value = {
-    show: true,
-    x: Math.min(e.clientX, window.innerWidth - 230),
-    y: Math.min(e.clientY, window.innerHeight - 160),
-    path,
-  }
+  const pos = menuPosition(e.clientX, e.clientY, 230, 160)
+  folderCtx.value = { show: true, x: parseInt(pos.left), y: parseInt(pos.top), path }
 }
 
 function playFolderPath(folderPath: string) {

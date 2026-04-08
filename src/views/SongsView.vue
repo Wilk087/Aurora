@@ -20,7 +20,7 @@
           </svg>
         </button>
 
-      <!-- View options dropdown -->
+        <!-- View options dropdown -->
       <div class="relative" ref="sortDropdownRef">
         <button
           @click.stop="showSortMenu = !showSortMenu"
@@ -34,60 +34,63 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
         </button>
-
-        <div
-          v-show="showSortMenu"
-          class="absolute right-0 top-full mt-1.5 w-80 py-1.5 rounded-xl menu-panel shadow-2xl z-50"
-        >
-          <p class="px-3.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">Sort</p>
-          <button
-            v-for="option in sortOptions"
-            :key="option.value"
-            @click="selectSort(option.value)"
-            class="w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center justify-between"
-            :class="library.sortOrder === option.value ? 'text-accent bg-white/[0.08]' : 'text-white/60 hover:text-white hover:bg-white/[0.06]'"
+        <Teleport to="body">
+          <div v-if="showSortMenu" class="fixed inset-0 z-[90]" @click="showSortMenu = false" />
+          <div
+            v-if="showSortMenu"
+            class="fixed z-[100] w-80 py-1.5 rounded-xl menu-panel shadow-2xl"
+            :style="sortMenuStyle"
           >
-            {{ option.label }}
-            <svg v-if="library.sortOrder === option.value" class="w-3.5 h-3.5 text-accent" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
-            </svg>
-          </button>
-
-          <div class="border-t border-white/[0.06] my-1" />
-          <div class="px-3.5 py-1">
-            <div class="flex items-center justify-between mb-1.5">
-              <p class="text-[10px] font-semibold uppercase tracking-wider text-white/30">Filter by Tags</p>
-              <button
-                v-if="activeTrackTags.length"
-                @click="activeTrackTags = []"
-                class="text-[10px] text-white/40 hover:text-white/70 transition-colors"
-              >
-                Clear
-              </button>
-            </div>
-            <input
-              v-model="tagSearch"
-              type="text"
-              placeholder="Search tags..."
-              class="w-full px-2.5 py-1.5 rounded-md bg-white/[0.06] border border-white/[0.08] text-xs text-white/80 placeholder:text-white/25 outline-none focus:border-accent/40"
-            />
-          </div>
-          <div class="max-h-52 overflow-y-auto py-1">
+            <p class="px-3.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">Sort</p>
             <button
-              v-for="tag in filteredTagOptions"
-              :key="tag"
-              @click="toggleTrackTag(tag)"
-              class="w-full px-3.5 py-1.5 text-left text-xs transition-colors flex items-center justify-between"
-              :class="activeTrackTags.includes(tag) ? 'text-accent bg-white/[0.08]' : 'text-white/60 hover:text-white hover:bg-white/[0.06]'"
+              v-for="option in sortOptions"
+              :key="option.value"
+              @click="selectSort(option.value)"
+              class="w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center justify-between"
+              :class="library.sortOrder === option.value ? 'text-accent bg-white/[0.08]' : 'text-white/60 hover:text-white hover:bg-white/[0.06]'"
             >
-              <span class="truncate pr-2">{{ tag }}</span>
-              <svg v-if="activeTrackTags.includes(tag)" class="w-3.5 h-3.5 text-accent shrink-0" fill="currentColor" viewBox="0 0 24 24">
+              {{ option.label }}
+              <svg v-if="library.sortOrder === option.value" class="w-3.5 h-3.5 text-accent" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
               </svg>
             </button>
-            <p v-if="filteredTagOptions.length === 0" class="px-3.5 py-2 text-xs text-white/30">No matching tags</p>
+
+            <div class="border-t border-white/[0.06] my-1" />
+            <div class="px-3.5 py-1">
+              <div class="flex items-center justify-between mb-1.5">
+                <p class="text-[10px] font-semibold uppercase tracking-wider text-white/30">Filter by Tags</p>
+                <button
+                  v-if="activeTrackTags.length"
+                  @click="activeTrackTags = []"
+                  class="text-[10px] text-white/40 hover:text-white/70 transition-colors"
+                >
+                  Clear
+                </button>
+              </div>
+              <input
+                v-model="tagSearch"
+                type="text"
+                placeholder="Search tags..."
+                class="w-full px-2.5 py-1.5 rounded-md bg-white/[0.06] border border-white/[0.08] text-xs text-white/80 placeholder:text-white/25 outline-none focus:border-accent/40"
+              />
+            </div>
+            <div class="max-h-52 overflow-y-auto py-1">
+              <button
+                v-for="tag in filteredTagOptions"
+                :key="tag"
+                @click="toggleTrackTag(tag)"
+                class="w-full px-3.5 py-1.5 text-left text-xs transition-colors flex items-center justify-between"
+                :class="activeTrackTags.includes(tag) ? 'text-accent bg-white/[0.08]' : 'text-white/60 hover:text-white hover:bg-white/[0.06]'"
+              >
+                <span class="truncate pr-2">{{ tag }}</span>
+                <svg v-if="activeTrackTags.includes(tag)" class="w-3.5 h-3.5 text-accent shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+                </svg>
+              </button>
+              <p v-if="filteredTagOptions.length === 0" class="px-3.5 py-2 text-xs text-white/30">No matching tags</p>
+            </div>
           </div>
-        </div>
+        </Teleport>
       </div>
       </div>
     </div>
@@ -245,6 +248,14 @@ const selection = useSelection(() => filteredTracksByTag.value)
 const showSortMenu = ref(false)
 const sortDropdownRef = ref<HTMLElement | null>(null)
 const virtualScrollerRef = ref<{ containerRef?: HTMLElement | null } | null>(null)
+const sortMenuStyle = computed(() => {
+  if (!sortDropdownRef.value) return {}
+  const rect = sortDropdownRef.value.getBoundingClientRect()
+  return {
+    top: `${rect.bottom + 4}px`,
+    left: `${Math.min(rect.left, window.innerWidth - 336)}px`,
+  }
+})
 
 // ── Scroll memory ────────────────────────
 let savedScrollTop = 0

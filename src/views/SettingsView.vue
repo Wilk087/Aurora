@@ -300,35 +300,39 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
               </svg>
             </button>
-            <Transition name="dropdown">
-              <div
-                v-if="showDeviceDropdown"
-                class="absolute top-full left-0 right-0 mt-1.5 rounded-xl menu-panel shadow-2xl py-1 z-50 max-h-60 overflow-y-auto"
-              >
-                <button
-                  @click="selectDevice('')"
-                  class="w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center justify-between"
-                  :class="selectedDevice === '' ? 'text-accent bg-white/[0.08]' : 'text-white/60 hover:text-white hover:bg-white/[0.06]'"
+            <Teleport to="body">
+              <div v-if="showDeviceDropdown" class="fixed inset-0 z-[90]" @click="showDeviceDropdown = false" />
+              <Transition name="dropdown">
+                <div
+                  v-if="showDeviceDropdown"
+                  class="fixed rounded-xl menu-panel shadow-2xl py-1 z-[100] max-h-60 overflow-y-auto w-[min(100vw-2rem,32rem)]"
+                  :style="deviceDropdownStyle"
                 >
-                  System Default
-                  <svg v-if="selectedDevice === ''" class="w-3.5 h-3.5 text-accent" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
-                  </svg>
-                </button>
-                <button
-                  v-for="d in player.audioDevices"
-                  :key="d.deviceId"
-                  @click="selectDevice(d.deviceId)"
-                  class="w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center justify-between"
-                  :class="selectedDevice === d.deviceId ? 'text-accent bg-white/[0.08]' : 'text-white/60 hover:text-white hover:bg-white/[0.06]'"
-                >
-                  <span class="truncate mr-2">{{ d.label || `Device ${d.deviceId.slice(0, 8)}` }}</span>
-                  <svg v-if="selectedDevice === d.deviceId" class="w-3.5 h-3.5 text-accent shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
-                  </svg>
-                </button>
-              </div>
-            </Transition>
+                  <button
+                    @click="selectDevice('')"
+                    class="w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center justify-between"
+                    :class="selectedDevice === '' ? 'text-accent bg-white/[0.08]' : 'text-white/60 hover:text-white hover:bg-white/[0.06]'"
+                  >
+                    System Default
+                    <svg v-if="selectedDevice === ''" class="w-3.5 h-3.5 text-accent" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+                    </svg>
+                  </button>
+                  <button
+                    v-for="d in player.audioDevices"
+                    :key="d.deviceId"
+                    @click="selectDevice(d.deviceId)"
+                    class="w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center justify-between"
+                    :class="selectedDevice === d.deviceId ? 'text-accent bg-white/[0.08]' : 'text-white/60 hover:text-white hover:bg-white/[0.06]'"
+                  >
+                    <span class="truncate mr-2">{{ d.label || `Device ${d.deviceId.slice(0, 8)}` }}</span>
+                    <svg v-if="selectedDevice === d.deviceId" class="w-3.5 h-3.5 text-accent shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+                    </svg>
+                  </button>
+                </div>
+              </Transition>
+            </Teleport>
           </div>
         </div>
         <!-- Exclusive Mode — disabled for 2.6.0, will revisit later
@@ -1652,6 +1656,14 @@ const discordClientId = ref('')
 const selectedDevice = ref('')
 const showDeviceDropdown = ref(false)
 const deviceDropdownRef = ref<HTMLElement | null>(null)
+const deviceDropdownStyle = computed(() => {
+  if (!deviceDropdownRef.value) return {}
+  const rect = deviceDropdownRef.value.getBoundingClientRect()
+  return {
+    top: `${rect.bottom + 6}px`,
+    left: `${Math.min(rect.left, window.innerWidth - 320)}px`,
+  }
+})
 
 const selectedDeviceLabel = computed(() => {
   if (!selectedDevice.value) return 'System Default'

@@ -248,20 +248,9 @@ async function addToPlaylist(playlistId: string) {
 </script>
 
 <style scoped>
-/* Themed button/item classes */
+/* .ctx-item / .ctx-item-accent / .ctx-input are global in main.css */
 .sel-btn { color: rgb(var(--app-text) / 0.65); }
 .sel-btn:hover { color: rgb(var(--app-text) / 0.90); background: rgb(var(--app-text) / 0.08); }
-.ctx-item { color: rgb(var(--app-text) / 0.70); }
-.ctx-item:hover { color: rgb(var(--app-text) / 0.90); background: rgb(var(--app-text) / 0.06); }
-.ctx-item-accent { color: rgb(var(--accent)); }
-.ctx-item-accent:hover { background: rgb(var(--app-text) / 0.06); }
-.ctx-input {
-  background: rgb(var(--app-text) / 0.08);
-  border: 1px solid var(--border);
-  color: rgb(var(--app-text) / 0.85);
-}
-.ctx-input::placeholder { color: rgb(var(--app-text) / 0.30); }
-.ctx-input:focus { border-color: rgb(var(--accent)); }
 .fav-active { color: rgb(var(--accent)); }
 .fav-active:hover { color: rgb(var(--app-text) / 0.65); background: rgb(var(--app-text) / 0.08); }
 

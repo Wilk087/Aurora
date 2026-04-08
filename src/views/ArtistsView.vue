@@ -60,8 +60,8 @@
         <!-- Artist image / avatar -->
         <div class="w-full aspect-square rounded-full overflow-hidden bg-white/[0.06] relative cover-shadow transition-transform group-hover:scale-[1.02]">
           <img
-            v-if="artistImages.get(artist.name)"
-            :src="artistImages.get(artist.name)"
+            v-if="artistImages[artist.name]"
+            :src="artistImages[artist.name]"
             class="w-full h-full object-cover"
             loading="lazy"
           />
@@ -105,7 +105,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onActivated } from 'vue'
+import { ref, reactive, computed, onMounted, onActivated } from 'vue'
 import { useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useLibraryStore, type Artist } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
@@ -140,17 +140,18 @@ const filteredArtists = computed(() => {
 })
 
 // ── Lazy-load artist images from MusicBrainz cache ────────────────────────
-const artistImages = ref<Map<string, string>>(new Map())
+// Using reactive<Record> so individual key assignments trigger reactivity
+// without needing to replace the whole Map each time.
+const artistImages = reactive<Record<string, string>>({})
 
 async function loadArtistImages() {
-  // Load in batches to avoid flooding the cache
   const batch = filteredArtists.value.slice(0, 24)
   for (const artist of batch) {
-    if (artistImages.value.has(artist.name)) continue
+    if (artistImages[artist.name]) continue
     try {
       const info = await window.api.getArtistInfo(artist.name)
       if (info?.imageUrl) {
-        artistImages.value = new Map(artistImages.value).set(artist.name, info.imageUrl)
+        artistImages[artist.name] = info.imageUrl
       }
     } catch { /* ignore */ }
   }

@@ -168,7 +168,7 @@
       <div
         v-if="showCtx"
         class="fixed z-[100] w-52 rounded-xl menu-panel py-1.5 shadow-2xl overflow-y-auto"
-        :style="{ ...ctxStyle, maxHeight: 'calc(100vh - 20px)' }"
+        :style="ctxStyle"
         @click.stop
       >
         <button
@@ -263,12 +263,11 @@
           <div class="border-t border-[var(--border)] my-1" />
           <template v-for="(item, idx) in pluginContextMenuItems" :key="item.label">
             <div v-if="item.separator" class="border-t border-[var(--border)] my-1" />
-            <!-- Item with children — hover submenu -->
+            <!-- Item with children — hover submenu via Teleport (bounds-aware) -->
             <div
               v-if="item.children && item.children.length"
-              class="relative"
-              @mouseenter="openPluginSubmenu = idx"
-              @mouseleave="openPluginSubmenu = null"
+              @mouseenter="e => showPluginSub(idx, e.currentTarget as HTMLElement)"
+              @mouseleave="scheduleHidePluginSub"
             >
               <button class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5">
                 <svg v-if="item.icon" class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -279,23 +278,6 @@
                   <path stroke-linecap="round" stroke-linejoin="round" d="M9 18l6-6-6-6" />
                 </svg>
               </button>
-              <div
-                v-if="openPluginSubmenu === idx"
-                class="absolute left-full top-0 ml-1 w-52 rounded-xl menu-panel py-1.5 shadow-2xl z-[110]"
-              >
-                <template v-for="child in item.children" :key="child.label">
-                  <div v-if="child.separator" class="border-t border-[var(--border)] my-1" />
-                  <button
-                    @click.stop="runPluginCtxItem(child)"
-                    class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5"
-                  >
-                    <svg v-if="child.icon" class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" :d="child.icon" />
-                    </svg>
-                    {{ child.label }}
-                  </button>
-                </template>
-              </div>
             </div>
             <!-- Regular item -->
             <button
@@ -309,6 +291,33 @@
               {{ item.label }}
             </button>
           </template>
+        </template>
+      </div>
+    </Teleport>
+
+    <!-- Plugin submenu (Teleported, bounds-aware, hover-intent) -->
+    <Teleport to="body">
+      <div
+        v-if="openPluginSubmenu !== null"
+        class="fixed z-[110] w-52 rounded-xl menu-panel py-1.5 shadow-2xl"
+        :style="pluginSubStyle"
+        @mouseenter="cancelHidePluginSub"
+        @mouseleave="scheduleHidePluginSub"
+      >
+        <template
+          v-for="child in (pluginContextMenuItems[openPluginSubmenu!]?.children ?? [])"
+          :key="child.label"
+        >
+          <div v-if="child.separator" class="border-t border-[var(--border)] my-1" />
+          <button
+            @click.stop="runPluginCtxItem(child)"
+            class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5"
+          >
+            <svg v-if="child.icon" class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" :d="child.icon" />
+            </svg>
+            {{ child.label }}
+          </button>
         </template>
       </div>
     </Teleport>
@@ -455,6 +464,7 @@ import { usePlaylistStore } from '@/stores/playlist'
 import { useLibraryStore } from '@/stores/library'
 import { useToast } from '@/composables/useToast'
 import { useFavoritesStore } from '@/stores/favorites'
+import { menuPosition } from '@/utils/menuPosition'
 import { formatTime } from '@/utils/formatTime'
 import ArtistLinks from '@/components/ArtistLinks.vue'
 import { pluginContextMenuItems } from '@/plugins/api'
@@ -495,11 +505,10 @@ const menuPos = ref({ top: 0, left: 0 })
 // Context menu state
 const showCtx = ref(false)
 const showTagDialog = ref(false)
-const ctxPos = ref({ top: 0, left: 0 })
+const ctxPos = ref<Record<string, string>>({})
 const openPluginSubmenu = ref<number | null>(null)
 const ctxStyle = computed(() => ({
-  top: ctxPos.value.top + 'px',
-  left: ctxPos.value.left + 'px',
+  ...ctxPos.value,
 }))
 
 const menuStyle = computed(() => ({
@@ -553,10 +562,7 @@ async function addTo(playlistId: string) {
 function openContextMenu(e: MouseEvent) {
   showCtx.value = false
   showMenu.value = false
-  ctxPos.value = {
-    top: Math.min(e.clientY, window.innerHeight - 320),
-    left: Math.min(e.clientX, window.innerWidth - 220),
-  }
+  ctxPos.value = menuPosition(e.clientX, e.clientY, 220, 360)
   showCtx.value = true
 }
 
@@ -615,7 +621,10 @@ function showInExplorer() {
 
 function openTagDialog() {
   showCtx.value = false
-  nextTick(() => { showTagDialog.value = true })
+  // setTimeout instead of nextTick: ensures the click event that closed the
+  // context menu has fully propagated before the TagDialog backdrop mounts,
+  // otherwise the same click can land on the new backdrop and close it immediately.
+  setTimeout(() => { showTagDialog.value = true }, 80)
 }
 
 // Credits panel state
@@ -634,6 +643,30 @@ async function showCredits() {
   } finally {
     creditsLoading.value = false
   }
+}
+
+// ── Plugin submenus (Teleported, hover-intent with delay) ─────────────────
+const pluginSubStyle = ref({ top: '0px', left: '0px' })
+let pluginSubHideTimer: ReturnType<typeof setTimeout> | null = null
+
+function showPluginSub(idx: number, el: HTMLElement) {
+  if (pluginSubHideTimer) { clearTimeout(pluginSubHideTimer); pluginSubHideTimer = null }
+  openPluginSubmenu.value = idx
+  const rect = el.getBoundingClientRect()
+  const subW = 212
+  const spaceRight = window.innerWidth - rect.right
+  pluginSubStyle.value = {
+    top: Math.min(rect.top, window.innerHeight - 260) + 'px',
+    left: (spaceRight >= subW ? rect.right + 4 : rect.left - subW) + 'px',
+  }
+}
+
+function scheduleHidePluginSub() {
+  pluginSubHideTimer = setTimeout(() => { openPluginSubmenu.value = null }, 120)
+}
+
+function cancelHidePluginSub() {
+  if (pluginSubHideTimer) { clearTimeout(pluginSubHideTimer); pluginSubHideTimer = null }
 }
 
 function runPluginCtxItem(item: PluginContextMenuItem) {
@@ -660,19 +693,7 @@ const noCredits = computed(() => {
 .fav-active:hover { color: rgb(var(--accent) / 0.70); background: rgb(var(--app-text) / 0.06); }
 .fav-inactive { color: rgb(var(--app-text) / 0.20); }
 .fav-inactive:hover { color: rgb(var(--accent)); background: rgb(var(--app-text) / 0.06); }
-
-/* Context menu item theming */
-.ctx-item { color: rgb(var(--app-text) / 0.70); }
-.ctx-item:hover { color: rgb(var(--app-text) / 0.90); background: rgb(var(--app-text) / 0.06); }
-.ctx-item-accent { color: rgb(var(--accent)); }
-.ctx-item-accent:hover { background: rgb(var(--app-text) / 0.06); }
-.ctx-input {
-  background: rgb(var(--app-text) / 0.08);
-  border: 1px solid var(--border);
-  color: rgb(var(--app-text) / 0.85);
-}
-.ctx-input::placeholder { color: rgb(var(--app-text) / 0.30); }
-.ctx-input:focus { border-color: rgb(var(--accent)); }
+/* .ctx-item / .ctx-item-accent / .ctx-input are global in main.css */
 
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }

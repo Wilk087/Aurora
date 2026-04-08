@@ -73,27 +73,31 @@
         <!-- Compact soundtrack tags under the card -->
         <div class="mt-1 px-0.5 relative">
           <button
-            @click.stop="openTagMenuAlbum = openTagMenuAlbum === item.album.id ? null : item.album.id"
+            @click.stop="openAlbumTagMenu(item.album.id, $event)"
             class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors bg-white/[0.06] text-white/40 hover:text-white/70"
           >
             <span>{{ item.tags[0] }}</span>
             <span v-if="item.tags.length > 1" class="text-white/30">+{{ item.tags.length - 1 }}</span>
           </button>
-          <div
-            v-if="openTagMenuAlbum === item.album.id"
-            class="absolute left-0 top-full mt-1 z-20 w-44 rounded-lg menu-panel p-1.5 shadow-2xl"
-            @click.stop
-          >
-            <button
-              v-for="tag in item.tags"
-              :key="tag"
-              @click="openTagMenuAlbum = null; toggleTag(tag)"
-              class="w-full px-2 py-1.5 text-left text-xs rounded-md transition-colors"
-              :class="activeTag === tag ? 'bg-accent/20 text-accent' : 'text-white/60 hover:text-white hover:bg-white/[0.06]'"
+          <Teleport to="body">
+            <div v-if="openTagMenuAlbum === item.album.id" class="fixed inset-0 z-[90]" @click="openTagMenuAlbum = null" />
+            <div
+              v-if="openTagMenuAlbum === item.album.id"
+              class="fixed z-[100] w-44 rounded-lg menu-panel p-1.5 shadow-2xl"
+              :style="tagMenuStyle"
+              @click.stop
             >
-              {{ tag }}
-            </button>
-          </div>
+              <button
+                v-for="tag in item.tags"
+                :key="tag"
+                @click="openTagMenuAlbum = null; toggleTag(tag)"
+                class="w-full px-2 py-1.5 text-left text-xs rounded-md transition-colors"
+                :class="activeTag === tag ? 'bg-accent/20 text-accent' : 'text-white/60 hover:text-white hover:bg-white/[0.06]'"
+              >
+                {{ tag }}
+              </button>
+            </div>
+          </Teleport>
         </div>
       </div>
     </div>
@@ -114,6 +118,7 @@ const player = usePlayerStore()
 const viewRoot = ref<HTMLElement | null>(null)
 const activeTag = ref<string | null>(null)
 const openTagMenuAlbum = ref<string | null>(null)
+const tagMenuStyle = ref<Record<string, string>>({})
 
 // ── Scroll memory ────────────────────────
 let savedScrollTop = 0
@@ -159,5 +164,19 @@ const filteredAlbums = computed(() => {
 
 function toggleTag(tag: string) {
   activeTag.value = activeTag.value === tag ? null : tag
+}
+
+function openAlbumTagMenu(albumId: string, event: MouseEvent) {
+  if (openTagMenuAlbum.value === albumId) {
+    openTagMenuAlbum.value = null
+    return
+  }
+  const maxLeft = Math.max(12, window.innerWidth - 180)
+  const maxTop = Math.max(12, window.innerHeight - 220)
+  tagMenuStyle.value = {
+    left: `${Math.min(event.clientX, maxLeft)}px`,
+    top: `${Math.min(event.clientY, maxTop)}px`,
+  }
+  openTagMenuAlbum.value = albumId
 }
 </script>

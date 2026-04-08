@@ -623,27 +623,31 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
-                <Transition name="dropdown">
-                  <div
-                    v-if="showStyleDropdown"
-                    class="absolute top-full left-0 right-0 mt-1.5 rounded-xl shadow-2xl py-1 z-10 imm-dropdown"
-                  >
-                    <button
-                      v-for="style in immersiveStyles"
-                      :key="style.id"
-                      @click="immersiveStyle = style.id; showStyleDropdown = false"
-                      class="w-full flex items-center justify-between px-3.5 py-2 text-sm transition-colors imm-dropdown-item"
-                      :class="immersiveStyle === style.id
-                        ? 'text-accent bg-accent/[0.08]'
-                        : 'imm-dropdown-item-inactive'"
+                <Teleport to="body">
+                  <div v-if="showStyleDropdown" class="fixed inset-0 z-[90]" @click="showStyleDropdown = false" />
+                  <Transition name="dropdown">
+                    <div
+                      v-if="showStyleDropdown"
+                      class="fixed rounded-xl shadow-2xl py-1 z-[100] imm-dropdown w-[min(100vw-2rem,18rem)]"
+                      :style="styleDropdownStyle"
                     >
-                      <span>{{ style.label }}</span>
-                      <svg v-if="immersiveStyle === style.id" class="w-4 h-4 text-accent" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                      </svg>
-                    </button>
-                  </div>
-                </Transition>
+                      <button
+                        v-for="style in immersiveStyles"
+                        :key="style.id"
+                        @click="immersiveStyle = style.id; showStyleDropdown = false"
+                        class="w-full flex items-center justify-between px-3.5 py-2 text-sm transition-colors imm-dropdown-item"
+                        :class="immersiveStyle === style.id
+                          ? 'text-accent bg-accent/[0.08]'
+                          : 'imm-dropdown-item-inactive'"
+                      >
+                        <span>{{ style.label }}</span>
+                        <svg v-if="immersiveStyle === style.id" class="w-4 h-4 text-accent" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                      </button>
+                    </div>
+                  </Transition>
+                </Teleport>
               </div>
             </div>
 
@@ -706,30 +710,34 @@
                       <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                     </svg>
                   </button>
-                  <Transition name="dropdown">
-                    <div
-                      v-if="showAnimStyleDropdown"
-                      class="absolute top-full left-0 right-0 mt-1.5 rounded-xl shadow-2xl py-1 z-10 imm-dropdown"
-                    >
-                      <button
-                        v-for="animOpt in animatedStyles"
-                        :key="animOpt.id"
-                        @click="animatedStyle = animOpt.id; showAnimStyleDropdown = false"
-                        class="w-full flex items-center justify-between px-3.5 py-2 text-left transition-colors imm-dropdown-item"
-                        :class="animatedStyle === animOpt.id
-                          ? 'text-accent bg-accent/[0.08]'
-                          : 'imm-dropdown-item-inactive'"
+                  <Teleport to="body">
+                    <div v-if="showAnimStyleDropdown" class="fixed inset-0 z-[90]" @click="showAnimStyleDropdown = false" />
+                    <Transition name="dropdown">
+                      <div
+                        v-if="showAnimStyleDropdown"
+                        class="fixed rounded-xl shadow-2xl py-1 z-[100] imm-dropdown w-[min(100vw-2rem,20rem)]"
+                        :style="animStyleDropdownStyle"
                       >
-                        <div>
-                          <span class="text-sm">{{ animOpt.label }}</span>
-                          <p class="text-[10px] opacity-50 mt-0.5">{{ animOpt.desc }}</p>
-                        </div>
-                        <svg v-if="animatedStyle === animOpt.id" class="w-4 h-4 text-accent shrink-0 ml-2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                        </svg>
-                      </button>
-                    </div>
-                  </Transition>
+                        <button
+                          v-for="animOpt in animatedStyles"
+                          :key="animOpt.id"
+                          @click="animatedStyle = animOpt.id; showAnimStyleDropdown = false"
+                          class="w-full flex items-center justify-between px-3.5 py-2 text-left transition-colors imm-dropdown-item"
+                          :class="animatedStyle === animOpt.id
+                            ? 'text-accent bg-accent/[0.08]'
+                            : 'imm-dropdown-item-inactive'"
+                        >
+                          <div>
+                            <span class="text-sm">{{ animOpt.label }}</span>
+                            <p class="text-[10px] opacity-50 mt-0.5">{{ animOpt.desc }}</p>
+                          </div>
+                          <svg v-if="animatedStyle === animOpt.id" class="w-4 h-4 text-accent shrink-0 ml-2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                          </svg>
+                        </button>
+                      </div>
+                    </Transition>
+                  </Teleport>
                 </div>
               </div>
             </div>
@@ -807,6 +815,14 @@ const showQueue = ref(false)
 const showImmersiveMenu = ref(false)
 const showStyleDropdown = ref(false)
 const styleDropdownRef = ref<HTMLElement | null>(null)
+const styleDropdownStyle = computed(() => {
+  if (!styleDropdownRef.value) return {}
+  const rect = styleDropdownRef.value.getBoundingClientRect()
+  return {
+    top: `${rect.bottom + 6}px`,
+    left: `${Math.min(rect.left, window.innerWidth - 288)}px`,
+  }
+})
 const modernControlsHover = ref(false)
 
 // ── Immersive settings ───────────────────────────────────────────────
@@ -843,6 +859,14 @@ const currentAnimStyleLabel = computed(() =>
 )
 const showAnimStyleDropdown = ref(false)
 const animStyleDropdownRef = ref<HTMLElement>()
+const animStyleDropdownStyle = computed(() => {
+  if (!animStyleDropdownRef.value) return {}
+  const rect = animStyleDropdownRef.value.getBoundingClientRect()
+  return {
+    top: `${rect.bottom + 6}px`,
+    left: `${Math.min(rect.left, window.innerWidth - 320)}px`,
+  }
+})
 
 // Convenience accessors for the current style's toggles
 const vibrantBackground = computed({
