@@ -598,6 +598,26 @@ async function saveFavorites(): Promise<void> {
   scheduleAutoExport()
 }
 
+// ── Tags persistence ───────────────────────────────────────────────────────
+const tagsPath = join(dataPath, 'tags.json')
+let trackTagsData: Record<string, string[]> = {}  // trackId → tags[]
+let albumTagsData: Record<string, string[]> = {}   // albumKey → tags[]
+
+async function loadTags(): Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }> {
+  try {
+    if (existsSync(tagsPath)) {
+      const raw = JSON.parse(await readFile(tagsPath, 'utf-8'))
+      trackTagsData = raw.trackTags || {}
+      albumTagsData = raw.albumTags || {}
+    }
+  } catch { trackTagsData = {}; albumTagsData = {} }
+  return { trackTags: trackTagsData, albumTags: albumTagsData }
+}
+
+async function saveTags(): Promise<void> {
+  await writeFile(tagsPath, JSON.stringify({ trackTags: trackTagsData, albumTags: albumTagsData }, null, 2))
+}
+
 // ── Playlist persistence ───────────────────────────────────────────────────
 interface TrackMetaSnapshot {
   title: string
@@ -1452,6 +1472,77 @@ app.whenReady().then(async () => {
     if (meta) favoriteMeta = meta
     await saveFavorites()
     return { ids: favoriteIds, meta: favoriteMeta }
+  })
+
+  // ── IPC: Tags ──
+  ipcMain.handle('tags:get', async () => await loadTags())
+
+  ipcMain.handle('tags:set-track-tags', async (_, ids: string[], tags: string[]) => {
+    for (const id of ids) {
+      if (tags.length === 0) {
+        delete trackTagsData[id]
+      } else {
+        trackTagsData[id] = tags
+      }
+    }
+    await saveTags()
+    return { trackTags: trackTagsData, albumTags: albumTagsData }
+  })
+
+  ipcMain.handle('tags:set-album-tags', async (_, albumKeys: string[], tags: string[]) => {
+    for (const key of albumKeys) {
+      if (tags.length === 0) {
+        delete albumTagsData[key]
+      } else {
+        albumTagsData[key] = tags
+      }
+    }
+    await saveTags()
+    return { trackTags: trackTagsData, albumTags: albumTagsData }
+  })
+
+  ipcMain.handle('tags:add-track-tags', async (_, ids: string[], tagsToAdd: string[]) => {
+    for (const id of ids) {
+      const current = new Set(trackTagsData[id] || [])
+      for (const t of tagsToAdd) current.add(t.toLowerCase().trim())
+      trackTagsData[id] = Array.from(current)
+    }
+    await saveTags()
+    return { trackTags: trackTagsData, albumTags: albumTagsData }
+  })
+
+  ipcMain.handle('tags:add-album-tags', async (_, albumKeys: string[], tagsToAdd: string[]) => {
+    for (const key of albumKeys) {
+      const current = new Set(albumTagsData[key] || [])
+      for (const t of tagsToAdd) current.add(t.toLowerCase().trim())
+      albumTagsData[key] = Array.from(current)
+    }
+    await saveTags()
+    return { trackTags: trackTagsData, albumTags: albumTagsData }
+  })
+
+  ipcMain.handle('tags:remove-track-tags', async (_, ids: string[], tagsToRemove: string[]) => {
+    const removeSet = new Set(tagsToRemove.map(t => t.toLowerCase().trim()))
+    for (const id of ids) {
+      if (trackTagsData[id]) {
+        trackTagsData[id] = trackTagsData[id].filter(t => !removeSet.has(t))
+        if (trackTagsData[id].length === 0) delete trackTagsData[id]
+      }
+    }
+    await saveTags()
+    return { trackTags: trackTagsData, albumTags: albumTagsData }
+  })
+
+  ipcMain.handle('tags:remove-album-tags', async (_, albumKeys: string[], tagsToRemove: string[]) => {
+    const removeSet = new Set(tagsToRemove.map(t => t.toLowerCase().trim()))
+    for (const key of albumKeys) {
+      if (albumTagsData[key]) {
+        albumTagsData[key] = albumTagsData[key].filter(t => !removeSet.has(t))
+        if (albumTagsData[key].length === 0) delete albumTagsData[key]
+      }
+    }
+    await saveTags()
+    return { trackTags: trackTagsData, albumTags: albumTagsData }
   })
 
   // ── IPC: Discord RPC ──

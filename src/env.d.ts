@@ -85,8 +85,8 @@ interface ArtistInfo {
 }
 
 interface SmartPlaylistRule {
-  field: 'genre' | 'year' | 'artist' | 'album' | 'duration' | 'title' | 'bpm' | 'playCount' | 'recentlyAdded' | 'format' | 'bitrate'
-  operator: 'is' | 'contains' | 'not_contains' | 'gt' | 'lt' | 'between' | 'equals' | 'greater' | 'less' | 'starts'
+  field: 'genre' | 'year' | 'artist' | 'album' | 'duration' | 'title' | 'bpm' | 'playCount' | 'recentlyAdded' | 'format' | 'bitrate' | 'tag'
+  operator: 'is' | 'contains' | 'not_contains' | 'gt' | 'lt' | 'between' | 'equals' | 'greater' | 'less' | 'starts' | 'has_tag' | 'not_has_tag'
   value: string
   value2?: string // for 'between'
 }
@@ -159,6 +159,14 @@ interface Window {
     getFavorites: () => Promise<{ ids: string[]; meta: Record<string, TrackMetaSnapshot> }>
     toggleFavorite: (trackId: string, meta?: TrackMetaSnapshot) => Promise<{ ids: string[]; meta: Record<string, TrackMetaSnapshot> }>
     setFavorites: (ids: string[], meta?: Record<string, TrackMetaSnapshot>) => Promise<{ ids: string[]; meta: Record<string, TrackMetaSnapshot> }>
+    // Tags
+    getTags: () => Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }>
+    setTrackTags: (ids: string[], tags: string[]) => Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }>
+    setAlbumTags: (albumKeys: string[], tags: string[]) => Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }>
+    addTrackTags: (ids: string[], tagsToAdd: string[]) => Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }>
+    addAlbumTags: (albumKeys: string[], tagsToAdd: string[]) => Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }>
+    removeTrackTags: (ids: string[], tagsToRemove: string[]) => Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }>
+    removeAlbumTags: (albumKeys: string[], tagsToRemove: string[]) => Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }>
     updateDiscordPresence: (data: any) => Promise<void>
     toggleDiscordRPC: (enabled: boolean, clientId?: string) => Promise<void>
     getPlaylists: () => Promise<Playlist[]>

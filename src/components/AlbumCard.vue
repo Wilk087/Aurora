@@ -88,6 +88,16 @@
           </svg>
           Show in File Explorer
         </button>
+        <button
+          @click.stop="openTagDialog"
+          class="w-full px-3.5 py-2 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors flex items-center gap-2.5"
+        >
+          <svg class="w-4 h-4 shrink-0 text-white/40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" />
+          </svg>
+          Manage Tags
+        </button>
         <div class="border-t border-white/[0.06] my-1" />
         <!-- Add to Playlist submenu -->
         <div class="relative" ref="playlistSubmenuRef">
@@ -125,7 +135,17 @@
             </button>
           </div>
         </div>
-        <!-- Plugin-injected album context menu items -->
+        <!-- Tag Dialog -->
+    <TagDialog
+      :show="showTagDialog"
+      type="album"
+      :ids="[albumKey]"
+      :label="album.name"
+      @close="showTagDialog = false"
+      @saved="showTagDialog = false"
+    />
+
+    <!-- Plugin-injected album context menu items -->
         <template v-if="pluginAlbumContextMenuItems.length">
           <div class="border-t border-white/[0.06] my-1" />
           <template v-for="(item, idx) in pluginAlbumContextMenuItems" :key="item.label">
@@ -183,12 +203,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { usePlaylistStore } from '@/stores/playlist'
 import { useToast } from '@/composables/useToast'
 import ArtistLinks from '@/components/ArtistLinks.vue'
+import TagDialog from '@/components/TagDialog.vue'
 import type { Album } from '@/stores/library'
 import { pluginAlbumContextMenuItems } from '@/plugins/api'
 import type { PluginAlbumContextMenuItem } from '@/types/plugin'
@@ -205,6 +226,9 @@ const toast = useToast()
 const showPlaylistSub = ref(false)
 const playlistSubmenuRef = ref<HTMLElement>()
 const openPluginSubmenu = ref<number | null>(null)
+const showTagDialog = ref(false)
+
+const albumKey = computed(() => `${props.album.name}---${props.album.artist}`)
 
 /** True when this album's tracks are currently playing */
 const isThisAlbumPlaying = computed(() => {
@@ -281,6 +305,11 @@ function runPluginAlbumCtxItem(item: PluginAlbumContextMenuItem) {
   try { item.onClick(props.album) } catch (err) {
     console.error('[Aurora] Plugin album context menu item error:', err)
   }
+}
+
+function openTagDialog() {
+  showCtx.value = false
+  nextTick(() => { showTagDialog.value = true })
 }
 
 async function addToPlaylist(playlistId: string) {

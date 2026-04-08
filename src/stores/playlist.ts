@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useLibraryStore } from './library'
 import { evaluateSmartPlaylist } from '@/utils/smartPlaylistMatcher'
 import { songKey } from '@/utils/smartPlaylistMatcher'
+import { useTagsStore } from './tags'
 
 export type PlaylistSortOrder = 'updated' | 'created' | 'name' | 'tracks'
 
@@ -140,7 +141,9 @@ export const usePlaylistStore = defineStore('playlist', () => {
         const statsStore = (window as any).__auroraStatsStore
         return statsStore ? statsStore.playCount(key) : 0
       }
-      return evaluateSmartPlaylist(library.tracks, pl.rules, pl.ruleMatch || 'all', getPlayCount)
+      const tagsStore = useTagsStore()
+      const getTrackTags = (trackId: string) => tagsStore.getTrackTags(trackId)
+      return evaluateSmartPlaylist(library.tracks, pl.rules, pl.ruleMatch || 'all', getPlayCount, getTrackTags)
     }
 
     // Normal playlist — resolve by ID with metadata snapshot fallback

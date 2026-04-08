@@ -70,6 +70,9 @@
                   <option value="playCount">Play Count</option>
                   <option value="recentlyAdded">Recently Added (days)</option>
                 </optgroup>
+                <optgroup label="Tags">
+                  <option value="tag">Tag</option>
+                </optgroup>
               </select>
 
               <!-- Operator -->
@@ -87,6 +90,11 @@
                   <option value="less">within last</option>
                   <option value="greater">older than</option>
                 </template>
+                <template v-else-if="rule.field === 'tag'">
+                  <option value="has_tag">has tag</option>
+                  <option value="not_has_tag">does not have tag</option>
+                  <option value="contains">tag contains</option>
+                </template>
                 <template v-else>
                   <option value="is">is</option>
                   <option value="contains">contains</option>
@@ -96,7 +104,20 @@
               </select>
 
               <!-- Value -->
+              <div v-if="rule.field === 'tag'" class="flex-1 min-w-0 relative">
+                <input
+                  v-model="rule.value"
+                  placeholder="tag name"
+                  type="text"
+                  list="smart-tag-suggestions"
+                  class="w-full px-2 py-1.5 rounded-lg bg-white/[0.06] border border-white/[0.06] text-sm text-white/70 placeholder:text-white/20 outline-none focus:border-accent/30"
+                />
+                <datalist id="smart-tag-suggestions">
+                  <option v-for="t in tagsStore.allTags" :key="t" :value="t" />
+                </datalist>
+              </div>
               <input
+                v-else
                 v-model="rule.value"
                 :placeholder="isNumericField(rule.field) ? '0' : rule.field === 'format' ? 'flac' : 'value'"
                 :type="isNumericField(rule.field) ? 'number' : 'text'"
@@ -171,6 +192,7 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import { useLibraryStore } from '@/stores/library'
+import { useTagsStore } from '@/stores/tags'
 import { evaluateSmartPlaylist } from '@/utils/smartPlaylistMatcher'
 
 const props = defineProps<{
@@ -185,6 +207,7 @@ const emit = defineEmits<{
 }>()
 
 const library = useLibraryStore()
+const tagsStore = useTagsStore()
 
 const name = ref('')
 const ruleMatch = ref<'all' | 'any'>('all')
@@ -202,6 +225,8 @@ function onFieldChange(i: number) {
     rule.operator = 'equals'
   } else if (rule.field === 'recentlyAdded') {
     rule.operator = 'less'
+  } else if (rule.field === 'tag') {
+    rule.operator = 'has_tag'
   } else {
     rule.operator = 'is'
   }
@@ -216,7 +241,8 @@ function addRule() {
 const matchCount = computed(() => {
   const validRules = rules.value.filter(r => r.value.toString().trim() !== '')
   if (validRules.length === 0) return -1
-  return evaluateSmartPlaylist(library.tracks, validRules, ruleMatch.value).length
+  const getTrackTags = (trackId: string) => tagsStore.getTrackTags(trackId)
+  return evaluateSmartPlaylist(library.tracks, validRules, ruleMatch.value, undefined, getTrackTags).length
 })
 
 watch(

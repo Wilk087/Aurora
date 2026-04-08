@@ -238,6 +238,16 @@
           </svg>
           Show in File Explorer
         </button>
+        <button
+          @click.stop="openTagDialog"
+          class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5"
+        >
+          <svg class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" />
+          </svg>
+          Manage Tags
+        </button>
         <div class="border-t border-[var(--border)] my-1" />
         <button
           @click.stop="ctxToPlaylist"
@@ -302,6 +312,16 @@
         </template>
       </div>
     </Teleport>
+
+    <!-- Tag Dialog -->
+    <TagDialog
+      :show="showTagDialog"
+      type="track"
+      :ids="[track.id]"
+      :label="track.title"
+      @close="showTagDialog = false"
+      @saved="showTagDialog = false"
+    />
 
     <!-- Credits panel (teleported) -->
     <Teleport to="body">
@@ -439,6 +459,7 @@ import { formatTime } from '@/utils/formatTime'
 import ArtistLinks from '@/components/ArtistLinks.vue'
 import { pluginContextMenuItems } from '@/plugins/api'
 import type { PluginContextMenuItem } from '@/types/plugin'
+import TagDialog from '@/components/TagDialog.vue'
 
 const props = defineProps<{
   track: Track
@@ -473,6 +494,7 @@ const menuPos = ref({ top: 0, left: 0 })
 
 // Context menu state
 const showCtx = ref(false)
+const showTagDialog = ref(false)
 const ctxPos = ref({ top: 0, left: 0 })
 const openPluginSubmenu = ref<number | null>(null)
 const ctxStyle = computed(() => ({
@@ -589,6 +611,11 @@ function goToAlbum() {
 function showInExplorer() {
   showCtx.value = false
   window.api.showInExplorer(props.track.path)
+}
+
+function openTagDialog() {
+  showCtx.value = false
+  nextTick(() => { showTagDialog.value = true })
 }
 
 // Credits panel state

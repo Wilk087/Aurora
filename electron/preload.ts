@@ -55,6 +55,15 @@ contextBridge.exposeInMainWorld('api', {
   toggleFavorite: (trackId: string, meta?: { title: string; artist: string; album: string }): Promise<{ ids: string[]; meta: Record<string, { title: string; artist: string; album: string }> }> => ipcRenderer.invoke('favorites:toggle', trackId, meta),
   setFavorites: (ids: string[], meta?: Record<string, { title: string; artist: string; album: string }>): Promise<{ ids: string[]; meta: Record<string, { title: string; artist: string; album: string }> }> => ipcRenderer.invoke('favorites:set', ids, meta),
 
+  // Tags
+  getTags: (): Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }> => ipcRenderer.invoke('tags:get'),
+  setTrackTags: (ids: string[], tags: string[]): Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }> => ipcRenderer.invoke('tags:set-track-tags', ids, tags),
+  setAlbumTags: (albumKeys: string[], tags: string[]): Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }> => ipcRenderer.invoke('tags:set-album-tags', albumKeys, tags),
+  addTrackTags: (ids: string[], tagsToAdd: string[]): Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }> => ipcRenderer.invoke('tags:add-track-tags', ids, tagsToAdd),
+  addAlbumTags: (albumKeys: string[], tagsToAdd: string[]): Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }> => ipcRenderer.invoke('tags:add-album-tags', albumKeys, tagsToAdd),
+  removeTrackTags: (ids: string[], tagsToRemove: string[]): Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }> => ipcRenderer.invoke('tags:remove-track-tags', ids, tagsToRemove),
+  removeAlbumTags: (albumKeys: string[], tagsToRemove: string[]): Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }> => ipcRenderer.invoke('tags:remove-album-tags', albumKeys, tagsToRemove),
+
   // Discord RPC
   updateDiscordPresence: (data: any) => ipcRenderer.invoke('discord:update-presence', data),
   toggleDiscordRPC: (enabled: boolean, clientId?: string) => ipcRenderer.invoke('discord:toggle', enabled, clientId),

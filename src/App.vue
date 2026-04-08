@@ -51,6 +51,7 @@ import { useLibraryStore } from '@/stores/library'
 import { useSearchFocus } from '@/composables/useSearchFocus'
 import { usePlaylistStore } from '@/stores/playlist'
 import { useFavoritesStore } from '@/stores/favorites'
+import { useTagsStore } from '@/stores/tags'
 import { useThemeStore } from '@/stores/theme'
 import { usePluginStore } from '@/stores/plugins'
 import { useStatsStore } from '@/stores/stats'
@@ -68,6 +69,7 @@ const player = usePlayerStore()
 const library = useLibraryStore()
 const playlistStore = usePlaylistStore()
 const favoritesStore = useFavoritesStore()
+const tagsStore = useTagsStore()
 const themeStore = useThemeStore()
 const pluginStore = usePluginStore()
 const statsStore = useStatsStore()
@@ -138,6 +140,7 @@ onMounted(async () => {
   await library.loadLibrary()
   await playlistStore.loadPlaylists()
   await favoritesStore.load()
+  tagsStore.load()
 
   // Init sync (non-blocking — pull after data loaded)
   await syncStore.loadConfig()

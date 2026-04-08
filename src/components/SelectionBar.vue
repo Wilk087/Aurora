@@ -107,6 +107,19 @@
         </Teleport>
       </div>
 
+      <!-- Tag -->
+      <button
+        @click.stop="showTagDialog = true"
+        class="sel-btn flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+        title="Manage Tags"
+      >
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z" />
+        </svg>
+        Tag
+      </button>
+
       <div class="w-px h-5 bg-[var(--border)]" />
 
       <!-- Select All -->
@@ -129,6 +142,15 @@
       </button>
     </div>
   </Transition>
+
+  <!-- Tag Dialog for selected tracks -->
+  <TagDialog
+    :show="showTagDialog"
+    type="track"
+    :ids="trackIds"
+    @close="showTagDialog = false"
+    @saved="showTagDialog = false"
+  />
 </template>
 
 <script setup lang="ts">
@@ -136,6 +158,7 @@ import { ref, computed, nextTick } from 'vue'
 import { usePlaylistStore } from '@/stores/playlist'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useToast } from '@/composables/useToast'
+import TagDialog from '@/components/TagDialog.vue'
 
 const props = defineProps<{
   count: number
@@ -150,6 +173,7 @@ const toast = useToast()
 
 const showPlaylistMenu = ref(false)
 const showNewInput = ref(false)
+const showTagDialog = ref(false)
 const newName = ref('')
 const playlistBtnRef = ref<HTMLElement>()
 const newInputRef = ref<HTMLInputElement>()

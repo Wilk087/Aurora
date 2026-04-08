@@ -9,7 +9,17 @@ export function matchRule(
   track: Track,
   rule: SmartPlaylistRule,
   getPlayCount?: (key: string) => number,
+  getTrackTags?: (trackId: string) => string[],
 ): boolean {
+  if (rule.field === 'tag') {
+    const tags = getTrackTags ? getTrackTags(track.id) : []
+    const ruleValue = rule.value.toLowerCase().trim()
+    if (rule.operator === 'has_tag' || rule.operator === 'is') return tags.some(t => t === ruleValue)
+    if (rule.operator === 'not_has_tag' || rule.operator === 'not_contains') return !tags.some(t => t === ruleValue)
+    if (rule.operator === 'contains') return tags.some(t => t.includes(ruleValue))
+    return false
+  }
+
   if (rule.field === 'playCount') {
     const count = getPlayCount ? getPlayCount(songKey(track)) : 0
     const rv = Number(rule.value)
@@ -87,11 +97,12 @@ export function evaluateSmartPlaylist(
   rules: SmartPlaylistRule[],
   ruleMatch: 'all' | 'any',
   getPlayCount?: (key: string) => number,
+  getTrackTags?: (trackId: string) => string[],
 ): Track[] {
   const validRules = rules.filter(r => r.value.toString().trim() !== '')
   if (validRules.length === 0) return []
   return tracks.filter(track => {
-    const results = validRules.map(rule => matchRule(track, rule, getPlayCount))
+    const results = validRules.map(rule => matchRule(track, rule, getPlayCount, getTrackTags))
     return ruleMatch === 'all' ? results.every(Boolean) : results.some(Boolean)
   })
 }
