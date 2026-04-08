@@ -101,6 +101,17 @@
               @click="$router.push(`/artist/${encodeURIComponent(artist.artist)}`)"
             >
               <span class="w-5 text-right text-xs text-white/20 shrink-0 tabular-nums">{{ i + 1 }}</span>
+              <div class="w-9 h-9 rounded-full overflow-hidden bg-white/[0.06] shrink-0">
+                <img
+                  v-if="artistImages[artist.artist]"
+                  :src="artistImages[artist.artist]"
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                />
+                <div v-else class="w-full h-full flex items-center justify-center">
+                  <span class="text-xs font-semibold text-white/50">{{ artist.artist[0]?.toUpperCase() || '?' }}</span>
+                </div>
+              </div>
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium truncate">{{ artist.artist }}</p>
                 <p class="text-xs text-white/30">{{ formatListeningTime(artist.totalTime) }}</p>
@@ -204,7 +215,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useStatsStore, type StatsPeriod } from '@/stores/stats'
 import { useLibraryStore } from '@/stores/library'
@@ -232,6 +243,27 @@ const periodPlayCount = computed(() => {
   return stats.plays.filter(e => e.ts >= cutoff).length
 })
 const streak = computed(() => stats.listeningStreak())
+
+const artistImages = ref<Record<string, string>>({})
+
+async function loadTopArtistImages() {
+  const next = { ...artistImages.value }
+  for (const item of topArtists.value) {
+    const name = item.artist
+    if (!name || next[name]) continue
+    try {
+      const info = await window.api.getArtistInfo(name)
+      if (info?.imageUrl) next[name] = info.imageUrl
+    } catch {
+      // Ignore per-artist failures so the rest still load.
+    }
+  }
+  artistImages.value = next
+}
+
+watch(topArtists, () => {
+  loadTopArtistImages()
+}, { immediate: true })
 
 function formatListeningTime(seconds: number): string {
   const h = Math.floor(seconds / 3600)
