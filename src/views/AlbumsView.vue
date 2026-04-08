@@ -192,8 +192,9 @@ const openTagMenuAlbum = ref<string | null>(null)
 
 const filteredTagOptions = computed(() => {
   const q = tagSearch.value.toLowerCase().trim()
-  if (!q) return tagsStore.allTags
-  return tagsStore.allTags.filter(tag => tag.includes(q))
+  const source = tagsStore.visibleTags
+  if (!q) return source
+  return source.filter(tag => tag.includes(q))
 })
 
 const filteredAlbumsByTag = computed(() => {

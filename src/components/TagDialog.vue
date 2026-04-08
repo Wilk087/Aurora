@@ -215,7 +215,7 @@ const suggestionsToShow = computed(() => {
 const filteredSuggestions = computed(() => {
   const q = inputValue.value.toLowerCase().trim()
   if (!q) return []
-  return tagsStore.allTags
+  return tagsStore.visibleTags
     .filter(t => t.includes(q) && !workingTags.value.includes(t))
     .slice(0, 8)
 })
@@ -250,7 +250,7 @@ async function loadMbTags() {
   for (const name of Array.from(artistNames).slice(0, 2)) {
     try {
       const info = await window.api.getArtistInfo(name)
-      if (info?.tags) fetched.push(...info.tags)
+      if (info?.tags) fetched.push(...info.tags.filter(tag => tagsStore.isVisibleTag(tag)))
     } catch { /* ignore */ }
   }
   mbTags.value = [...new Set(fetched.map(t => t.toLowerCase()))]

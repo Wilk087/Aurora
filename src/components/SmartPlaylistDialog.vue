@@ -107,14 +107,26 @@
               <div v-if="rule.field === 'tag'" class="flex-1 min-w-0 relative">
                 <input
                   v-model="rule.value"
+                  @focus="openTagPicker(i)"
+                  @input="openTagPicker(i)"
+                  @blur="closeTagPicker"
                   placeholder="tag name"
                   type="text"
-                  list="smart-tag-suggestions"
                   class="w-full px-2 py-1.5 rounded-lg bg-white/[0.06] border border-white/[0.06] text-sm text-white/70 placeholder:text-white/20 outline-none focus:border-accent/30"
                 />
-                <datalist id="smart-tag-suggestions">
-                  <option v-for="t in tagsStore.allTags" :key="t" :value="t" />
-                </datalist>
+                <div
+                  v-if="tagPickerOpenIndex === i && tagOptionsFor(rule.value).length > 0"
+                  class="absolute top-full left-0 right-0 mt-1 rounded-xl menu-panel py-1 shadow-2xl z-20 max-h-44 overflow-y-auto"
+                >
+                  <button
+                    v-for="t in tagOptionsFor(rule.value)"
+                    :key="t"
+                    @mousedown.prevent="selectTagValue(i, t)"
+                    class="w-full px-3 py-1.5 text-left text-sm text-white/70 hover:text-white hover:bg-white/[0.06] transition-colors"
+                  >
+                    {{ t }}
+                  </button>
+                </div>
               </div>
               <input
                 v-else
@@ -214,6 +226,7 @@ const ruleMatch = ref<'all' | 'any'>('all')
 const rules = ref<SmartPlaylistRule[]>([
   { field: 'genre', operator: 'is', value: '', value2: '' },
 ])
+const tagPickerOpenIndex = ref<number | null>(null)
 
 function isNumericField(field: string): boolean {
   return ['year', 'bpm', 'playCount', 'bitrate', 'duration'].includes(field)
@@ -236,6 +249,26 @@ function onFieldChange(i: number) {
 
 function addRule() {
   rules.value.push({ field: 'genre', operator: 'is', value: '', value2: '' })
+}
+
+function openTagPicker(index: number) {
+  tagPickerOpenIndex.value = index
+}
+
+function closeTagPicker() {
+  tagPickerOpenIndex.value = null
+}
+
+function tagOptionsFor(query: string): string[] {
+  const q = query.toLowerCase().trim()
+  const source = tagsStore.visibleTags
+  if (!q) return source.slice(0, 20)
+  return source.filter(tag => tag.includes(q)).slice(0, 20)
+}
+
+function selectTagValue(index: number, value: string) {
+  rules.value[index].value = value
+  tagPickerOpenIndex.value = null
 }
 
 const matchCount = computed(() => {

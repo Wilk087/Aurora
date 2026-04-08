@@ -219,8 +219,9 @@ const tagSearch = ref('')
 
 const filteredTagOptions = computed(() => {
   const q = tagSearch.value.toLowerCase().trim()
-  if (!q) return tagsStore.allTags
-  return tagsStore.allTags.filter(tag => tag.includes(q))
+  const source = tagsStore.visibleTags
+  if (!q) return source
+  return source.filter(tag => tag.includes(q))
 })
 
 const filteredTracksByTag = computed(() => {
@@ -243,7 +244,7 @@ const selection = useSelection(() => filteredTracksByTag.value)
 
 const showSortMenu = ref(false)
 const sortDropdownRef = ref<HTMLElement | null>(null)
-const virtualScrollerRef = ref<InstanceType<typeof VirtualScroller> | null>(null)
+const virtualScrollerRef = ref<{ containerRef?: HTMLElement | null } | null>(null)
 
 // ── Scroll memory ────────────────────────
 let savedScrollTop = 0

@@ -27,6 +27,10 @@ export const useTagsStore = defineStore('tags', () => {
     return albumTags.value.get(albumKey) ?? []
   }
 
+  function isVisibleTag(tag: string): boolean {
+    return !tag.startsWith('_')
+  }
+
   /** Returns the album key used to look up tags: "albumName---albumArtist" */
   function albumKey(albumName: string, albumArtist: string): string {
     return `${albumName}---${albumArtist}`
@@ -44,6 +48,8 @@ export const useTagsStore = defineStore('tags', () => {
     return Array.from(set).sort()
   })
 
+  const visibleTags = computed<string[]>(() => allTags.value.filter(isVisibleTag))
+
   /** Suggested tags for a set of track IDs — genre metadata + existing library tags */
   function suggestedTrackTags(trackIds: string[]): string[] {
     const library = useLibraryStore()
@@ -59,7 +65,7 @@ export const useTagsStore = defineStore('tags', () => {
     }
 
     // Add tags already used elsewhere in the library (for discoverability)
-    for (const t of allTags.value) suggestions.add(t)
+    for (const t of visibleTags.value) suggestions.add(t)
 
     // Remove tags already applied to all selected tracks
     const commonTags = trackIds.length > 0
@@ -94,7 +100,7 @@ export const useTagsStore = defineStore('tags', () => {
       }
     }
 
-    for (const t of allTags.value) suggestions.add(t)
+    for (const t of visibleTags.value) suggestions.add(t)
 
     const commonTags = albumKeys.length > 0
       ? albumKeys.reduce<Set<string>>((acc, key, i) => {
@@ -168,7 +174,7 @@ export const useTagsStore = defineStore('tags', () => {
             .split(/[,/;]+/)
             .map(v => v.trim())
             .filter(Boolean),
-        ),
+        ).filter(isVisibleTag),
       )
 
       let tagsToApply = genreTags
@@ -177,7 +183,7 @@ export const useTagsStore = defineStore('tags', () => {
         if (!artistTagCache.has(artistName)) {
           try {
             const info = await window.api.getArtistInfo(artistName)
-            artistTagCache.set(artistName, normalizeTagList(info?.tags ?? []))
+            artistTagCache.set(artistName, normalizeTagList((info?.tags ?? []).filter(isVisibleTag)))
           } catch {
             artistTagCache.set(artistName, [])
           }
@@ -201,10 +207,12 @@ export const useTagsStore = defineStore('tags', () => {
     trackTags,
     albumTags,
     allTags,
+    visibleTags,
     loaded,
     load,
     getTrackTags,
     getAlbumTags,
+    isVisibleTag,
     albumKey,
     suggestedTrackTags,
     suggestedAlbumTags,
