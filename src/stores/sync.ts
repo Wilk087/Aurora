@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { usePlaylistStore } from './playlist'
 import { useFavoritesStore } from './favorites'
+import { useTagsStore } from './tags'
 
 interface SyncData {
   version: 1
@@ -12,6 +13,8 @@ interface SyncData {
   favoriteIds?: string[]
   favoriteMeta?: Record<string, TrackMetaSnapshot>
   favoritesUpdatedAt?: number
+  trackTags?: Record<string, string[]>
+  albumTags?: Record<string, string[]>
 }
 
 export const useSyncStore = defineStore('sync', () => {
@@ -21,6 +24,7 @@ export const useSyncStore = defineStore('sync', () => {
     syncPlaylists: true,
     syncFavorites: true,
     syncStats: true,
+    syncTags: true,
   })
   const lastSynced = ref(0)
   const syncing = ref(false)
@@ -77,6 +81,12 @@ export const useSyncStore = defineStore('sync', () => {
         data.favoriteIds = [...favoritesStore.ids]
         data.favoriteMeta = Object.fromEntries(favoritesStore.meta)
         data.favoritesUpdatedAt = state.favoritesUpdatedAt
+      }
+
+      if (config.value.syncTags) {
+        const tagsData = await window.api.getTags()
+        data.trackTags = tagsData.trackTags
+        data.albumTags = tagsData.albumTags
       }
 
       const result = await window.api.syncPush(data)
@@ -145,6 +155,22 @@ export const useSyncStore = defineStore('sync', () => {
           await window.api.setFavorites(data.favoriteIds, data.favoriteMeta)
           await favoritesStore.load()
         }
+      }
+
+      if (config.value.syncTags && (data.trackTags || data.albumTags)) {
+        const local = await window.api.getTags()
+        const mergedTrackTags: Record<string, string[]> = { ...local.trackTags }
+        for (const [id, remoteTags] of Object.entries(data.trackTags ?? {})) {
+          const localTags = mergedTrackTags[id] ?? []
+          mergedTrackTags[id] = Array.from(new Set([...localTags, ...remoteTags]))
+        }
+        const mergedAlbumTags: Record<string, string[]> = { ...local.albumTags }
+        for (const [key, remoteTags] of Object.entries(data.albumTags ?? {})) {
+          const localTags = mergedAlbumTags[key] ?? []
+          mergedAlbumTags[key] = Array.from(new Set([...localTags, ...remoteTags]))
+        }
+        await window.api.applyTagsSync({ trackTags: mergedTrackTags, albumTags: mergedAlbumTags })
+        await tagsStore.load()
       }
 
       // Pull stats from all other devices

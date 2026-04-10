@@ -172,9 +172,11 @@ async function handleOpenFiles(paths: string[]) {
   await player.addToQueue(tracks)
 }
 
-// Auto-push to sync folder when playlists or favorites change
+// Auto-push to sync folder when playlists, favorites, or tags change
 watch(() => playlistStore.playlists, () => syncStore.schedulePush(), { deep: true })
 watch(() => favoritesStore.ids, () => syncStore.schedulePush(), { deep: true })
+watch(() => tagsStore.trackTags, () => syncStore.schedulePush(), { deep: true })
+watch(() => tagsStore.albumTags, () => syncStore.schedulePush(), { deep: true })
 
 // Sync before the app closes
 window.api.onBeforeQuit(async () => {

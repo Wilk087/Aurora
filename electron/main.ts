@@ -1545,6 +1545,13 @@ app.whenReady().then(async () => {
     return { trackTags: trackTagsData, albumTags: albumTagsData }
   })
 
+  ipcMain.handle('tags:apply-sync', async (_, merged: { trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }) => {
+    trackTagsData = merged.trackTags
+    albumTagsData = merged.albumTags
+    await saveTags()
+    return { trackTags: trackTagsData, albumTags: albumTagsData }
+  })
+
   // ── IPC: Discord RPC ──
   ipcMain.handle('discord:update-presence', async (_, data) => {
     await updateDiscordPresence(data)
@@ -2459,6 +2466,7 @@ app.whenReady().then(async () => {
       syncPlaylists: s.syncPlaylists ?? true,
       syncFavorites: s.syncFavorites ?? true,
       syncStats: s.syncStats ?? true,
+      syncTags: s.syncTags ?? true,
     }
   })
 
@@ -2469,6 +2477,7 @@ app.whenReady().then(async () => {
       syncPlaylists: config.syncPlaylists,
       syncFavorites: config.syncFavorites,
       syncStats: config.syncStats,
+      syncTags: config.syncTags,
     })
   })
 

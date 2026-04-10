@@ -116,6 +116,7 @@ interface SyncConfig {
   syncPlaylists: boolean
   syncFavorites: boolean
   syncStats: boolean
+  syncTags: boolean
 }
 
 interface FolderEntry {
@@ -167,6 +168,7 @@ interface Window {
     addAlbumTags: (albumKeys: string[], tagsToAdd: string[]) => Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }>
     removeTrackTags: (ids: string[], tagsToRemove: string[]) => Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }>
     removeAlbumTags: (albumKeys: string[], tagsToRemove: string[]) => Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }>
+    applyTagsSync: (merged: { trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }) => Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }>
     updateDiscordPresence: (data: any) => Promise<void>
     toggleDiscordRPC: (enabled: boolean, clientId?: string) => Promise<void>
     getPlaylists: () => Promise<Playlist[]>

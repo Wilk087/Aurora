@@ -63,6 +63,7 @@ contextBridge.exposeInMainWorld('api', {
   addAlbumTags: (albumKeys: string[], tagsToAdd: string[]): Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }> => ipcRenderer.invoke('tags:add-album-tags', albumKeys, tagsToAdd),
   removeTrackTags: (ids: string[], tagsToRemove: string[]): Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }> => ipcRenderer.invoke('tags:remove-track-tags', ids, tagsToRemove),
   removeAlbumTags: (albumKeys: string[], tagsToRemove: string[]): Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }> => ipcRenderer.invoke('tags:remove-album-tags', albumKeys, tagsToRemove),
+  applyTagsSync: (merged: { trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }): Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }> => ipcRenderer.invoke('tags:apply-sync', merged),
 
   // Discord RPC
   updateDiscordPresence: (data: any) => ipcRenderer.invoke('discord:update-presence', data),

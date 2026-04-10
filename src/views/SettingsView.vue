@@ -1041,6 +1041,14 @@
               <p class="text-xs text-white/30 mt-0.5">Each device writes its own history file — Stats view shows combined plays from all devices</p>
             </div>
           </label>
+          <label class="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" v-model="syncConfig.syncTags" @change="saveSyncConfig"
+              class="w-4 h-4 rounded accent-accent mt-0.5" />
+            <div>
+              <span class="text-sm text-white/70">Tags</span>
+              <p class="text-xs text-white/30 mt-0.5">Tags are merged across devices — tags added on any device are combined</p>
+            </div>
+          </label>
         </div>
 
         <!-- Status + actions -->
@@ -1515,7 +1523,7 @@ function pluginNeedsNewerAurora(minVersion?: string): boolean {
 }
 
 // ── Sync ────────────────────────────────────────────────────────────────
-const syncConfig = ref<SyncConfig>({ enabled: false, folder: '', syncPlaylists: true, syncFavorites: true, syncStats: true })
+const syncConfig = ref<SyncConfig>({ enabled: false, folder: '', syncPlaylists: true, syncFavorites: true, syncStats: true, syncTags: true })
 
 async function loadSyncConfig() {
   syncConfig.value = await window.api.syncGetConfig()
