@@ -3,7 +3,7 @@
     <h1 class="text-3xl font-bold text-white mb-6">Settings</h1>
 
     <!-- ── Tab bar ────────────────────────────────────────────────── -->
-    <nav class="flex items-center justify-center gap-1 mb-8 p-1 rounded-xl bg-white/[0.04] border border-white/[0.06] overflow-x-auto no-scrollbar">
+    <nav v-if="!isSearching" class="flex items-center justify-center gap-1 mb-2 p-1 rounded-xl bg-white/[0.04] border border-white/[0.06] overflow-x-auto no-scrollbar">
       <button
         v-for="tab in tabs"
         :key="tab.id"
@@ -17,8 +17,26 @@
       </button>
     </nav>
 
+    <!-- ── Search input ───────────────────────────────────────────── -->
+    <div class="relative mb-6">
+      <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
+      </svg>
+      <input
+        v-model="settingsSearch"
+        type="text"
+        placeholder="Search settings…"
+        class="w-full pl-9 pr-3 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08] text-sm text-white placeholder:text-white/25 outline-none focus:border-accent/40 transition-colors"
+      />
+    </div>
+
+    <!-- ── Search: no results ─────────────────────────────────────── -->
+    <div v-if="isSearching && !anyVisible" class="py-16 text-center">
+      <p class="text-white/30 text-sm">No settings match "<span class="text-white/50">{{ settingsSearch }}</span>"</p>
+    </div>
+
     <!-- ── Music Folders ──────────────────────────────────────────── -->
-    <section v-show="activeTab === 'general'" class="mb-8">
+    <section v-show="showSection('general', 'Music Folders')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Music Folders</h2>
 
       <div class="space-y-2 mb-4">
@@ -98,7 +116,7 @@
     </section>
 
     <!-- ── Library stats ──────────────────────────────────────────── -->
-    <section v-show="activeTab === 'general'" class="mb-8">
+    <section v-show="showSection('general', 'Library')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Library</h2>
       <div class="grid grid-cols-3 gap-4">
         <div class="px-4 py-3 rounded-xl bg-white/[0.05]">
@@ -116,7 +134,7 @@
       </div>
     </section>
 
-    <section v-show="activeTab === 'general'" class="mb-8">
+    <section v-show="showSection('general', 'Album Display')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Album Display</h2>
       <div class="space-y-4">
         <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
@@ -192,7 +210,7 @@
     </section>
 
     <!-- ── Discord Rich Presence ──────────────────────────────────── -->
-    <section v-show="activeTab === 'integrations'" class="mb-8">
+    <section v-show="showSection('integrations', 'Discord Rich Presence')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Discord Rich Presence</h2>
 
       <div class="space-y-4">
@@ -263,7 +281,7 @@
     </section>
 
     <!-- ── Search ────────────────────────────────────────────────── -->
-    <section v-show="activeTab === 'general'" class="mb-8">
+    <section v-show="showSection('general', 'Search')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Search</h2>
       <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
         <div>
@@ -284,7 +302,7 @@
     </section>
 
     <!-- ── Audio Output ───────────────────────────────────────────── -->
-    <section v-show="activeTab === 'general'" class="mb-8">
+    <section v-show="showSection('general', 'Audio Output')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Audio Output</h2>
       <div class="space-y-4">
         <div class="px-4 py-3 rounded-xl bg-white/[0.05]">
@@ -382,7 +400,7 @@
     </section>
 
     <!-- ── Playback ───────────────────────────────────────────────── -->
-    <section v-show="activeTab === 'general'" class="mb-8">
+    <section v-show="showSection('general', 'Playback')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Playback</h2>
       <div class="space-y-4">
         <!-- Audio normalization -->
@@ -461,7 +479,7 @@
     </section>
 
     <!-- ── Appearance ─────────────────────────────────────────────── -->
-    <section v-show="activeTab === 'appearance'" class="mb-8">
+    <section v-show="showSection('appearance', 'Appearance')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Appearance</h2>
       <div class="space-y-4">
         <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
@@ -535,7 +553,7 @@
     </section>
 
     <!-- ── Animated Covers ────────────────────────────────────────── -->
-    <section v-show="activeTab === 'appearance'" class="mb-8">
+    <section v-show="showSection('appearance', 'Animated Covers')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Animated Covers</h2>
       <div class="space-y-4">
         <!-- Toggle -->
@@ -576,7 +594,7 @@
     </section>
 
     <!-- ── Behavior ───────────────────────────────────────────────── -->
-    <section v-show="activeTab === 'general'" class="mb-8">
+    <section v-show="showSection('general', 'Behavior')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Behavior</h2>
       <div class="space-y-4">
         <!-- Auto-fullscreen toggle -->
@@ -621,7 +639,7 @@
     </section>
 
     <!-- ── Scrobbling ─────────────────────────────────────────────── -->
-    <section v-show="activeTab === 'integrations'" class="mb-8">
+    <section v-show="showSection('integrations', 'Scrobbling')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">
         Scrobbling
         <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/15 text-amber-500 uppercase tracking-wider align-middle">WIP</span>
@@ -700,7 +718,7 @@
     </section>
 
     <!-- ── Navidrome / Subsonic ─────────────────────────────────── -->
-    <section v-show="activeTab === 'integrations'" class="mb-8">
+    <section v-show="showSection('integrations', 'Navidrome / Subsonic')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">
         Navidrome / Subsonic
         <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/15 text-amber-500 uppercase tracking-wider align-middle">WIP</span>
@@ -784,7 +802,7 @@
     </section>
 
     <!-- ── Remote Control ───────────────────────────────────────── -->
-    <section v-show="activeTab === 'integrations'" class="mb-8">
+    <section v-show="showSection('integrations', 'Remote Control')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Remote Control</h2>
 
       <div class="px-4 py-4 rounded-xl bg-white/[0.05] space-y-4">
@@ -878,7 +896,7 @@
     </section>
 
     <!-- ── Cache Management ─────────────────────────────────────── -->
-    <section v-show="activeTab === 'system'" class="mb-8">
+    <section v-show="showSection('system', 'Cache')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Cache</h2>
 
       <div class="px-4 py-4 rounded-xl bg-white/[0.05] space-y-3">
@@ -967,7 +985,7 @@
     </section>
 
     <!-- ── Sync ──────────────────────────────────────────────────── -->
-    <section v-show="activeTab === 'sync'" class="mb-8">
+    <section v-show="showSection('sync', 'Sync Folder')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-1">Sync Folder</h2>
       <p class="text-xs text-white/40 mb-4">
         Point Aurora to any folder managed by Dropbox, Google Drive, Syncthing, or similar.
@@ -1081,7 +1099,7 @@
     </section>
 
     <!-- ── Export / Import ──────────────────────────────────────── -->
-    <section v-show="activeTab === 'system'" class="mb-8">
+    <section v-show="showSection('system', 'Export / Import')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">
         Export / Import
         <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/15 text-amber-500 uppercase tracking-wider align-middle">WIP</span>
@@ -1161,7 +1179,7 @@
     </section>
 
     <!-- ── Troubleshooting ────────────────────────────────────── -->
-    <section v-show="activeTab === 'system'" class="mb-8">
+    <section v-show="showSection('system', 'Troubleshooting')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Troubleshooting</h2>
       <div class="px-4 py-4 rounded-xl bg-white/[0.05] space-y-3">
         <p class="text-xs text-white/40">Aurora writes diagnostic logs to help troubleshoot issues. Share the log file when reporting bugs.</p>
@@ -1181,7 +1199,7 @@
     </section>
 
     <!-- ── Themes ──────────────────────────────────────────────────── -->
-    <section v-show="activeTab === 'appearance'" class="mb-8">
+    <section v-show="showSection('appearance', 'Themes')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">
         Themes
         <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/15 text-amber-500 uppercase tracking-wider align-middle">WIP</span>
@@ -1258,7 +1276,7 @@
     </section>
 
     <!-- ── Plugins ──────────────────────────────────────────────────── -->
-    <section v-show="activeTab === 'plugins'" class="mb-8">
+    <section v-show="showSection('plugins', 'Plugins')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">
         Plugins
         <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/15 text-amber-500 uppercase tracking-wider align-middle">WIP</span>
@@ -1426,7 +1444,7 @@
     </section>
 
     <!-- ── About ──────────────────────────────────────────────────── -->
-    <section v-show="activeTab === 'system'">
+    <section v-show="showSection('system', 'About')">
       <h2 class="text-lg font-semibold text-white mb-4">About</h2>
       <div class="px-4 py-4 rounded-xl bg-white/[0.05]">
         <div class="flex items-center gap-3 mb-3">
@@ -1569,6 +1587,54 @@ const tabs = [
   { id: 'sync', label: 'Sync' },
   { id: 'system', label: 'System' },
 ]
+
+// ── Settings search ────────────────────────────────────────────────────
+const settingsSearch = ref('')
+const isSearching = computed(() => settingsSearch.value.trim().length > 0)
+
+const sectionKeywords: Record<string, string[]> = {
+  'Music Folders': ['folder', 'scan', 'rescan', 'add folder', 'music library'],
+  'Library': ['songs', 'albums', 'artists', 'stats', 'count'],
+  'Album Display': ['soundtrack', 'singles', 'tags', 'auto-tag', 'display', 'covers'],
+  'Discord Rich Presence': ['discord', 'rpc', 'activity', 'presence', 'status'],
+  'Search': ['search lyrics', 'lyrics search'],
+  'Audio Output': ['audio', 'output', 'device', 'speaker', 'sound', 'sink'],
+  'Playback': ['playback', 'queue', 'shuffle', 'crossfade', 'player', 'volume', 'gapless'],
+  'Appearance': ['theme', 'color', 'accent', 'font', 'ui', 'dark', 'window', 'opacity', 'blur'],
+  'Animated Covers': ['animation', 'cover', 'album art', 'animated'],
+  'Behavior': ['behavior', 'window', 'minimize', 'tray', 'startup', 'close'],
+  'Scrobbling': ['lastfm', 'last.fm', 'scrobble', 'last fm'],
+  'Navidrome / Subsonic': ['navidrome', 'subsonic', 'remote server', 'jellyfin', 'stream'],
+  'Remote Control': ['remote', 'control', 'mpris', 'media keys', 'keyboard'],
+  'Cache': ['cache', 'clear', 'storage', 'disk', 'memory'],
+  'Sync Folder': ['sync', 'cloud', 'dropbox', 'backup', 'cross-device', 'playlists sync', 'favorites sync'],
+  'Export / Import': ['export', 'import', 'backup', 'restore', 'data'],
+  'Troubleshooting': ['troubleshoot', 'debug', 'logs', 'reset', 'diagnostic'],
+  'Themes': ['themes', 'custom theme', 'css', 'custom css'],
+  'Plugins': ['plugins', 'extensions', 'addons', 'add-ons'],
+  'About': ['about', 'version', 'update', 'changelog', 'app info'],
+}
+
+function showSection(tabId: string, heading: string): boolean {
+  if (!isSearching.value) return activeTab.value === tabId
+  const q = settingsSearch.value.toLowerCase().trim()
+  const keywords = sectionKeywords[heading] ?? []
+  return [heading.toLowerCase(), tabId, ...keywords].some(k => k.includes(q))
+}
+
+const sectionTabMap: Record<string, string> = {
+  'Music Folders': 'general', 'Library': 'general', 'Album Display': 'general',
+  'Discord Rich Presence': 'integrations', 'Search': 'general', 'Audio Output': 'general',
+  'Playback': 'general', 'Appearance': 'appearance', 'Animated Covers': 'appearance',
+  'Behavior': 'general', 'Scrobbling': 'integrations', 'Navidrome / Subsonic': 'integrations',
+  'Remote Control': 'integrations', 'Cache': 'system', 'Sync Folder': 'sync',
+  'Export / Import': 'system', 'Troubleshooting': 'system', 'Themes': 'appearance',
+  'Plugins': 'plugins', 'About': 'system',
+}
+
+const anyVisible = computed(() =>
+  isSearching.value && Object.entries(sectionTabMap).some(([heading, tabId]) => showSection(tabId, heading))
+)
 
 // ── Theme / Plugin helpers ─────────────────────────────────────────────
 const themeCustomCSS = ref('')
