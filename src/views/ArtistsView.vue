@@ -105,7 +105,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onActivated } from 'vue'
+import { ref, reactive, computed, onMounted, onActivated, watch } from 'vue'
 import { useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useLibraryStore, type Artist } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
@@ -145,8 +145,7 @@ const filteredArtists = computed(() => {
 const artistImages = reactive<Record<string, string>>({})
 
 async function loadArtistImages() {
-  const batch = filteredArtists.value.slice(0, 24)
-  for (const artist of batch) {
+  for (const artist of filteredArtists.value) {
     if (artistImages[artist.name]) continue
     try {
       const info = await window.api.getArtistInfo(artist.name)
@@ -159,6 +158,15 @@ async function loadArtistImages() {
 
 onMounted(() => {
   if (library.libraryReady) loadArtistImages()
+})
+
+onActivated(() => {
+  if (library.libraryReady) loadArtistImages()
+})
+
+// Also kick off loading when the library finishes scanning
+watch(() => library.libraryReady, (ready) => {
+  if (ready) loadArtistImages()
 })
 
 // ── Actions ────────────────────────────────────────────────────────────────

@@ -82,6 +82,10 @@ interface ArtistInfo {
   tags?: string[]
   bio?: string
   imageUrl?: string | null
+  website?: string
+  socials?: { name: string; url: string }[]
+  members?: string[]
+  similarArtists?: string[]
 }
 
 interface SmartPlaylistRule {

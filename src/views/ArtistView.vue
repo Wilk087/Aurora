@@ -42,6 +42,33 @@
           </span>
         </div>
 
+        <!-- Website + social links -->
+        <div v-if="artistInfo?.website || artistInfo?.socials?.length" class="flex flex-wrap items-center gap-2 mb-4">
+          <a
+            v-if="artistInfo.website"
+            href="#"
+            @click.prevent="openExternal(artistInfo.website!)"
+            class="inline-flex items-center gap-1.5 px-3 py-1 text-xs text-white/60 bg-white/[0.06] hover:bg-white/[0.10] rounded-full transition-colors"
+          >
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" />
+            </svg>
+            Website
+          </a>
+          <a
+            v-for="social in artistInfo.socials"
+            :key="social.url"
+            href="#"
+            @click.prevent="openExternal(social.url)"
+            class="inline-flex items-center gap-1.5 px-3 py-1 text-xs text-white/60 bg-white/[0.06] hover:bg-white/[0.10] rounded-full transition-colors"
+          >
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+            </svg>
+            {{ social.name }}
+          </a>
+        </div>
+
         <div class="flex items-center gap-3">
           <button
             @click="playAll"
@@ -66,23 +93,54 @@
     <div v-if="artistInfo?.bio" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-3">About</h2>
       <div
+        ref="bioContainer"
         class="relative px-5 py-4 rounded-xl bg-white/[0.04] border border-white/[0.06]"
-        :class="{ 'max-h-40 overflow-hidden': !bioExpanded }"
+        :class="{ 'max-h-40 overflow-hidden': !bioExpanded && bioOverflows }"
       >
         <p v-if="artistInfo.disambiguation" class="text-xs text-white/40 italic mb-2">{{ artistInfo.disambiguation }}</p>
         <p class="text-sm text-white/60 leading-relaxed whitespace-pre-line">{{ artistInfo.bio }}</p>
         <div
-          v-if="!bioExpanded && (artistInfo.bio?.length || 0) > 250"
+          v-if="!bioExpanded && bioOverflows"
           class="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0d0d1a] to-transparent pointer-events-none"
         />
       </div>
       <button
-        v-if="(artistInfo.bio?.length || 0) > 250"
+        v-if="bioOverflows"
         @click="bioExpanded = !bioExpanded"
         class="mt-2 text-xs text-accent hover:text-accent-hover transition-colors"
       >
         {{ bioExpanded ? 'Show less' : 'Read more' }}
       </button>
+    </div>
+
+    <!-- Band members -->
+    <div v-if="artistInfo?.members?.length" class="mb-8">
+      <h2 class="text-lg font-semibold text-white mb-3">Members</h2>
+      <div class="flex flex-wrap gap-2">
+        <button
+          v-for="member in artistInfo.members"
+          :key="member"
+          @click="goToArtist(member)"
+          class="px-3 py-1.5 text-sm text-white/70 bg-white/[0.06] hover:bg-white/[0.10] rounded-full transition-colors"
+        >
+          {{ member }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Similar artists -->
+    <div v-if="artistInfo?.similarArtists?.length" class="mb-8">
+      <h2 class="text-lg font-semibold text-white mb-3">Similar Artists</h2>
+      <div class="flex flex-wrap gap-2">
+        <button
+          v-for="similar in artistInfo.similarArtists"
+          :key="similar"
+          @click="goToArtist(similar)"
+          class="px-3 py-1.5 text-sm text-white/70 bg-white/[0.06] hover:bg-white/[0.10] rounded-full transition-colors"
+        >
+          {{ similar }}
+        </button>
+      </div>
     </div>
 
     <!-- Active years / dates -->
@@ -181,20 +239,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useLibraryStore, type Album } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import SongRow from '@/components/SongRow.vue'
 import { splitArtists } from '@/utils/splitArtists'
 
 const route = useRoute()
+const router = useRouter()
 const library = useLibraryStore()
 const player = usePlayerStore()
 
 const artistInfo = ref<ArtistInfo | null>(null)
 const loadingInfo = ref(false)
 const bioExpanded = ref(false)
+const bioContainer = ref<HTMLElement | null>(null)
+const bioOverflows = ref(false)
 
 const artistName = computed(() => decodeURIComponent(route.params.name as string))
 
@@ -237,6 +298,14 @@ function getCoverUrl(path: string) {
   return window.api.getMediaUrl(path)
 }
 
+function openExternal(url: string) {
+  window.api.openExternal(url)
+}
+
+function goToArtist(name: string) {
+  router.push(`/artist/${encodeURIComponent(name)}`)
+}
+
 function isAlbumPlaying(album: Album): boolean {
   if (!player.isPlaying || !player.currentTrack) return false
   return album.tracks.some(t => t.id === player.currentTrack?.id)
@@ -261,6 +330,8 @@ async function fetchArtistInfo() {
   loadingInfo.value = true
   try {
     artistInfo.value = await window.api.getArtistInfo(artistName.value)
+    await nextTick()
+    bioOverflows.value = !!bioContainer.value && bioContainer.value.scrollHeight > bioContainer.value.clientHeight
   } catch (err) {
     console.error('Failed to fetch artist info:', err)
   } finally {
@@ -273,6 +344,7 @@ onMounted(fetchArtistInfo)
 watch(artistName, () => {
   artistInfo.value = null
   bioExpanded.value = false
+  bioOverflows.value = false
   fetchArtistInfo()
 })
 </script>

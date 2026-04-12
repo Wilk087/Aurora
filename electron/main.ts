@@ -2031,7 +2031,7 @@ app.whenReady().then(async () => {
     }
   })
 
-  // ── IPC: Artist info (MusicBrainz + Wikipedia summary) ──
+  // ── IPC: Artist info (MusicBrainz + Wikipedia + TheAudioDB + Last.fm) ──
   ipcMain.handle('artist:get-info', async (_, artistName: string) => {
     // Check disk cache first. Entries without an image expire much faster
     // so we can pick up images that become available later.
@@ -2043,8 +2043,28 @@ app.whenReady().then(async () => {
       return cached.data
     }
 
+    // Social network domains to include (exclude streaming platforms)
+    const STREAMING_DOMAINS = ['youtube.com', 'youtu.be', 'spotify.com', 'soundcloud.com',
+      'bandcamp.com', 'deezer.com', 'tidal.com', 'music.apple.com', 'music.amazon.com',
+      'napster.com', 'pandora.com', 'last.fm', 'lastfm.com', 'listenbrainz.org',
+      'musicbrainz.org', 'discogs.com', 'allmusic.com', 'imdb.com', 'amazon.com']
+    const SOCIAL_NAMES: Record<string, string> = {
+      'twitter.com': 'Twitter', 'x.com': 'X', 'instagram.com': 'Instagram',
+      'facebook.com': 'Facebook', 'tiktok.com': 'TikTok', 'threads.net': 'Threads',
+      'bsky.app': 'Bluesky', 'vk.com': 'VK', 'weibo.com': 'Weibo',
+      'tumblr.com': 'Tumblr', 'myspace.com': 'Myspace',
+    }
+    const classifySocialUrl = (url: string): { name: string; url: string } | null => {
+      try {
+        const host = new URL(url).hostname.replace(/^www\./, '')
+        if (STREAMING_DOMAINS.some(d => host === d || host.endsWith('.' + d))) return null
+        const name = SOCIAL_NAMES[host] || (host.split('.')[0].charAt(0).toUpperCase() + host.split('.')[0].slice(1))
+        return { name, url }
+      } catch { return null }
+    }
+
     try {
-      const query = encodeURIComponent(artistName)
+      const settings = await loadSettings()
       // Use quoted exact match to avoid e.g. "bôa" returning "BoA"
       const exactQuery = encodeURIComponent(`"${artistName}"`)
       const mbUrl = `https://musicbrainz.org/ws/2/artist/?query=artist:${exactQuery}&fmt=json&limit=5`
@@ -2069,6 +2089,10 @@ app.whenReady().then(async () => {
         tags: (artist.tags || []).slice(0, 10).map((t: any) => t.name),
         bio: '',
         imageUrl: null,
+        website: '',
+        socials: [],
+        members: [],
+        similarArtists: [],
       }
 
       // Helper to fetch Wikipedia summary + thumbnail for a given page title/lang
@@ -2084,12 +2108,12 @@ app.whenReady().then(async () => {
         }
       }
 
-      // Try to fetch Wikipedia summary for bio using MusicBrainz relations
+      // Fetch MusicBrainz relations (URL relations for links + artist relations for members)
       if (artist.id) {
         try {
           // Rate limit: MusicBrainz requires max 1 req/sec
           await new Promise(r => setTimeout(r, 1200))
-          const relUrl = `https://musicbrainz.org/ws/2/artist/${artist.id}?inc=url-rels&fmt=json`
+          const relUrl = `https://musicbrainz.org/ws/2/artist/${artist.id}?inc=url-rels+artist-rels&fmt=json`
           const relRaw = await fetchJSON(relUrl)
           const relData = JSON.parse(relRaw)
           const relations = relData.relations || []
@@ -2130,13 +2154,33 @@ app.whenReady().then(async () => {
           if (!info.imageUrl) {
             const imgRel = relations.find((r: any) => r.type === 'image')
             if (imgRel?.url?.resource) {
-              // Commons image URL — convert to thumbnail
               const commonsMatch = imgRel.url.resource.match(/commons\.wikimedia\.org\/wiki\/File:(.+)/)
               if (commonsMatch) {
                 const filename = decodeURIComponent(commonsMatch[1])
                 info.imageUrl = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}?width=400`
               }
             }
+          }
+
+          // Extract official homepage
+          const homepageRel = relations.find((r: any) => r.type === 'official homepage')
+          if (homepageRel?.url?.resource) {
+            info.website = homepageRel.url.resource
+          }
+
+          // Extract social network links (excluding streaming platforms)
+          const socialRels = relations.filter((r: any) => r.type === 'social network' && r.url?.resource)
+          for (const rel of socialRels) {
+            const social = classifySocialUrl(rel.url.resource)
+            if (social) info.socials.push(social)
+          }
+
+          // Extract band members (artist-rels where this artist is the band)
+          const memberRels = relations.filter((r: any) =>
+            r.type === 'member of band' && r.direction === 'backward' && r.artist?.name
+          )
+          if (memberRels.length > 0) {
+            info.members = memberRels.map((r: any) => r.artist.name)
           }
         } catch (wikiErr) {
           logger.error('Wikipedia fetch error:', wikiErr)
@@ -2156,6 +2200,42 @@ app.whenReady().then(async () => {
             }
           }
         } catch { /* direct search failed */ }
+      }
+
+      // TheAudioDB fallback for missing image (free, no key required)
+      if (!info.imageUrl) {
+        try {
+          const tadbUrl = `https://www.theaudiodb.com/api/v1/json/2/search.php?s=${encodeURIComponent(artistName)}`
+          const tadbRaw = await fetchJSON(tadbUrl)
+          const tadbData = JSON.parse(tadbRaw)
+          const tadbArtist = tadbData.artists?.[0]
+          if (tadbArtist?.strArtistThumb) {
+            info.imageUrl = tadbArtist.strArtistThumb
+          }
+        } catch { /* TheAudioDB fallback failed */ }
+      }
+
+      // Last.fm: similar artists (+ bio fallback) when API key is configured
+      if (settings.lastfmApiKey) {
+        try {
+          const lfmUrl = `https://ws.audioscrobbler.com/2.0/?method=artist.getinfo&artist=${encodeURIComponent(artistName)}&api_key=${settings.lastfmApiKey}&format=json`
+          const lfmRaw = await fetchJSON(lfmUrl)
+          const lfmData = JSON.parse(lfmRaw)
+          if (lfmData.artist) {
+            const similar = lfmData.artist.similar?.artist || []
+            if (similar.length > 0) {
+              info.similarArtists = similar.slice(0, 6).map((a: any) => a.name)
+            }
+            // Use Last.fm bio as fallback if no bio yet (strip HTML tags)
+            if (!info.bio && lfmData.artist.bio?.summary) {
+              info.bio = lfmData.artist.bio.summary
+                .replace(/<a\b[^>]*>.*?<\/a>/gi, '')
+                .replace(/<[^>]+>/g, '')
+                .replace(/\s+/g, ' ')
+                .trim()
+            }
+          }
+        } catch { /* Last.fm fallback failed */ }
       }
 
       // Cache and return
