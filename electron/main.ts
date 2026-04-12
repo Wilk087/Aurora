@@ -2095,7 +2095,8 @@ app.whenReady().then(async () => {
         similarArtists: [],
       }
 
-      // Deezer: try first for a clean promo/press photo
+      // Deezer: try first for a clean promo/press photo; save ID for related artists fallback
+      let deezerArtistId: number | null = null
       try {
         const deezerUrl = `https://api.deezer.com/search/artist?q=${encodeURIComponent(artistName)}&limit=5`
         const deezerRaw = await fetchJSON(deezerUrl)
@@ -2105,6 +2106,9 @@ app.whenReady().then(async () => {
         ) || deezerData.data?.[0]
         if (deezerArtist?.picture_xl) {
           info.imageUrl = deezerArtist.picture_xl
+        }
+        if (deezerArtist?.id) {
+          deezerArtistId = deezerArtist.id
         }
       } catch { /* Deezer lookup failed */ }
 
@@ -2238,7 +2242,7 @@ app.whenReady().then(async () => {
           if (lfmData.artist) {
             const similar = lfmData.artist.similar?.artist || []
             if (similar.length > 0) {
-              info.similarArtists = similar.slice(0, 6).map((a: any) => a.name)
+              info.similarArtists = similar.slice(0, 20).map((a: any) => a.name)
             }
             // Use Last.fm bio as fallback if no bio yet (strip HTML tags)
             if (!info.bio && lfmData.artist.bio?.summary) {
@@ -2250,6 +2254,18 @@ app.whenReady().then(async () => {
             }
           }
         } catch { /* Last.fm fallback failed */ }
+      }
+
+      // Deezer related artists: fallback if Last.fm didn't provide any
+      if (info.similarArtists.length === 0 && deezerArtistId) {
+        try {
+          const relatedUrl = `https://api.deezer.com/artist/${deezerArtistId}/related?limit=20`
+          const relatedRaw = await fetchJSON(relatedUrl)
+          const relatedData = JSON.parse(relatedRaw)
+          if (relatedData.data?.length) {
+            info.similarArtists = relatedData.data.map((a: any) => a.name)
+          }
+        } catch { /* Deezer related artists failed */ }
       }
 
       // Cache and return

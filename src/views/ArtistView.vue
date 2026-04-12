@@ -129,11 +129,11 @@
     </div>
 
     <!-- Similar artists -->
-    <div v-if="artistInfo?.similarArtists?.length" class="mb-8">
+    <div v-if="similarArtistsInLibrary.length" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-3">Similar Artists</h2>
       <div class="flex flex-wrap gap-2">
         <button
-          v-for="similar in artistInfo.similarArtists"
+          v-for="similar in similarArtistsInLibrary"
           :key="similar"
           @click="goToArtist(similar)"
           class="px-3 py-1.5 text-sm text-white/70 bg-white/[0.06] hover:bg-white/[0.10] rounded-full transition-colors"
@@ -293,6 +293,12 @@ const allTracks = computed(() => {
 })
 
 const allPlayableTracks = computed(() => [...allTracks.value, ...featuredTracks.value])
+
+const localArtistNames = computed(() => new Set(library.artists.map(a => a.name)))
+
+const similarArtistsInLibrary = computed(() =>
+  (artistInfo.value?.similarArtists ?? []).filter(name => localArtistNames.value.has(name))
+)
 
 function getCoverUrl(path: string) {
   return window.api.getMediaUrl(path)
