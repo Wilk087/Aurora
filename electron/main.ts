@@ -2095,16 +2095,30 @@ app.whenReady().then(async () => {
         similarArtists: [],
       }
 
+      // Deezer: try first for a clean promo/press photo
+      try {
+        const deezerUrl = `https://api.deezer.com/search/artist?q=${encodeURIComponent(artistName)}&limit=5`
+        const deezerRaw = await fetchJSON(deezerUrl)
+        const deezerData = JSON.parse(deezerRaw)
+        const deezerArtist = deezerData.data?.find(
+          (a: any) => normalize(a.name) === target
+        ) || deezerData.data?.[0]
+        if (deezerArtist?.picture_xl) {
+          info.imageUrl = deezerArtist.picture_xl
+        }
+      } catch { /* Deezer lookup failed */ }
+
       // Helper to fetch Wikipedia summary + thumbnail for a given page title/lang
+      // Only sets imageUrl if Deezer didn't already provide one
       const fetchWikiSummary = async (pageTitle: string, lang = 'en') => {
         const summaryUrl = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(pageTitle)}`
         const summaryRaw = await fetchJSON(summaryUrl)
         const summaryData = JSON.parse(summaryRaw)
         if (summaryData.extract) info.bio = summaryData.extract
-        if (summaryData.thumbnail?.source) info.imageUrl = summaryData.thumbnail.source
-        // Get higher res image if available
-        if (summaryData.originalimage?.source && !info.imageUrl) {
+        if (!info.imageUrl && summaryData.originalimage?.source) {
           info.imageUrl = summaryData.originalimage.source
+        } else if (!info.imageUrl && summaryData.thumbnail?.source) {
+          info.imageUrl = summaryData.thumbnail.source
         }
       }
 
