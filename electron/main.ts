@@ -1008,6 +1008,9 @@ async function createWindow() {
     mainWindow.loadFile(join(__dirname, '../dist/index.html'))
   }
 
+  // Prevent Ctrl+click / middle-click on router-links from opening a blank Electron window
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+
   // Forward renderer console logs to the log file
   mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
     const src = sourceId ? ` (${sourceId}:${line})` : ''
