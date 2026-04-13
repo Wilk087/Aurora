@@ -85,6 +85,23 @@
           >
             Add to Queue
           </button>
+          <button
+            @click="fetchArtistInfo(true)"
+            :disabled="loadingInfo"
+            class="w-9 h-9 flex items-center justify-center bg-white/[0.06] hover:bg-white/[0.12] rounded-full text-white/50 hover:text-white/80 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Refresh artist info"
+          >
+            <svg
+              class="w-4 h-4"
+              :class="{ 'animate-spin': loadingInfo }"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+            </svg>
+          </button>
         </div>
       </div>
     </div>
@@ -225,11 +242,6 @@
       </div>
     </section>
 
-    <!-- Loading info state -->
-    <div v-if="loadingInfo" class="flex items-center gap-2 text-xs text-white/30 mt-4">
-      <div class="w-3 h-3 border border-accent/30 border-t-accent rounded-full animate-spin" />
-      Fetching artist information...
-    </div>
   </div>
 
   <!-- Not found -->
@@ -239,7 +251,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onActivated, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useLibraryStore, type Album } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
@@ -331,11 +343,11 @@ function playAll() {
   }
 }
 
-async function fetchArtistInfo() {
+async function fetchArtistInfo(forceRefresh = false) {
   if (!artistName.value) return
   loadingInfo.value = true
   try {
-    artistInfo.value = await window.api.getArtistInfo(artistName.value)
+    artistInfo.value = await window.api.getArtistInfo(artistName.value, forceRefresh)
     await nextTick()
     bioOverflows.value = !!bioContainer.value && bioContainer.value.scrollHeight > bioContainer.value.clientHeight
   } catch (err) {
@@ -346,6 +358,7 @@ async function fetchArtistInfo() {
 }
 
 onMounted(fetchArtistInfo)
+onActivated(fetchArtistInfo)
 
 watch(artistName, () => {
   artistInfo.value = null
