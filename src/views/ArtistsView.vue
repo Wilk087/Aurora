@@ -106,7 +106,8 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onActivated, watch } from 'vue'
-import { useRouter, onBeforeRouteLeave } from 'vue-router'
+import { useRouter } from 'vue-router'
+import { useScrollMemory } from '@/composables/useScrollMemory'
 import { useLibraryStore, type Artist } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 
@@ -115,18 +116,7 @@ const player = usePlayerStore()
 const router = useRouter()
 const viewRoot = ref<HTMLElement | null>(null)
 
-// ── Scroll memory ────────────────────────
-let savedScrollTop = 0
-onActivated(() => {
-  requestAnimationFrame(() => {
-    const el = viewRoot.value?.closest('main')
-    if (el) el.scrollTop = savedScrollTop
-  })
-})
-onBeforeRouteLeave(() => {
-  const el = viewRoot.value?.closest('main')
-  if (el) savedScrollTop = el.scrollTop
-})
+useScrollMemory(() => viewRoot.value?.closest('main'))
 
 // ── Filtered artists (respects search query) ────────────────────────
 function normalize(str: string): string {

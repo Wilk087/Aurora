@@ -183,8 +183,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, onActivated, computed } from 'vue'
-import { onBeforeRouteLeave } from 'vue-router'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { useScrollMemory } from '@/composables/useScrollMemory'
 import { useLibraryStore, type AlbumSortOrder } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { useTagsStore } from '@/stores/tags'
@@ -256,18 +256,7 @@ function toggleSortMenu() {
   showSortMenu.value = !showSortMenu.value
 }
 
-// ── Scroll memory ────────────────────────
-let savedScrollTop = 0
-onActivated(() => {
-  requestAnimationFrame(() => {
-    const el = viewRoot.value?.closest('main')
-    if (el) el.scrollTop = savedScrollTop
-  })
-})
-onBeforeRouteLeave(() => {
-  const el = viewRoot.value?.closest('main')
-  if (el) savedScrollTop = el.scrollTop
-})
+useScrollMemory(() => viewRoot.value?.closest('main'))
 
 const albumSortOptions: { value: AlbumSortOrder; label: string }[] = [
   { value: 'name', label: 'Name' },

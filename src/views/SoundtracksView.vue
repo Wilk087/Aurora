@@ -105,8 +105,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onActivated } from 'vue'
-import { onBeforeRouteLeave } from 'vue-router'
+import { ref, computed } from 'vue'
+import { useScrollMemory } from '@/composables/useScrollMemory'
 import { useLibraryStore } from '@/stores/library'
 import { useTagsStore } from '@/stores/tags'
 import { usePlayerStore } from '@/stores/player'
@@ -120,18 +120,7 @@ const activeTag = ref<string | null>(null)
 const openTagMenuAlbum = ref<string | null>(null)
 const tagMenuStyle = ref<Record<string, string>>({})
 
-// ── Scroll memory ────────────────────────
-let savedScrollTop = 0
-onActivated(() => {
-  requestAnimationFrame(() => {
-    const el = viewRoot.value?.closest('main')
-    if (el) el.scrollTop = savedScrollTop
-  })
-})
-onBeforeRouteLeave(() => {
-  const el = viewRoot.value?.closest('main')
-  if (el) savedScrollTop = el.scrollTop
-})
+useScrollMemory(() => viewRoot.value?.closest('main'))
 
 /** All albums that have at least one album-level tag */
 const soundtrackTaggedAlbums = computed(() => {

@@ -1,34 +1,26 @@
-import { onActivated, type Ref } from 'vue'
+import { onActivated } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 
 /**
  * Session-scoped scroll position memory.
+ * Pass a getter that returns the scrollable element — avoids needing a
+ * dedicated ref when the element is accessed via nested property or DOM query.
+ *
  * Uses onBeforeRouteLeave to save (DOM is still visible at that point)
  * and onActivated + requestAnimationFrame to restore.
  */
-const scrollPositions = new Map<string, number>()
-
-export function useScrollMemory(key: string, containerRef: Ref<HTMLElement | null>) {
-  function save() {
-    if (containerRef.value) {
-      scrollPositions.set(key, containerRef.value.scrollTop)
-    }
-  }
-
-  function restore() {
-    const pos = scrollPositions.get(key)
-    if (pos !== undefined && containerRef.value) {
-      containerRef.value.scrollTop = pos
-    }
-  }
+export function useScrollMemory(getEl: () => HTMLElement | null | undefined) {
+  let savedScrollTop = 0
 
   onActivated(() => {
-    requestAnimationFrame(() => restore())
+    requestAnimationFrame(() => {
+      const el = getEl()
+      if (el) el.scrollTop = savedScrollTop
+    })
   })
 
   onBeforeRouteLeave(() => {
-    save()
+    const el = getEl()
+    if (el) savedScrollTop = el.scrollTop
   })
-
-  return { save, restore }
 }

@@ -204,8 +204,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, onActivated } from 'vue'
-import { onBeforeRouteLeave } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useScrollMemory } from '@/composables/useScrollMemory'
 import { useLibraryStore, type SortOrder } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { useSelection } from '@/composables/useSelection'
@@ -261,18 +261,7 @@ function toggleSortMenu() {
   showSortMenu.value = !showSortMenu.value
 }
 
-// ── Scroll memory ────────────────────────
-let savedScrollTop = 0
-onActivated(() => {
-  requestAnimationFrame(() => {
-    const el = virtualScrollerRef.value?.containerRef
-    if (el) el.scrollTop = savedScrollTop
-  })
-})
-onBeforeRouteLeave(() => {
-  const el = virtualScrollerRef.value?.containerRef
-  if (el) savedScrollTop = el.scrollTop
-})
+useScrollMemory(() => virtualScrollerRef.value?.containerRef)
 
 const sortOptions: { value: SortOrder; label: string }[] = [
   { value: 'title', label: 'Title' },

@@ -256,8 +256,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onActivated, nextTick } from 'vue'
-import { onBeforeRouteLeave, useRouter } from 'vue-router'
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
+import { useScrollMemory } from '@/composables/useScrollMemory'
 import { menuPosition } from '@/utils/menuPosition'
 import { usePlaylistStore, type PlaylistSortOrder } from '@/stores/playlist'
 import { usePlayerStore } from '@/stores/player'
@@ -271,18 +272,7 @@ const router = useRouter()
 const toast = useToast()
 const viewRoot = ref<HTMLElement | null>(null)
 
-// ── Scroll memory ────────────────────────
-let savedScrollTop = 0
-onActivated(() => {
-  requestAnimationFrame(() => {
-    const el = viewRoot.value?.closest('main')
-    if (el) el.scrollTop = savedScrollTop
-  })
-})
-onBeforeRouteLeave(() => {
-  const el = viewRoot.value?.closest('main')
-  if (el) savedScrollTop = el.scrollTop
-})
+useScrollMemory(() => viewRoot.value?.closest('main'))
 
 const showCreateDialog = ref(false)
 const showSmartDialog = ref(false)

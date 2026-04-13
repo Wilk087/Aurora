@@ -91,8 +91,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, onActivated, ref } from 'vue'
-import { onBeforeRouteLeave } from 'vue-router'
+import { onMounted, onUnmounted, ref } from 'vue'
+import { useScrollMemory } from '@/composables/useScrollMemory'
 import { useFavoritesStore } from '@/stores/favorites'
 import { usePlayerStore } from '@/stores/player'
 import { useSelection } from '@/composables/useSelection'
@@ -105,18 +105,7 @@ const player = usePlayerStore()
 const selection = useSelection(() => favorites.favoriteTracks)
 const virtualScrollerRef = ref<{ containerRef?: HTMLElement | null } | null>(null)
 
-// ── Scroll memory ────────────────────────
-let savedScrollTop = 0
-onActivated(() => {
-  requestAnimationFrame(() => {
-    const el = virtualScrollerRef.value?.containerRef
-    if (el) el.scrollTop = savedScrollTop
-  })
-})
-onBeforeRouteLeave(() => {
-  const el = virtualScrollerRef.value?.containerRef
-  if (el) savedScrollTop = el.scrollTop
-})
+useScrollMemory(() => virtualScrollerRef.value?.containerRef)
 
 function playAll() {
   if (favorites.favoriteTracks.length > 0) {
