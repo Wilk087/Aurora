@@ -191,7 +191,7 @@ interface Window {
     generateWaveform: (trackPath: string) => Promise<number[]>
     generateWaveformSubsonic: (songId: string) => Promise<number[]>
     // Artist info
-    getArtistInfo: (artistName: string) => Promise<ArtistInfo | null>
+    getArtistInfo: (artistName: string, forceRefresh?: boolean) => Promise<ArtistInfo | null>
     // Folder structure
     getFolderTree: (folderPath: string) => Promise<FolderEntry[]>
     // Scrobbling
