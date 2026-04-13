@@ -102,7 +102,7 @@
         <template v-if="pluginAlbumContextMenuItems.length">
           <div class="border-t border-[var(--border)] my-1" />
           <template v-for="(item, idx) in pluginAlbumContextMenuItems" :key="item.label">
-            <div v-if="item.separator" class="border-t border-[var(--border)] my-1" />
+            <div v-if="item.separator && idx > 0" class="border-t border-[var(--border)] my-1" />
             <!-- Item with children — hover submenu via Teleport -->
             <div
               v-if="item.children && item.children.length"
@@ -209,7 +209,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { menuPosition } from '@/utils/menuPosition'
+import { menuPosition, subMenuPosition } from '@/utils/menuPosition'
 import { usePlayerStore } from '@/stores/player'
 import { usePlaylistStore } from '@/stores/playlist'
 import { useToast } from '@/composables/useToast'
@@ -290,12 +290,7 @@ function togglePlaylistSub() {
   if (showPlaylistSub.value) { showPlaylistSub.value = false; return }
   if (playlistBtnRef.value) {
     const rect = playlistBtnRef.value.getBoundingClientRect()
-    const subW = 212
-    const spaceRight = window.innerWidth - rect.right
-    playlistSubStyle.value = {
-      top: Math.min(rect.top, window.innerHeight - 270) + 'px',
-      left: (spaceRight >= subW ? rect.right + 4 : rect.left - subW) + 'px',
-    }
+    playlistSubStyle.value = subMenuPosition(rect, 212, 270)
   }
   showPlaylistSub.value = true
 }
@@ -327,12 +322,7 @@ function showPluginSub(idx: number, el: HTMLElement) {
   if (pluginSubHideTimer) { clearTimeout(pluginSubHideTimer); pluginSubHideTimer = null }
   openPluginSubmenu.value = idx
   const rect = el.getBoundingClientRect()
-  const subW = 212
-  const spaceRight = window.innerWidth - rect.right
-  pluginSubStyle.value = {
-    top: Math.min(rect.top, window.innerHeight - 260) + 'px',
-    left: (spaceRight >= subW ? rect.right + 4 : rect.left - subW) + 'px',
-  }
+  pluginSubStyle.value = subMenuPosition(rect, 212)
 }
 
 function scheduleHidePluginSub() {

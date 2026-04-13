@@ -262,7 +262,7 @@
         <template v-if="pluginContextMenuItems.length">
           <div class="border-t border-[var(--border)] my-1" />
           <template v-for="(item, idx) in pluginContextMenuItems" :key="item.label">
-            <div v-if="item.separator" class="border-t border-[var(--border)] my-1" />
+            <div v-if="item.separator && idx > 0" class="border-t border-[var(--border)] my-1" />
             <!-- Item with children — hover submenu via Teleport (bounds-aware) -->
             <div
               v-if="item.children && item.children.length"
@@ -464,7 +464,7 @@ import { usePlaylistStore } from '@/stores/playlist'
 import { useLibraryStore } from '@/stores/library'
 import { useToast } from '@/composables/useToast'
 import { useFavoritesStore } from '@/stores/favorites'
-import { menuPosition } from '@/utils/menuPosition'
+import { menuPosition, subMenuPosition } from '@/utils/menuPosition'
 import { formatTime } from '@/utils/formatTime'
 import ArtistLinks from '@/components/ArtistLinks.vue'
 import { pluginContextMenuItems } from '@/plugins/api'
@@ -500,7 +500,7 @@ const showNewInput = ref(false)
 const newName = ref('')
 const plusBtnRef = ref<HTMLElement>()
 const newInputRef = ref<HTMLInputElement>()
-const menuPos = ref({ top: 0, left: 0 })
+const menuPos = ref<Record<string, string>>({})
 
 // Context menu state
 const showCtx = ref(false)
@@ -511,19 +511,23 @@ const ctxStyle = computed(() => ({
   ...ctxPos.value,
 }))
 
-const menuStyle = computed(() => ({
-  top: menuPos.value.top + 'px',
-  left: menuPos.value.left + 'px',
-}))
+const menuStyle = computed(() => menuPos.value)
 
 function openMenu() {
   if (showMenu.value) { showMenu.value = false; return }
   const btn = plusBtnRef.value
   if (btn) {
     const rect = btn.getBoundingClientRect()
-    menuPos.value = {
-      top: Math.min(rect.bottom + 4, window.innerHeight - 280),
-      left: Math.min(rect.right - 224, window.innerWidth - 240),
+    const vh = window.innerHeight
+    const vw = window.innerWidth
+    const margin = 6
+    const estH = 280
+    const left = Math.max(margin, Math.min(rect.right - 224, vw - 240))
+    const spaceBelow = vh - rect.bottom - margin
+    if (spaceBelow >= estH || spaceBelow >= rect.top - margin) {
+      menuPos.value = { top: (rect.bottom + 4) + 'px', left: left + 'px', maxHeight: Math.max(60, spaceBelow) + 'px', overflowY: 'auto' }
+    } else {
+      menuPos.value = { bottom: Math.max(margin, vh - rect.top + 4) + 'px', left: left + 'px', maxHeight: Math.max(60, rect.top - margin) + 'px', overflowY: 'auto' }
     }
   }
   showNewInput.value = false
@@ -653,12 +657,7 @@ function showPluginSub(idx: number, el: HTMLElement) {
   if (pluginSubHideTimer) { clearTimeout(pluginSubHideTimer); pluginSubHideTimer = null }
   openPluginSubmenu.value = idx
   const rect = el.getBoundingClientRect()
-  const subW = 212
-  const spaceRight = window.innerWidth - rect.right
-  pluginSubStyle.value = {
-    top: Math.min(rect.top, window.innerHeight - 260) + 'px',
-    left: (spaceRight >= subW ? rect.right + 4 : rect.left - subW) + 'px',
-  }
+  pluginSubStyle.value = subMenuPosition(rect, 212)
 }
 
 function scheduleHidePluginSub() {
