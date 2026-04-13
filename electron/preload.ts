@@ -332,4 +332,10 @@ contextBridge.exposeInMainWorld('api', {
     input.click()
   }),
   setPlaylistCustomImage: (id: string, imagePath: string | null): Promise<any> => ipcRenderer.invoke('playlists:set-custom-image', id, imagePath),
+
+  // Plugin HTTP helper — use instead of fetch() to avoid renderer CORS blocks.
+  // Returns { ok, status, text }; parse JSON yourself with JSON.parse(result.text).
+  netFetch: (url: string, options?: { method?: string; headers?: Record<string, string>; body?: string }):
+    Promise<{ ok: boolean; status: number; text: string }> =>
+    ipcRenderer.invoke('net:fetch', url, options),
 })

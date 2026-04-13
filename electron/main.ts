@@ -485,7 +485,16 @@ async function loadSettings(): Promise<any> {
   }
 }
 
-async function saveSettings(settings: any): Promise<void> {
+// Serialise all settings writes — concurrent settings:merge calls share the
+// same .tmp filename, so without a queue the second rename hits ENOENT.
+let _settingsSaveQueue: Promise<void> = Promise.resolve()
+
+function saveSettings(settings: any): Promise<void> {
+  _settingsSaveQueue = _settingsSaveQueue.then(() => _doSaveSettings(settings))
+  return _settingsSaveQueue
+}
+
+async function _doSaveSettings(settings: any): Promise<void> {
   const tmp = settingsPath + '.tmp'
   const data = JSON.stringify(settings, null, 2)
   // Write to a temp file first, then atomically rename so a crash mid-write
@@ -1475,6 +1484,22 @@ app.whenReady().then(async () => {
       const { shell } = await import('electron')
       await shell.openExternal(url)
     }
+  })
+
+  // ── IPC: Plugin-safe HTTP fetch (bypasses renderer CORS restrictions) ──
+  // Plugins call window.api.netFetch(url, options) instead of fetch() to avoid
+  // CORS blocks — requests go through Electron's net module in the main process.
+  ipcMain.handle('net:fetch', async (_, url: string, options?: {
+    method?: string
+    headers?: Record<string, string>
+    body?: string
+  }) => {
+    if (!url.startsWith('https://') && !url.startsWith('http://')) {
+      throw new Error('net:fetch only supports http/https URLs')
+    }
+    const resp = await net.fetch(url, options as RequestInit)
+    const text = await resp.text()
+    return { ok: resp.ok, status: resp.status, text }
   })
 
   // ── IPC: Favorites ──
