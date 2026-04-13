@@ -7,7 +7,7 @@
         <!-- Sort dropdown -->
         <div class="relative" ref="sortBtnRef">
           <button
-            @click.stop="showSortMenu = !showSortMenu"
+            @click.stop="toggleSortMenu"
             class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/[0.06] text-white/60 hover:text-white hover:bg-white/[0.1] transition-colors text-sm font-medium"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -306,11 +306,15 @@ const sortOptions: { label: string; value: PlaylistSortOrder }[] = [
   { label: 'Song Count', value: 'tracks' },
 ]
 const sortLabel = computed(() => sortOptions.find(o => o.value === playlistStore.playlistSortOrder)?.label || 'Sort')
-const sortMenuStyle = computed(() => {
-  if (!sortBtnRef.value) return {}
-  const rect = sortBtnRef.value.getBoundingClientRect()
-  return { top: (rect.bottom + 4) + 'px', left: Math.min(rect.left, window.innerWidth - 200) + 'px' }
-})
+const sortMenuStyle = ref<Record<string, string>>({})
+
+function toggleSortMenu() {
+  if (!showSortMenu.value && sortBtnRef.value) {
+    const rect = sortBtnRef.value.getBoundingClientRect()
+    sortMenuStyle.value = { top: (rect.bottom + 4) + 'px', left: Math.min(rect.left, window.innerWidth - 200) + 'px' }
+  }
+  showSortMenu.value = !showSortMenu.value
+}
 function setSort(order: PlaylistSortOrder) {
   playlistStore.playlistSortOrder = order
   showSortMenu.value = false

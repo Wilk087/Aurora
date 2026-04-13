@@ -22,7 +22,7 @@
         <!-- View options dropdown -->
       <div class="relative" ref="sortDropdownRef">
         <button
-          @click.stop="showSortMenu = !showSortMenu"
+          @click.stop="toggleSortMenu"
           class="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 hover:bg-white/[0.15] text-sm text-white/70 hover:text-white transition-all border border-white/[0.08]"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -243,14 +243,18 @@ function openAlbumTagMenu(albumId: string, event: MouseEvent) {
 const showSortMenu = ref(false)
 const sortDropdownRef = ref<HTMLElement | null>(null)
 const viewRoot = ref<HTMLElement | null>(null)
-const sortMenuStyle = computed(() => {
-  if (!sortDropdownRef.value) return {}
-  const rect = sortDropdownRef.value.getBoundingClientRect()
-  return {
-    top: `${rect.bottom + 4}px`,
-    left: `${Math.min(rect.left, window.innerWidth - 336)}px`,
+const sortMenuStyle = ref<Record<string, string>>({})
+
+function toggleSortMenu() {
+  if (!showSortMenu.value && sortDropdownRef.value) {
+    const rect = sortDropdownRef.value.getBoundingClientRect()
+    sortMenuStyle.value = {
+      top: `${rect.bottom + 4}px`,
+      left: `${Math.min(rect.left, window.innerWidth - 336)}px`,
+    }
   }
-})
+  showSortMenu.value = !showSortMenu.value
+}
 
 // ── Scroll memory ────────────────────────
 let savedScrollTop = 0
