@@ -72,27 +72,16 @@
               </button>
 
               <!-- Value: tag autocomplete -->
-              <div v-if="rule.field === 'tag'" class="flex-1 min-w-0 relative">
+              <div v-if="rule.field === 'tag'" class="flex-1 min-w-0">
                 <input
                   v-model="rule.value"
-                  @focus="openTagPicker(i)"
-                  @input="openTagPicker(i)"
+                  @focus="e => openTagPicker(i, e.currentTarget as HTMLElement)"
+                  @input="e => openTagPicker(i, e.currentTarget as HTMLElement)"
                   @blur="closeTagPicker"
                   placeholder="tag name"
                   type="text"
                   class="w-full px-2.5 py-1.5 rounded-lg bg-white/[0.06] border border-white/[0.06] text-sm text-white/70 placeholder:text-white/20 outline-none focus:border-accent/30 transition-colors"
                 />
-                <div
-                  v-if="tagPickerOpenIndex === i && tagOptionsFor(rule.value).length > 0"
-                  class="absolute top-full left-0 right-0 mt-1 rounded-xl menu-panel py-1 shadow-2xl z-[110] max-h-44 overflow-y-auto"
-                >
-                  <button
-                    v-for="t in tagOptionsFor(rule.value)"
-                    :key="t"
-                    @mousedown.prevent="selectTagValue(i, t)"
-                    class="ctx-item w-full px-3 py-1.5 text-left text-sm transition-colors"
-                  >{{ t }}</button>
-                </div>
               </div>
 
               <!-- Value: numeric/text -->
@@ -212,6 +201,20 @@
         </svg>
       </button>
     </div>
+
+    <!-- ── Tag autocomplete (Teleported) ── -->
+    <div
+      v-if="tagPickerOpenIndex !== null && tagOptionsFor(rules[tagPickerOpenIndex]?.value ?? '').length > 0"
+      class="fixed z-[102] rounded-xl menu-panel py-1 shadow-2xl overflow-y-auto"
+      :style="tagDropdownStyle"
+    >
+      <button
+        v-for="t in tagOptionsFor(rules[tagPickerOpenIndex!]?.value ?? '')"
+        :key="t"
+        @mousedown.prevent="selectTagValue(tagPickerOpenIndex!, t)"
+        class="ctx-item w-full px-3 py-1.5 text-left text-sm transition-colors"
+      >{{ t }}</button>
+    </div>
   </Teleport>
 </template>
 
@@ -241,6 +244,7 @@ const rules = ref<SmartPlaylistRule[]>([
   { field: 'genre', operator: 'is', value: '', value2: '' },
 ])
 const tagPickerOpenIndex = ref<number | null>(null)
+const tagDropdownStyle = ref<Record<string, string>>({})
 
 // ── Custom dropdown state ─────────────────────────────────────────────────
 type DropdownKind = 'field' | 'op'
@@ -388,10 +392,32 @@ function addRule() {
 }
 
 // ── Tag autocomplete ──────────────────────────────────────────────────────
-function openTagPicker(index: number) {
+function openTagPicker(index: number, el: HTMLElement) {
   openField.value = null
   openOp.value = null
   tagPickerOpenIndex.value = index
+
+  const rect = el.getBoundingClientRect()
+  const vh = window.innerHeight
+  const spaceBelow = vh - rect.bottom - 8
+  const spaceAbove = rect.top - 8
+  const maxH = 176 // max-h-44
+
+  if (spaceBelow >= Math.min(maxH, 80) || spaceBelow >= spaceAbove) {
+    tagDropdownStyle.value = {
+      top: (rect.bottom + 4) + 'px',
+      left: rect.left + 'px',
+      width: rect.width + 'px',
+      maxHeight: Math.min(spaceBelow, maxH) + 'px',
+    }
+  } else {
+    tagDropdownStyle.value = {
+      bottom: (vh - rect.top + 4) + 'px',
+      left: rect.left + 'px',
+      width: rect.width + 'px',
+      maxHeight: Math.min(spaceAbove, maxH) + 'px',
+    }
+  }
 }
 
 function closeTagPicker() {
