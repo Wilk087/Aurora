@@ -486,13 +486,16 @@ async function loadSettings(): Promise<any> {
 }
 
 async function saveSettings(settings: any): Promise<void> {
-  // Write a backup of the previous settings before overwriting
+  const tmp = settingsPath + '.tmp'
+  const data = JSON.stringify(settings, null, 2)
+  // Write to a temp file first, then atomically rename so a crash mid-write
+  // never leaves a partial/corrupt settings.json
+  await writeFile(tmp, data)
+  // Snapshot the previous good file as a backup before replacing it
   if (existsSync(settingsPath)) {
-    try {
-      await writeFile(settingsPath + '.bak', await readFile(settingsPath, 'utf-8'))
-    } catch {}
+    try { await writeFile(settingsPath + '.bak', await readFile(settingsPath, 'utf-8')) } catch {}
   }
-  await writeFile(settingsPath, JSON.stringify(settings, null, 2))
+  await rename(tmp, settingsPath)
   scheduleAutoExport()
 }
 
@@ -2789,8 +2792,26 @@ app.whenReady().then(async () => {
   const pluginsDir = join(dataPath, 'plugins')
   const pluginSettingsDir = join(dataPath, 'plugin-settings')
 
-  // Map from manifest id → actual folder name on disk
+  // Map from manifest id → relative path from pluginsDir to the actual plugin root (for file reads)
   const pluginFolderMap = new Map<string, string>()
+  // Map from manifest id → top-level entry name in pluginsDir (for removal)
+  const pluginTopLevelMap = new Map<string, string>()
+
+  /** Recursively find the directory containing manifest.json within searchDir.
+   *  Returns the absolute path to that directory, or null if not found. */
+  async function findPluginRoot(searchDir: string, depth = 0): Promise<string | null> {
+    if (depth > 5) return null // guard against deeply nested or circular structures
+    if (existsSync(join(searchDir, 'manifest.json'))) return searchDir
+    try {
+      const subEntries = await readdir(searchDir, { withFileTypes: true })
+      for (const sub of subEntries) {
+        if (!sub.isDirectory()) continue
+        const found = await findPluginRoot(join(searchDir, sub.name), depth + 1)
+        if (found) return found
+      }
+    } catch {}
+    return null
+  }
 
   ipcMain.handle('plugins:get-all', async () => {
     try {
@@ -2798,18 +2819,21 @@ app.whenReady().then(async () => {
       const entries = await readdir(pluginsDir, { withFileTypes: true })
       const manifests: any[] = []
       pluginFolderMap.clear()
+      pluginTopLevelMap.clear()
       for (const entry of entries) {
         if (!entry.isDirectory()) continue
-        const manifestPath = join(pluginsDir, entry.name, 'manifest.json')
         try {
-          if (existsSync(manifestPath)) {
-            const raw = await readFile(manifestPath, 'utf-8')
-            const manifest = JSON.parse(raw)
-            // Store the mapping so read-file / remove can find the folder
-            pluginFolderMap.set(manifest.id, entry.name)
-            manifest._folderName = entry.name
-            manifests.push(manifest)
-          }
+          const rootAbs = await findPluginRoot(join(pluginsDir, entry.name))
+          if (!rootAbs) continue
+          const raw = await readFile(join(rootAbs, 'manifest.json'), 'utf-8')
+          const manifest = JSON.parse(raw)
+          // Relative path from pluginsDir → used by read-file
+          const relRoot = rootAbs.slice(pluginsDir.length + 1) // e.g. "my-plugin" or "my-plugin/inner"
+          pluginFolderMap.set(manifest.id, relRoot)
+          // Top-level folder → used by remove
+          pluginTopLevelMap.set(manifest.id, entry.name)
+          manifest._folderName = relRoot
+          manifests.push(manifest)
         } catch {}
       }
       return manifests
@@ -2844,11 +2868,12 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('plugins:remove', async (_, pluginId: string) => {
-    // Resolve actual folder name from the map (falls back to pluginId)
-    const folderName = pluginFolderMap.get(pluginId) || pluginId
-    const pluginDir = join(pluginsDir, folderName)
+    // Use the top-level folder so we remove the whole entry (even if manifest was nested)
+    const topLevel = pluginTopLevelMap.get(pluginId) || pluginFolderMap.get(pluginId) || pluginId
+    const pluginDir = join(pluginsDir, topLevel)
     try { await rm(pluginDir, { recursive: true, force: true }) } catch {}
     pluginFolderMap.delete(pluginId)
+    pluginTopLevelMap.delete(pluginId)
     // Also remove settings
     const settingsFile = join(pluginSettingsDir, `${pluginId}.json`)
     try { await rm(settingsFile) } catch {}
