@@ -14,9 +14,9 @@ Aurora Player is a local music player for Linux and Windows, built with Electron
 |-------------|---------------|
 | ![Artist page](docs/images/artistpage.png) | ![Lyrics sync](docs/images/lyricssync.png) |
 
-| Queue |
+| Search |
 |-------|
-| ![Queue panel](docs/images/queue.png) |
+| ![Search Page](docs/images/search.png) |
 
 ## Features
 
@@ -24,8 +24,10 @@ Aurora Player is a local music player for Linux and Windows, built with Electron
 
 - Scan local folders for audio files (MP3, FLAC, OGG, WAV, M4A, AAC, OPUS, WMA)
 - Browse by songs, albums, artists, years, or folder structure
-- Detailed artist pages with bio, images, tags, active years, and country info
-- Real-time search across songs and albums
+- Detailed artist pages with bio, images, similar artists, active years, and country info
+- Tag-based filtering - apply custom tags to tracks and albums, filter views by tag
+- Auto-tagging for soundtracks and singles; separate soundtrack/singles library sections
+- Real-time search across songs and albums with a dedicated search view
 - Sort songs by title, artist, album, year, and duration
 - Sort albums by name, artist, year, and track count
 - Virtual scrolling for large libraries
@@ -34,6 +36,7 @@ Aurora Player is a local music player for Linux and Windows, built with Electron
 
 - Queue with play next, play later, shuffle, and repeat modes (off, all, one)
 - Waveform progress bar
+- Crossfade between tracks with adjustable duration
 - Audio output device selection
 - Volume normalization (dynamics compressor)
 - Drag-and-drop queue reordering
@@ -43,6 +46,8 @@ Aurora Player is a local music player for Linux and Windows, built with Electron
 ### Playlists and favorites
 
 - Create, rename, delete, and reorder playlists
+- Custom cover images for playlists
+- Import playlists from M3U files
 - Smart playlists with rule-based auto-population (genre, year, artist, album, title, BPM, etc.)
 - Mark songs as favorites with inline heart buttons
 - Multi-select with Ctrl+Click, Shift+Click, and Ctrl+A for bulk actions
@@ -59,8 +64,10 @@ Aurora Player is a local music player for Linux and Windows, built with Electron
 ### Lyrics
 
 - Automatic loading of local .lrc files alongside audio files
-- Online lyrics fetching via LRCLIB
+- Online lyrics fetching via LRCLIB with auto-save
+- Manual lyrics search from within the app
 - Synced lyrics display with manual time offset adjustment
+- Enhanced LRC support (word-level timestamps)
 - Built-in LRC syncer tool for creating lyrics from scratch
 
 ### Integrations
@@ -69,21 +76,23 @@ Aurora Player is a local music player for Linux and Windows, built with Electron
 - Last.fm and ListenBrainz scrobbling
 - Navidrome / Subsonic server streaming
 - MPRIS D-Bus integration on Linux (media keys, desktop controls)
+- Automatic Wayland / X11 display server detection on Linux
 - Remote control via LAN (mobile access with PIN-based authentication)
+- File association - open audio files directly with Aurora Player
 
 ### Theming
 
 - JSON-based theme system with full colour, glass, scrollbar, slider, and font overrides
 - Light and dark theme support via base colour axis inversion
 - Custom CSS injection on top of any theme
-- Hot-reload — themes are detected automatically when dropped into the themes folder
+- Hot-reload - themes are detected automatically when dropped into the themes folder
 - See [docs/themes.md](docs/themes.md) for the full format reference
 
 ### Plugins
 
 - JavaScript plugin system with lifecycle hooks (track change, play, pause, queue, seek, etc.)
 - Plugin API for controlling playback, library, playlists, favorites, themes, and UI
-- Settings schema — plugins declare typed settings and Aurora auto-renders the UI controls
+- Settings schema - plugins declare typed settings and Aurora auto-renders the UI controls
 - Sidebar items, player bar slots, and fullscreen slots for injecting custom UI
 - Per-plugin persistent key-value storage
 - Optional CSS injection for plugin-specific styles
@@ -92,6 +101,8 @@ Aurora Player is a local music player for Linux and Windows, built with Electron
 ### Other
 
 - First-time setup wizard
+- Aurora Stats - listening statistics with charts and artist breakdowns
+- Library sync - mirror playlists and favorites across machines via a shared folder, with auto-push/pull
 - Export and import settings, favorites, and playlists as a backup file
 - Context menus for songs, albums, and playlists
 - Cache management (covers, artist images, waveform data, animated covers)
@@ -191,12 +202,12 @@ Built packages are written to the `release/` directory.
 
 ## Documentation
 
-- [Themes](docs/themes.md) — theme format, CSS variable reference, and light/dark theme guide
-- [Plugins](docs/plugins.md) — plugin structure, manifest format, lifecycle hooks, and full API reference
-- [Example theme (Nord Dark)](docs/example-theme.json) — dark theme example
-- [Example theme (Aurora Light)](docs/example-light-theme.json) — light theme example
-- [Example plugin (Now Playing Logger)](docs/example-plugin/) — beginner plugin with sidebar items, toasts, and settings
-- [Example plugin (Quality Badge)](docs/example-quality-badge-plugin/) — intermediate plugin with IPC calls, player-bar/immersive slots, and DOM observers
+- [Themes](docs/themes.md) - theme format, CSS variable reference, and light/dark theme guide
+- [Plugins](docs/plugins.md) - plugin structure, manifest format, lifecycle hooks, and full API reference
+- [Example theme (Nord Dark)](docs/example-theme.json) - dark theme example
+- [Example theme (Aurora Light)](docs/example-light-theme.json) - light theme example
+- [Example plugin (Now Playing Logger)](docs/example-plugin/) - beginner plugin with sidebar items, toasts, and settings
+- [Example plugin (Quality Badge)](docs/example-quality-badge-plugin/) - intermediate plugin with IPC calls, player-bar/immersive slots, and DOM observers
 
 ## Project structure
 
@@ -221,7 +232,7 @@ build/             App icons (PNG, ICO)
 
 ## Tech stack
 
-- Electron 28
+- Electron 33
 - Vue 3.4 (Composition API)
 - Pinia 2.1
 - Vue Router 4

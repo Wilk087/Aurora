@@ -192,17 +192,21 @@ Control and query playback state.
 | `addToQueue(tracks)` | `void` | Append tracks to the end of the queue |
 | `playNext(tracks)` | `void` | Insert tracks after the current track |
 | `playLater(tracks)` | `void` | Append tracks to the end of the queue |
+| `registerUrlResolver(fn)` | `void` | Register a function `(track) => Promise<string \| null>` that resolves a playback URL for a track (e.g. for remote/streaming sources) |
+| `unregisterUrlResolver(fn)` | `void` | Remove a previously registered URL resolver |
 
 ### aurora.library
 
-Access the music library (read-only).
+Access the music library.
 
-| Property | Type | Description |
+| Property / Method | Type | Description |
 |---|---|---|
 | `tracks` | `object[]` | All tracks in the library |
 | `albums` | `object[]` | All albums |
 | `artists` | `object[]` | All artists |
 | `searchQuery` | `string` | Get/set the current search query |
+| `addTracks(tracks)` | `void` | Inject plugin-provided virtual tracks into the library |
+| `removeTracks(trackIds)` | `void` | Remove previously injected plugin tracks by ID |
 
 ### aurora.playlists
 
@@ -226,6 +230,31 @@ Manage favorites.
 | `ids` | `Set<string>` | Set of favorite track IDs |
 | `isFavorite(trackId)` | `boolean` | Check if a track is favorited |
 | `toggle(trackId)` | `void` | Toggle favorite status |
+
+### aurora.tags
+
+Read and write the tag system. Tags can be applied to individual tracks or whole albums and are used in the library for filtering.
+
+| Method | Type | Description |
+|---|---|---|
+| `all` | `string[]` | All tags defined in the library |
+| `getTrack(trackId)` | `string[]` | Get tags for a single track |
+| `getAlbum(albumKey)` | `string[]` | Get tags for an album |
+| `albumKey(albumName, albumArtist)` | `string` | Compute the canonical key used to identify an album in the tag store |
+| `setTrack(ids, values)` | `Promise<void>` | Replace the tags on one or more tracks |
+| `setAlbum(albumKeys, values)` | `Promise<void>` | Replace the tags on one or more albums |
+| `addTrack(ids, values)` | `Promise<void>` | Add tags to one or more tracks (non-destructive) |
+| `addAlbum(albumKeys, values)` | `Promise<void>` | Add tags to one or more albums (non-destructive) |
+| `removeTrack(ids, values)` | `Promise<void>` | Remove specific tags from one or more tracks |
+| `removeAlbum(albumKeys, values)` | `Promise<void>` | Remove specific tags from one or more albums |
+
+```javascript
+// Tag the current track
+exports.onTrackChange = async function (track) {
+  const key = aurora.tags.albumKey(track.album, track.artist)
+  await aurora.tags.addTrack([track.id], ['plugin-processed'])
+}
+```
 
 ### aurora.theme
 
@@ -306,6 +335,8 @@ Access, fetch, parse, and save lyrics for any track.
 | `save(trackPath, lrcContent)` | `Promise<void>` | Save an LRC string to disk next to the audio file |
 | `parse(lrcContent)` | `LyricLine[]` | Parse raw LRC content into `[{ time, text }, ...]` (sorted by time) |
 | `findCurrentLine(lyrics, time)` | `number` | Given parsed lyrics and a time in seconds, return the index of the active line (−1 if before the first line) |
+| `findCurrentWord(line, time)` | `number` | Given a parsed line's words array and a time in seconds, return the index of the active word (enhanced LRC only) |
+| `isEnhancedLrc(content)` | `boolean` | Returns true if the LRC string contains word-level (enhanced) timestamps |
 | `offset` | `number` | Current lyrics timing offset in seconds (positive = lyrics appear earlier) |
 | `setOffset(seconds)` | `void` | Set the lyrics timing offset (persisted to settings) |
 | `getCurrentTrackLyrics()` | `Promise<object \| null>` | Convenience method — returns `{ synced, lines, raw }` for the playing track, or `null` |
@@ -386,6 +417,8 @@ Interact with the UI.
 | `getPlayerBarSlot(position?)` | Get a DOM element slot in the player bar (`'left'` or `'right'`, default `'right'`) |
 | `getImmersiveSlot(position?)` | Get a DOM slot in the fullscreen view (`'right'` or `'modern-right'`) |
 | `getImmersiveSettingsSlot()` | Get a DOM slot in the fullscreen settings panel |
+| `getAlbumDetailSlot()` | Get a DOM slot in the album detail page header (next to Play / Add to Queue). Has a `data-album-id` attribute that updates on navigation. Returns `null` when the page is not mounted. |
+| `getSearchSlot()` | Get a DOM slot at the bottom of the search results page. Has a `data-query` attribute kept in sync with the current query. Returns `null` when the search view is not mounted. |
 
 #### Sidebar items
 
@@ -552,6 +585,7 @@ Direct access to Electron IPC (advanced, unrestricted).
 |---|---|
 | `invoke(channel, ...args)` | Send an IPC invoke to the main process and await the result |
 | `send(channel, ...args)` | Send a one-way IPC message to the main process |
+| `on(channel, callback)` | Listen for events pushed from the main process on `channel`. Returns an unsubscribe function — call it in `onDeactivate`. |
 
 ### aurora.version
 
@@ -559,7 +593,7 @@ Direct access to Electron IPC (advanced, unrestricted).
 
 ## Lifecycle
 
-1. **Discovery** — Aurora scans the plugins directory for subfolders containing a `manifest.json`.
+1. **Discovery** — Aurora scans the plugins directory for subfolders containing a `manifest.json`. The search is recursive, so a plugin is found even if there is an extra wrapper directory between the top-level folder and the plugin files (e.g. when a ZIP is accidentally extracted into a subdirectory).
 2. **Enable** — When toggled on in Settings, the plugin's `main.js` is read from disk and executed via `new Function()`.
 3. **`onActivate()`** — Called immediately after the plugin code runs.
 4. **Hooks fire** — `onTrackChange`, `onPlay`, `onPause`, etc. fire as playback events occur.
