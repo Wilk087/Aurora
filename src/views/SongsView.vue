@@ -96,37 +96,37 @@
     </div>
 
     <!-- No search results -->
-    <div
+    <EmptyState
       v-if="library.searchQuery && filteredTracksByTag.length === 0"
-      class="flex flex-col items-center justify-center py-20"
+      title="No songs found"
+      :description="`No songs match &quot;${library.searchQuery}&quot;`"
     >
-      <svg class="w-16 h-16 text-white/[0.06] mb-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-        <circle cx="11" cy="11" r="8" />
-        <path d="M21 21l-4.35-4.35" />
-      </svg>
-      <h2 class="text-lg font-semibold text-white/60 mb-1">No songs found</h2>
-      <p class="text-sm text-white/30">No songs match "{{ library.searchQuery }}"</p>
-    </div>
+      <template #icon>
+        <svg class="w-16 h-16 text-white/[0.06]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+        </svg>
+      </template>
+    </EmptyState>
 
     <!-- Empty state -->
-    <div
+    <EmptyState
       v-if="library.tracks.length === 0 && !library.isScanning && !library.searchQuery"
-      class="flex flex-col items-center justify-center py-20"
+      title="No music yet"
+      description="Add a folder to start building your library"
+      large
     >
-      <svg class="w-20 h-20 text-white/[0.06] mb-6" fill="currentColor" viewBox="0 0 24 24">
-        <path
-          d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"
-        />
-      </svg>
-      <h2 class="text-xl font-semibold text-white/60 mb-2">No music yet</h2>
-      <p class="text-sm text-white/30 mb-6">Add a folder to start building your library</p>
+      <template #icon>
+        <svg class="w-20 h-20 text-white/[0.06]" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+        </svg>
+      </template>
       <button
         @click="library.addFolder()"
         class="px-6 py-2.5 bg-accent hover:bg-accent-hover rounded-full text-sm font-medium text-white transition-colors accent-glow"
       >
         Add Music Folder
       </button>
-    </div>
+    </EmptyState>
 
     <!-- Scanning indicator -->
     <div
@@ -209,6 +209,8 @@ import { useScrollMemory } from '@/composables/useScrollMemory'
 import { useLibraryStore, type SortOrder } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { useSelection } from '@/composables/useSelection'
+import EmptyState from '@/components/EmptyState.vue'
+import { useTagFilter } from '@/composables/useTagFilter'
 import { useTagsStore } from '@/stores/tags'
 import SongRow from '@/components/SongRow.vue'
 import VirtualScroller from '@/components/VirtualScroller.vue'
@@ -216,16 +218,8 @@ import SelectionBar from '@/components/SelectionBar.vue'
 
 const library = useLibraryStore()
 const player = usePlayerStore()
+const { tagSearch, activeTags: activeTrackTags, filteredTagOptions, toggleTag: toggleTrackTag } = useTagFilter()
 const tagsStore = useTagsStore()
-const activeTrackTags = ref<string[]>([])
-const tagSearch = ref('')
-
-const filteredTagOptions = computed(() => {
-  const q = tagSearch.value.toLowerCase().trim()
-  const source = tagsStore.visibleTags
-  if (!q) return source
-  return source.filter(tag => tag.includes(q))
-})
 
 const filteredTracksByTag = computed(() => {
   if (activeTrackTags.value.length === 0) return library.sortedTracks
@@ -234,14 +228,6 @@ const filteredTracksByTag = computed(() => {
     return activeTrackTags.value.some(tag => trackTags.includes(tag))
   })
 })
-
-function toggleTrackTag(tag: string) {
-  if (activeTrackTags.value.includes(tag)) {
-    activeTrackTags.value = activeTrackTags.value.filter(t => t !== tag)
-  } else {
-    activeTrackTags.value = [...activeTrackTags.value, tag]
-  }
-}
 
 const selection = useSelection(() => filteredTracksByTag.value)
 

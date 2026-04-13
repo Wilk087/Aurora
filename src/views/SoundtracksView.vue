@@ -32,17 +32,19 @@
     </div>
 
     <!-- Empty: no soundtrack tags at all -->
-    <div
+    <EmptyState
       v-if="!library.isScanning && library.libraryReady && soundtrackTaggedAlbums.length === 0"
-      class="flex flex-col items-center justify-center py-20"
+      title="No soundtracks yet"
+      description="Tag albums with soundtrack tags from Settings → Album Display."
+      large
     >
-      <svg class="w-20 h-20 text-white/[0.06] mb-6" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z" />
-      </svg>
-      <h2 class="text-xl font-semibold text-white/60 mb-2">No soundtracks yet</h2>
-      <p class="text-sm text-white/30 mb-2">Tag albums with soundtrack tags from Settings → Album Display.</p>
-      <p class="text-xs text-white/20">Right-click any album → Manage Tags</p>
-    </div>
+      <template #icon>
+        <svg class="w-20 h-20 text-white/[0.06]" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z" />
+        </svg>
+      </template>
+      <p class="text-xs text-white/20 -mt-4">Right-click any album → Manage Tags</p>
+    </EmptyState>
 
     <!-- No results for active tag filter -->
     <div
@@ -111,6 +113,7 @@ import { useLibraryStore } from '@/stores/library'
 import { useTagsStore } from '@/stores/tags'
 import { usePlayerStore } from '@/stores/player'
 import AlbumCard from '@/components/AlbumCard.vue'
+import EmptyState from '@/components/EmptyState.vue'
 
 const library = useLibraryStore()
 const tagsStore = useTagsStore()

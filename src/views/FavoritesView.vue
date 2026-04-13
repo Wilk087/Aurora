@@ -28,16 +28,18 @@
     </div>
 
     <!-- Empty state -->
-    <div
+    <EmptyState
       v-if="favorites.count === 0"
-      class="flex flex-col items-center justify-center py-20"
+      title="No favorites yet"
+      description='Right-click a song and choose "Add to Favorites"'
+      large
     >
-      <svg class="w-20 h-20 text-white/[0.06] mb-6" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
-      </svg>
-      <h2 class="text-xl font-semibold text-white/60 mb-2">No favorites yet</h2>
-      <p class="text-sm text-white/30">Right-click a song and choose "Add to Favorites"</p>
-    </div>
+      <template #icon>
+        <svg class="w-20 h-20 text-white/[0.06]" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+        </svg>
+      </template>
+    </EmptyState>
 
     <!-- Song list -->
     <div v-if="favorites.count > 0" class="flex flex-col flex-1 min-h-0">
@@ -99,6 +101,7 @@ import { useSelection } from '@/composables/useSelection'
 import SongRow from '@/components/SongRow.vue'
 import SelectionBar from '@/components/SelectionBar.vue'
 import VirtualScroller from '@/components/VirtualScroller.vue'
+import EmptyState from '@/components/EmptyState.vue'
 
 const favorites = useFavoritesStore()
 const player = usePlayerStore()

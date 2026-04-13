@@ -10,35 +10,37 @@
     </div>
 
     <!-- No search results -->
-    <div
+    <EmptyState
       v-if="library.searchQuery && filteredArtists.length === 0"
-      class="flex flex-col items-center justify-center py-20"
+      title="No artists found"
+      :description="`No artists match &quot;${library.searchQuery}&quot;`"
     >
-      <svg class="w-16 h-16 text-white/[0.06] mb-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-        <circle cx="11" cy="11" r="8" />
-        <path d="M21 21l-4.35-4.35" />
-      </svg>
-      <h2 class="text-lg font-semibold text-white/60 mb-1">No artists found</h2>
-      <p class="text-sm text-white/30">No artists match "{{ library.searchQuery }}"</p>
-    </div>
+      <template #icon>
+        <svg class="w-16 h-16 text-white/[0.06]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+        </svg>
+      </template>
+    </EmptyState>
 
     <!-- Empty state -->
-    <div
+    <EmptyState
       v-else-if="library.artists.length === 0 && !library.isScanning"
-      class="flex flex-col items-center justify-center py-20"
+      title="No artists yet"
+      description="Add a music folder to see your artists"
+      large
     >
-      <svg class="w-20 h-20 text-white/[0.06] mb-6" fill="currentColor" viewBox="0 0 24 24">
-        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-      </svg>
-      <h2 class="text-xl font-semibold text-white/60 mb-2">No artists yet</h2>
-      <p class="text-sm text-white/30 mb-6">Add a music folder to see your artists</p>
+      <template #icon>
+        <svg class="w-20 h-20 text-white/[0.06]" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+        </svg>
+      </template>
       <button
         @click="library.addFolder()"
         class="px-6 py-2.5 bg-accent hover:bg-accent-hover rounded-full text-sm font-medium text-white transition-colors accent-glow"
       >
         Add Music Folder
       </button>
-    </div>
+    </EmptyState>
 
     <!-- Loading skeleton -->
     <div v-else-if="!library.libraryReady" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
@@ -110,6 +112,7 @@ import { useRouter } from 'vue-router'
 import { useScrollMemory } from '@/composables/useScrollMemory'
 import { useLibraryStore, type Artist } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
+import EmptyState from '@/components/EmptyState.vue'
 
 const library = useLibraryStore()
 const player = usePlayerStore()

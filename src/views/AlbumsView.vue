@@ -95,37 +95,37 @@
     </div>
 
     <!-- No search results -->
-    <div
+    <EmptyState
       v-if="library.searchQuery && filteredAlbumsByTag.length === 0"
-      class="flex flex-col items-center justify-center py-20"
+      title="No albums found"
+      :description="`No albums match &quot;${library.searchQuery}&quot;`"
     >
-      <svg class="w-16 h-16 text-white/[0.06] mb-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-        <circle cx="11" cy="11" r="8" />
-        <path d="M21 21l-4.35-4.35" />
-      </svg>
-      <h2 class="text-lg font-semibold text-white/60 mb-1">No albums found</h2>
-      <p class="text-sm text-white/30">No albums match "{{ library.searchQuery }}"</p>
-    </div>
+      <template #icon>
+        <svg class="w-16 h-16 text-white/[0.06]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+        </svg>
+      </template>
+    </EmptyState>
 
     <!-- Empty -->
-    <div
+    <EmptyState
       v-if="library.albums.length === 0 && !library.isScanning && !library.searchQuery"
-      class="flex flex-col items-center justify-center py-20"
+      title="No albums yet"
+      description="Add a music folder to see your albums"
+      large
     >
-      <svg class="w-20 h-20 text-white/[0.06] mb-6" fill="currentColor" viewBox="0 0 24 24">
-        <path
-          d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"
-        />
-      </svg>
-      <h2 class="text-xl font-semibold text-white/60 mb-2">No albums yet</h2>
-      <p class="text-sm text-white/30 mb-6">Add a music folder to see your albums</p>
+      <template #icon>
+        <svg class="w-20 h-20 text-white/[0.06]" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z" />
+        </svg>
+      </template>
       <button
         @click="library.addFolder()"
         class="px-6 py-2.5 bg-accent hover:bg-accent-hover rounded-full text-sm font-medium text-white transition-colors accent-glow"
       >
         Add Music Folder
       </button>
-    </div>
+    </EmptyState>
 
     <!-- Loading skeleton -->
     <div
@@ -188,22 +188,16 @@ import { useScrollMemory } from '@/composables/useScrollMemory'
 import { useLibraryStore, type AlbumSortOrder } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { useTagsStore } from '@/stores/tags'
+import { useTagFilter } from '@/composables/useTagFilter'
 import AlbumCard from '@/components/AlbumCard.vue'
+import EmptyState from '@/components/EmptyState.vue'
 
 const library = useLibraryStore()
 const player = usePlayerStore()
 const tagsStore = useTagsStore()
-const activeAlbumTags = ref<string[]>([])
-const tagSearch = ref('')
+const { tagSearch, activeTags: activeAlbumTags, filteredTagOptions, toggleTag: toggleAlbumTag } = useTagFilter()
 const openTagMenuAlbum = ref<string | null>(null)
 const tagMenuStyle = ref<Record<string, string>>({})
-
-const filteredTagOptions = computed(() => {
-  const q = tagSearch.value.toLowerCase().trim()
-  const source = tagsStore.visibleTags
-  if (!q) return source
-  return source.filter(tag => tag.includes(q))
-})
 
 const filteredAlbumsByTag = computed(() => {
   if (activeAlbumTags.value.length === 0) return library.filteredAlbums
@@ -213,14 +207,6 @@ const filteredAlbumsByTag = computed(() => {
     return activeAlbumTags.value.some(tag => albumTags.includes(tag))
   })
 })
-
-function toggleAlbumTag(tag: string) {
-  if (activeAlbumTags.value.includes(tag)) {
-    activeAlbumTags.value = activeAlbumTags.value.filter(t => t !== tag)
-  } else {
-    activeAlbumTags.value = [...activeAlbumTags.value, tag]
-  }
-}
 
 function getAlbumTags(album: { name: string; artist: string }): string[] {
   return tagsStore.getAlbumTags(`${album.name}---${album.artist}`)
