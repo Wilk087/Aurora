@@ -225,7 +225,9 @@ const filteredTracksByTag = computed(() => {
   if (activeTrackTags.value.length === 0) return library.sortedTracks
   return library.sortedTracks.filter(track => {
     const trackTags = tagsStore.getTrackTags(track.id)
-    return activeTrackTags.value.some(tag => trackTags.includes(tag))
+    const albumKey = `${track.album}---${track.albumArtist || track.artist}`
+    const albumTagList = tagsStore.getAlbumTags(albumKey)
+    return activeTrackTags.value.some(tag => trackTags.includes(tag) || albumTagList.includes(tag))
   })
 })
 

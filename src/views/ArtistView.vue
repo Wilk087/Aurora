@@ -300,8 +300,9 @@ const featuredTracks = computed(() => {
 })
 
 const allTracks = computed(() => {
-  if (!artist.value) return []
-  return artist.value.albums.flatMap(a => a.tracks)
+  // Use the same chronological order shown on the page (oldest → newest for playback,
+  // which is the reverse of the display order that shows newest first)
+  return [...albums.value].reverse().flatMap(a => a.tracks)
 })
 
 const allPlayableTracks = computed(() => [...allTracks.value, ...featuredTracks.value])
