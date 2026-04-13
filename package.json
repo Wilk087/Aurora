@@ -18,7 +18,8 @@
     "dist:deb": "npm run build && electron-builder --linux deb",
     "dist:rpm": "npm run build && electron-builder --linux rpm",
     "dist:win": "npm run build && electron-builder --win",
-    "dist:all": "npm run build && electron-builder --linux --win"
+    "dist:all": "npm run build && electron-builder --linux --win",
+    "dist:pac-win": "npm run build && electron-builder --linux pacman --win"
   },
   "build": {
     "appId": "com.wilk087.aurora-player",
