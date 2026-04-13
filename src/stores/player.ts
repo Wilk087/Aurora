@@ -391,7 +391,7 @@ export const usePlayerStore = defineStore('player', () => {
 
   // ── Crossfade ────────────────────────────────────────────────────────────
   const crossfadeEnabled = ref(false)
-  const crossfadeDuration = ref(5) // seconds
+  const crossfadeDuration = ref(1.5) // seconds
   let isCrossfading = false
   let cfNextTrack: Track | null = null
   let cfNextIndex = -1

@@ -466,18 +466,36 @@ async function forceFlush() {
 // ── Simple JSON persistence (settings only) ────────────────────────────────
 // ── Simple JSON persistence (settings only) ────────────────────────────────
 async function loadSettings(): Promise<any> {
+  const defaults = { volume: 0.8, folders: [] }
+  if (!existsSync(settingsPath)) return defaults
   try {
-    if (existsSync(settingsPath)) {
-      return JSON.parse(await readFile(settingsPath, 'utf-8'))
+    return JSON.parse(await readFile(settingsPath, 'utf-8'))
+  } catch (err) {
+    console.error('[settings] Failed to parse settings file, trying backup:', err)
+    // Try the backup written before each save
+    const backupPath = settingsPath + '.bak'
+    if (existsSync(backupPath)) {
+      try {
+        return JSON.parse(await readFile(backupPath, 'utf-8'))
+      } catch {
+        console.error('[settings] Backup also unreadable, using defaults')
+      }
     }
-  } catch {}
-  return { volume: 0.8, folders: [] }
+    return defaults
+  }
 }
 
 async function saveSettings(settings: any): Promise<void> {
+  // Write a backup of the previous settings before overwriting
+  if (existsSync(settingsPath)) {
+    try {
+      await writeFile(settingsPath + '.bak', await readFile(settingsPath, 'utf-8'))
+    } catch {}
+  }
   await writeFile(settingsPath, JSON.stringify(settings, null, 2))
   scheduleAutoExport()
 }
+
 
 async function mergeSettingsFile(partial: Record<string, any>): Promise<void> {
   const current = await loadSettings()

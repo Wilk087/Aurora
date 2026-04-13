@@ -113,67 +113,68 @@ export const useSyncStore = defineStore('sync', () => {
     syncing.value = true
     syncError.value = null
     try {
-      const result = await window.api.syncPull()
-      if (result.error) { syncError.value = result.error; return }
-      if (!result.data) return
-
-      const data: SyncData = result.data
       const state = await window.api.syncGetState()
-
-      // Skip if this is our own push
-      if (data.deviceId === state.deviceId) {
-        lastSynced.value = Date.now()
-        return
+      const result = await window.api.syncPull()
+      if (result.error) {
+        syncError.value = result.error
       }
 
-      const playlistStore = usePlaylistStore()
-      const favoritesStore = useFavoritesStore()
+      if (result.data) {
+        const data: SyncData = result.data
 
-      if (config.value.syncPlaylists && data.playlists) {
-        // Per-playlist last-write-wins merge
-        const merged = new Map(playlistStore.playlists.map(p => [p.id, p]))
-        for (const syncPl of data.playlists) {
-          const local = merged.get(syncPl.id)
-          if (!local || syncPl.updatedAt > local.updatedAt) {
-            merged.set(syncPl.id, syncPl)
+        // Skip non-stats merge if this is our own push.
+        if (data.deviceId !== state.deviceId) {
+          const playlistStore = usePlaylistStore()
+          const favoritesStore = useFavoritesStore()
+          const tagsStore = useTagsStore()
+
+          if (config.value.syncPlaylists && data.playlists) {
+            // Per-playlist last-write-wins merge
+            const merged = new Map(playlistStore.playlists.map(p => [p.id, p]))
+            for (const syncPl of data.playlists) {
+              const local = merged.get(syncPl.id)
+              if (!local || syncPl.updatedAt > local.updatedAt) {
+                merged.set(syncPl.id, syncPl)
+              }
+            }
+            // Apply tombstones
+            for (const tombstone of (data.deletedPlaylistIds ?? [])) {
+              const local = merged.get(tombstone.id)
+              if (local && tombstone.deletedAt > local.updatedAt) {
+                merged.delete(tombstone.id)
+              }
+            }
+            const finalPlaylists = Array.from(merged.values())
+            await window.api.syncApplyPlaylists(finalPlaylists)
+            playlistStore.playlists = finalPlaylists
+          }
+
+          if (config.value.syncFavorites && data.favoriteIds !== undefined && data.favoritesUpdatedAt) {
+            if (data.favoritesUpdatedAt > (state.favoritesUpdatedAt ?? 0)) {
+              await window.api.setFavorites(data.favoriteIds, data.favoriteMeta)
+              await favoritesStore.load()
+            }
+          }
+
+          if (config.value.syncTags && (data.trackTags || data.albumTags)) {
+            const local = await window.api.getTags()
+            const mergedTrackTags: Record<string, string[]> = { ...local.trackTags }
+            for (const [id, remoteTags] of Object.entries(data.trackTags ?? {})) {
+              const localTags = mergedTrackTags[id] ?? []
+              mergedTrackTags[id] = Array.from(new Set([...localTags, ...remoteTags]))
+            }
+            const mergedAlbumTags: Record<string, string[]> = { ...local.albumTags }
+            for (const [key, remoteTags] of Object.entries(data.albumTags ?? {})) {
+              const localTags = mergedAlbumTags[key] ?? []
+              mergedAlbumTags[key] = Array.from(new Set([...localTags, ...remoteTags]))
+            }
+            await window.api.applyTagsSync({ trackTags: mergedTrackTags, albumTags: mergedAlbumTags })
+            await tagsStore.load()
           }
         }
-        // Apply tombstones
-        for (const tombstone of (data.deletedPlaylistIds ?? [])) {
-          const local = merged.get(tombstone.id)
-          if (local && tombstone.deletedAt > local.updatedAt) {
-            merged.delete(tombstone.id)
-          }
-        }
-        const finalPlaylists = Array.from(merged.values())
-        await window.api.syncApplyPlaylists(finalPlaylists)
-        playlistStore.playlists = finalPlaylists
       }
 
-      if (config.value.syncFavorites && data.favoriteIds !== undefined && data.favoritesUpdatedAt) {
-        if (data.favoritesUpdatedAt > (state.favoritesUpdatedAt ?? 0)) {
-          await window.api.setFavorites(data.favoriteIds, data.favoriteMeta)
-          await favoritesStore.load()
-        }
-      }
-
-      if (config.value.syncTags && (data.trackTags || data.albumTags)) {
-        const local = await window.api.getTags()
-        const mergedTrackTags: Record<string, string[]> = { ...local.trackTags }
-        for (const [id, remoteTags] of Object.entries(data.trackTags ?? {})) {
-          const localTags = mergedTrackTags[id] ?? []
-          mergedTrackTags[id] = Array.from(new Set([...localTags, ...remoteTags]))
-        }
-        const mergedAlbumTags: Record<string, string[]> = { ...local.albumTags }
-        for (const [key, remoteTags] of Object.entries(data.albumTags ?? {})) {
-          const localTags = mergedAlbumTags[key] ?? []
-          mergedAlbumTags[key] = Array.from(new Set([...localTags, ...remoteTags]))
-        }
-        await window.api.applyTagsSync({ trackTags: mergedTrackTags, albumTags: mergedAlbumTags })
-        await tagsStore.load()
-      }
-
-      // Pull stats from all other devices
+      // Pull stats from all other devices independently of aurora-sync.json state.
       if (config.value.syncStats) {
         const remoteStats = await window.api.syncPullStats(state.deviceId)
         for (const { remoteDeviceId, events } of remoteStats) {
