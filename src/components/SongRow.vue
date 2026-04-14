@@ -650,7 +650,7 @@ async function showCredits() {
 }
 
 // ── Plugin submenus (Teleported, hover-intent with delay) ─────────────────
-const pluginSubStyle = ref({ top: '0px', left: '0px' })
+const pluginSubStyle = ref<Record<string, string>>({ top: '0px', left: '0px' })
 let pluginSubHideTimer: ReturnType<typeof setTimeout> | null = null
 
 function showPluginSub(idx: number, el: HTMLElement) {

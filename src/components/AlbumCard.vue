@@ -284,7 +284,7 @@ function openTagDialog() {
 // ── Playlist submenu (Teleported, bounds-aware) ───────────────────────────
 const showPlaylistSub = ref(false)
 const playlistBtnRef = ref<HTMLElement>()
-const playlistSubStyle = ref({ top: '0px', left: '0px' })
+const playlistSubStyle = ref<Record<string, string>>({ top: '0px', left: '0px' })
 
 function togglePlaylistSub() {
   if (showPlaylistSub.value) { showPlaylistSub.value = false; return }
@@ -315,7 +315,7 @@ async function addToPlaylist(playlistId: string) {
 
 // ── Plugin submenus (Teleported, hover-intent with delay) ─────────────────
 const openPluginSubmenu = ref<number | null>(null)
-const pluginSubStyle = ref({ top: '0px', left: '0px' })
+const pluginSubStyle = ref<Record<string, string>>({ top: '0px', left: '0px' })
 let pluginSubHideTimer: ReturnType<typeof setTimeout> | null = null
 
 function showPluginSub(idx: number, el: HTMLElement) {
