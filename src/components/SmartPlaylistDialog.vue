@@ -440,7 +440,13 @@ function selectTagValue(index: number, value: string) {
 const matchCount = computed(() => {
   const validRules = rules.value.filter(r => r.value.toString().trim() !== '')
   if (validRules.length === 0) return -1
-  const getTrackTags = (trackId: string) => tagsStore.getTrackTags(trackId)
+  const getTrackTags = (trackId: string) => {
+    const track = library.tracks.find(t => t.id === trackId)
+    const trackTagList = tagsStore.getTrackTags(trackId)
+    if (!track) return trackTagList
+    const key = `${track.album}---${track.albumArtist || track.artist}`
+    return [...new Set([...trackTagList, ...tagsStore.getAlbumTags(key)])]
+  }
   return evaluateSmartPlaylist(library.tracks, validRules, ruleMatch.value, undefined, getTrackTags).length
 })
 

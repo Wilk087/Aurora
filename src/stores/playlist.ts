@@ -142,7 +142,13 @@ export const usePlaylistStore = defineStore('playlist', () => {
         return statsStore ? statsStore.playCount(key) : 0
       }
       const tagsStore = useTagsStore()
-      const getTrackTags = (trackId: string) => tagsStore.getTrackTags(trackId)
+      const getTrackTags = (trackId: string) => {
+        const track = library.tracks.find(t => t.id === trackId)
+        const trackTagList = tagsStore.getTrackTags(trackId)
+        if (!track) return trackTagList
+        const key = `${track.album}---${track.albumArtist || track.artist}`
+        return [...new Set([...trackTagList, ...tagsStore.getAlbumTags(key)])]
+      }
       return evaluateSmartPlaylist(library.tracks, pl.rules, pl.ruleMatch || 'all', getPlayCount, getTrackTags)
     }
 

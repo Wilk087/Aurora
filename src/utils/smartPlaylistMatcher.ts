@@ -14,9 +14,9 @@ export function matchRule(
   if (rule.field === 'tag') {
     const tags = getTrackTags ? getTrackTags(track.id) : []
     const ruleValue = rule.value.toLowerCase().trim()
-    if (rule.operator === 'has_tag' || rule.operator === 'is') return tags.some(t => t === ruleValue)
-    if (rule.operator === 'not_has_tag' || rule.operator === 'not_contains') return !tags.some(t => t === ruleValue)
-    if (rule.operator === 'contains') return tags.some(t => t.includes(ruleValue))
+    if (rule.operator === 'has_tag' || rule.operator === 'is') return tags.some(t => t.toLowerCase() === ruleValue)
+    if (rule.operator === 'not_has_tag' || rule.operator === 'not_contains') return !tags.some(t => t.toLowerCase() === ruleValue)
+    if (rule.operator === 'contains') return tags.some(t => t.toLowerCase().includes(ruleValue))
     return false
   }
 
