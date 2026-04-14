@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 contextBridge.exposeInMainWorld('api', {
   // Library
@@ -327,7 +327,7 @@ contextBridge.exposeInMainWorld('api', {
     input.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none'
     document.body.appendChild(input)
     const cleanup = () => { if (document.body.contains(input)) document.body.removeChild(input) }
-    input.onchange = () => { cleanup(); resolve(input.files?.[0] ? (input.files[0] as any).path : null) }
+    input.onchange = () => { const file = input.files?.[0]; cleanup(); resolve(file ? webUtils.getPathForFile(file) : null) }
     input.oncancel = () => { cleanup(); resolve(null) }
     input.click()
   }),
