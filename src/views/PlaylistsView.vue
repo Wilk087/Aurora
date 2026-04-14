@@ -213,9 +213,9 @@
           <svg class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
           Edit Rules
         </button>
-        <button @click="startRename" class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5">
+        <button @click="openEditDialog" class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5">
           <svg class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" /></svg>
-          Rename
+          Edit
         </button>
         <div class="border-t border-[var(--border)] my-1" />
         <button @click="confirmDelete" class="w-full px-3.5 py-2 text-left text-sm text-red-400 hover:text-red-300 hover:bg-white/[0.06] transition-colors flex items-center gap-2.5">
@@ -225,24 +225,13 @@
       </div>
     </Teleport>
 
-    <!-- Rename dialog -->
-    <Teleport to="body">
-      <Transition name="fade">
-        <div v-if="showRenameDialog" class="fixed inset-0 z-[80] bg-black/50" @click="showRenameDialog = false" />
-      </Transition>
-      <Transition name="dialog-slide">
-        <div v-if="showRenameDialog" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[90] w-[360px] max-w-[90vw] rounded-2xl bg-[#12121f]/95 backdrop-blur-2xl border border-white/[0.08] shadow-2xl">
-          <div class="p-6">
-            <h2 class="text-base font-semibold mb-4">Rename Playlist</h2>
-            <input v-model="renameValue" ref="renameInput" @keydown.enter="doRename" @keydown.escape="showRenameDialog = false" class="ctx-input w-full px-3 py-2 rounded-lg text-sm outline-none transition-colors" />
-            <div class="flex justify-end gap-3 mt-4">
-              <button @click="showRenameDialog = false" class="px-4 py-2 rounded-lg text-sm text-white/50 hover:text-white hover:bg-white/[0.06] transition-colors">Cancel</button>
-              <button @click="doRename" :disabled="!renameValue.trim()" class="px-5 py-2 rounded-lg text-sm font-medium bg-accent hover:bg-accent-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors">Save</button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    <!-- Edit playlist dialog -->
+    <EditPlaylistDialog
+      :show="showEditDialog"
+      :playlist="editTarget"
+      @close="showEditDialog = false"
+      @save="onEditSave"
+    />
 
     <!-- Smart Playlist Dialog (create + edit) -->
     <SmartPlaylistDialog
@@ -256,7 +245,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useScrollMemory } from '@/composables/useScrollMemory'
 import { menuPosition } from '@/utils/menuPosition'
@@ -265,6 +254,7 @@ import { usePlayerStore } from '@/stores/player'
 import { useToast } from '@/composables/useToast'
 import PlaylistCover from '@/components/PlaylistCover.vue'
 import SmartPlaylistDialog from '@/components/SmartPlaylistDialog.vue'
+import EditPlaylistDialog from '@/components/EditPlaylistDialog.vue'
 
 const playlistStore = usePlaylistStore()
 const player = usePlayerStore()
@@ -281,10 +271,8 @@ const newPlaylistName = ref('')
 const nameInput = ref<HTMLInputElement>()
 const contextPlaylist = ref<Playlist | null>(null)
 const contextPos = ref<Record<string, string>>({})
-const showRenameDialog = ref(false)
-const renameValue = ref('')
-const renameInput = ref<HTMLInputElement>()
-const renameTargetId = ref('')
+const showEditDialog = ref(false)
+const editTarget = ref<Playlist | null>(null)
 
 // ── Sort ─────────────────────────────────
 const showSortMenu = ref(false)
@@ -349,20 +337,20 @@ function playContextPlaylist(shuffle: boolean) {
   contextPlaylist.value = null
 }
 
-function startRename() {
+function openEditDialog() {
   if (!contextPlaylist.value) return
-  renameTargetId.value = contextPlaylist.value.id
-  renameValue.value = contextPlaylist.value.name
+  editTarget.value = contextPlaylist.value
   contextPlaylist.value = null
-  showRenameDialog.value = true
-  nextTick(() => renameInput.value?.focus())
+  showEditDialog.value = true
 }
 
-async function doRename() {
-  const name = renameValue.value.trim()
-  if (!name || !renameTargetId.value) return
-  await playlistStore.renamePlaylist(renameTargetId.value, name)
-  showRenameDialog.value = false
+async function onEditSave(data: { id: string; name: string; description: string; customImage: string | null }) {
+  await playlistStore.editPlaylist(data.id, {
+    name: data.name,
+    description: data.description,
+    customImage: data.customImage,
+  })
+  showEditDialog.value = false
 }
 
 async function confirmDelete() {
