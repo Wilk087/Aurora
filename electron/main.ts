@@ -852,6 +852,86 @@ async function saveLyricsFile(audioPath: string, lrcContent: string): Promise<vo
   }
 }
 
+// ── Background lyrics fetcher ─────────────────────────────────────────────
+// Crawls all local library tracks and fetches lyrics from LRCLIB for any that
+// don't have a .lrc file yet.  Instrumental sentinels are retried after 7 days.
+// Rate-limited to one request per 500 ms to avoid hammering LRCLIB.
+
+const LYRICS_BG_DELAY_MS        = 500                          // ms between LRCLIB requests
+const LYRICS_BG_RETRY_INTERVAL  = 7 * 24 * 60 * 60 * 1000    // 7 days in ms
+
+let lyricsBgRunning = false
+let lyricsBgPending = false
+
+function lrcPathFor(audioPath: string): string {
+  return join(dirname(audioPath), `${basename(audioPath, extname(audioPath))}.lrc`)
+}
+
+async function runLyricsBackgroundFetch() {
+  if (lyricsBgRunning) { lyricsBgPending = true; return }
+  lyricsBgRunning = true
+  lyricsBgPending = false
+
+  try {
+    const localTracks = cache.tracks.filter(
+      (t: any) => t.path && !t.path.startsWith('subsonic://')
+    )
+
+    let fetched = 0
+    let skipped = 0
+
+    for (const track of localTracks) {
+      const lrcPath = lrcPathFor(track.path)
+      let needsFetch = false
+
+      if (!existsSync(lrcPath)) {
+        needsFetch = true
+      } else {
+        try {
+          const content = await readFile(lrcPath, 'utf-8')
+          if (content.trim() === '[instrumental]') {
+            const { mtime } = await stat(lrcPath)
+            if (Date.now() - mtime.getTime() > LYRICS_BG_RETRY_INTERVAL) {
+              needsFetch = true
+            }
+          }
+        } catch { /* unreadable lrc – skip */ }
+      }
+
+      if (!needsFetch) { skipped++; continue }
+
+      // Throttle requests
+      await new Promise<void>(r => setTimeout(r, LYRICS_BG_DELAY_MS))
+
+      // Abort if a fresh scan kicked off a new run; it will re-queue us
+      if (lyricsBgPending) break
+
+      try {
+        const online = await fetchLRCLIB(track)
+        if (online) {
+          await saveLyricsFile(track.path, online)
+          fetched++
+          logger.info(`[lyrics-bg] fetched: ${track.artist} – ${track.title}`)
+        } else {
+          await saveLyricsFile(track.path, '[instrumental]')
+          logger.info(`[lyrics-bg] no lyrics (instrumental): ${track.artist} – ${track.title}`)
+        }
+      } catch (err) {
+        logger.error(`[lyrics-bg] error fetching ${track.title}:`, err)
+      }
+    }
+
+    if (fetched > 0 || skipped > 0) {
+      logger.info(`[lyrics-bg] done — fetched: ${fetched}, skipped: ${skipped}`)
+    }
+  } finally {
+    lyricsBgRunning = false
+    if (lyricsBgPending) {
+      setTimeout(runLyricsBackgroundFetch, 2000)
+    }
+  }
+}
+
 // ── Last.fm scrobbling helpers ─────────────────────────────────────────────
 function md5(str: string): string {
   return createHash('md5').update(str, 'utf-8').digest('hex')
@@ -1267,6 +1347,8 @@ app.whenReady().then(async () => {
   await loadArtistCache()
   await loadWaveformCache()
   logger.info(`Library cache loaded: ${cache.tracks.length} tracks, ${cache.folders.length} folders`)
+  // Start background lyrics fetch 30 s after startup so the UI can settle first
+  setTimeout(runLyricsBackgroundFetch, 30_000)
 
   // Initialize Discord Rich Presence
   loadSettings().then((settings) => {
@@ -1348,6 +1430,10 @@ app.whenReady().then(async () => {
     if (missingMeta.length > 0 && mainWindow) {
       mainWindow.webContents.send('library:found-missing-metadata', missingMeta.length)
     }
+
+    // Kick off background lyrics fetch for any newly added tracks (5 s delay
+    // lets the renderer finish processing the scan result first)
+    setTimeout(runLyricsBackgroundFetch, 5_000)
 
     return cache.tracks
   })
