@@ -101,7 +101,7 @@
             :selected="false"
             :selectable="false"
             :selected-tracks="[]"
-            @play="playTrack(track)"
+            @play="playLyricsTrack(track)"
             @select="() => {}"
           />
         </div>
@@ -305,6 +305,11 @@ const hasNoResults = computed(() =>
 function playTrack(track: Track) {
   const idx = library.filteredTracks.indexOf(track)
   player.playAll(library.filteredTracks, idx >= 0 ? idx : 0)
+}
+
+function playLyricsTrack(track: Track) {
+  const idx = library.tracks.indexOf(track)
+  player.playAll(library.tracks, idx >= 0 ? idx : 0)
 }
 
 function getPlaylistCovers(pl: Playlist): string[] {
