@@ -633,6 +633,7 @@ async function loadLyrics() {
   try {
     const lrc = await window.api.getLyrics(track.path)
     if (lrc) {
+      if (lrc === '[instrumental]') return // cached sentinel: no lyrics exist, skip online fetch
       const parsed = parseLRC(lrc)
       if (parsed.length > 0) { lyricsLines.value = parsed; isSynced.value = true; return }
       lyricsLines.value = lrc.split('\n').filter(l => l.trim()).map(t => ({ text: t.trim(), time: 0 }))

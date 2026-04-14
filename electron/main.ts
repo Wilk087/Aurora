@@ -1377,9 +1377,14 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('lyrics:fetch-online', async (_, trackInfo: { path: string; title: string; artist: string; album: string; duration: number }) => {
     const online = await fetchLRCLIB(trackInfo)
-    if (online && trackInfo.path && !trackInfo.path.startsWith('subsonic://')) {
-      // Save the fetched lyrics as .lrc file next to the audio (skip for remote/subsonic tracks)
-      await saveLyricsFile(trackInfo.path, online)
+    if (trackInfo.path && !trackInfo.path.startsWith('subsonic://')) {
+      if (online) {
+        // Save the fetched lyrics as .lrc file next to the audio
+        await saveLyricsFile(trackInfo.path, online)
+      } else {
+        // Save a sentinel so we don't hit LRCLIB again for this instrumental track
+        await saveLyricsFile(trackInfo.path, '[instrumental]')
+      }
     }
     return online
   })

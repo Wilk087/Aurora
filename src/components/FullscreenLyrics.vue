@@ -178,6 +178,7 @@ watch(
     try {
       const lrc = await window.api.getLyrics(path)
       if (lrc) {
+        if (lrc === '[instrumental]') return // cached sentinel: no lyrics exist, skip online fetch
         const parsed = parseLRC(lrc)
         if (parsed.length > 0) {
           lyrics.value = parsed
