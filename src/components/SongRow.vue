@@ -116,51 +116,13 @@
       </button>
     </div>
 
-    <!-- Playlist dropdown (teleported) -->
-    <Teleport to="body">
-      <div v-if="showMenu" class="fixed inset-0 z-[90]" @click="showMenu = false" />
-      <div
-        v-if="showMenu"
-        class="fixed z-[100] w-56 max-h-64 overflow-y-auto rounded-xl menu-panel py-1.5 shadow-2xl"
-        :style="menuStyle"
-      >
-        <p class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider" style="color: rgb(var(--app-text) / 0.35)">Add to playlist</p>
-        <div v-if="showNewInput" class="px-3 py-1.5 flex items-center gap-2">
-          <input
-            ref="newInputRef"
-            v-model="newName"
-            @keydown.enter="createAndAdd"
-            @keydown.escape.stop="showNewInput = false"
-            @click.stop
-            placeholder="Name…"
-            class="ctx-input flex-1 px-2 py-1 rounded text-xs outline-none focus:border-accent"
-          />
-          <button @click.stop="createAndAdd" class="text-accent text-xs font-medium hover:underline shrink-0">Add</button>
-        </div>
-        <button
-          v-else
-          @click.stop="beginCreate"
-          class="ctx-item-accent w-full px-3 py-2 text-left text-sm transition-colors flex items-center gap-2"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
-          New Playlist
-        </button>
-        <div v-if="playlistStore.playlists.length > 0" class="border-t border-[var(--border)] my-1" />
-        <button
-          v-for="pl in playlistStore.sortedPlaylists"
-          :key="pl.id"
-          @click.stop="addTo(pl.id)"
-          class="ctx-item w-full px-3 py-2 text-left text-sm transition-colors truncate flex items-center justify-between"
-        >
-          <span class="truncate">{{ pl.name }}</span>
-          <svg v-if="pl.trackIds.includes(track.id)" class="w-3.5 h-3.5 text-accent shrink-0" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
-          </svg>
-        </button>
-      </div>
-    </Teleport>
+    <!-- Playlist submenu (teleported) -->
+    <PlaylistSubmenu
+      :show="showMenu"
+      :trigger-el="plusBtnRef"
+      :track-ids="[track.id]"
+      @update:show="(val: boolean) => { showMenu = val }"
+    />
 
     <!-- Context menu (teleported) -->
     <Teleport to="body">
@@ -460,13 +422,13 @@
 import { ref, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
-import { usePlaylistStore } from '@/stores/playlist'
 import { useLibraryStore } from '@/stores/library'
 import { useToast } from '@/composables/useToast'
 import { useFavoritesStore } from '@/stores/favorites'
 import { menuPosition, subMenuPosition } from '@/utils/menuPosition'
 import { formatTime } from '@/utils/formatTime'
 import ArtistLinks from '@/components/ArtistLinks.vue'
+import PlaylistSubmenu from '@/components/PlaylistSubmenu.vue'
 import { pluginContextMenuItems } from '@/plugins/api'
 import type { PluginContextMenuItem } from '@/types/plugin'
 import TagDialog from '@/components/TagDialog.vue'
@@ -484,7 +446,6 @@ defineEmits(['play', 'select'])
 
 const router = useRouter()
 const player = usePlayerStore()
-const playlistStore = usePlaylistStore()
 const library = useLibraryStore()
 const toast = useToast()
 const favoritesStore = useFavoritesStore()
@@ -496,11 +457,7 @@ const coverUrl = computed(() =>
 )
 
 const showMenu = ref(false)
-const showNewInput = ref(false)
-const newName = ref('')
 const plusBtnRef = ref<HTMLElement>()
-const newInputRef = ref<HTMLInputElement>()
-const menuPos = ref<Record<string, string>>({})
 
 // Context menu state
 const showCtx = ref(false)
@@ -511,55 +468,8 @@ const ctxStyle = computed(() => ({
   ...ctxPos.value,
 }))
 
-const menuStyle = computed(() => menuPos.value)
-
 function openMenu() {
-  if (showMenu.value) { showMenu.value = false; return }
-  const btn = plusBtnRef.value
-  if (btn) {
-    const rect = btn.getBoundingClientRect()
-    const vh = window.innerHeight
-    const vw = window.innerWidth
-    const margin = 6
-    const estH = 280
-    const left = Math.max(margin, Math.min(rect.right - 224, vw - 240))
-    const spaceBelow = vh - rect.bottom - margin
-    if (spaceBelow >= estH || spaceBelow >= rect.top - margin) {
-      menuPos.value = { top: (rect.bottom + 4) + 'px', left: left + 'px', maxHeight: Math.max(60, spaceBelow) + 'px', overflowY: 'auto' }
-    } else {
-      menuPos.value = { bottom: Math.max(margin, vh - rect.top + 4) + 'px', left: left + 'px', maxHeight: Math.max(60, rect.top - margin) + 'px', overflowY: 'auto' }
-    }
-  }
-  showNewInput.value = false
-  newName.value = ''
-  showMenu.value = true
-}
-
-function beginCreate() {
-  showNewInput.value = true
-  nextTick(() => newInputRef.value?.focus())
-}
-
-async function createAndAdd() {
-  const name = newName.value.trim()
-  if (!name) return
-  const pl = await playlistStore.createPlaylist(name)
-  await playlistStore.addTracks(pl.id, [props.track.id])
-  showMenu.value = false
-  showNewInput.value = false
-  newName.value = ''
-}
-
-async function addTo(playlistId: string) {
-  const pl = playlistStore.getPlaylistById(playlistId)
-  if (pl && pl.trackIds.includes(props.track.id)) {
-    toast.warning('Song is already in this playlist')
-    showMenu.value = false
-    return
-  }
-  await playlistStore.addTracks(playlistId, [props.track.id])
-  toast.success(`Added to ${pl?.name || 'playlist'}`)
-  showMenu.value = false
+  showMenu.value = !showMenu.value
 }
 
 // ── Context menu ────────────────────────────────────────────
@@ -593,13 +503,7 @@ async function toggleFavoriteInline() {
 
 function ctxToPlaylist() {
   showCtx.value = false
-  // Open the + playlist menu at same position
-  nextTick(() => {
-    menuPos.value = { ...ctxPos.value }
-    showNewInput.value = false
-    newName.value = ''
-    showMenu.value = true
-  })
+  nextTick(() => { showMenu.value = true })
 }
 
 function goToArtist() {

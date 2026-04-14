@@ -43,13 +43,7 @@
     </EmptyState>
 
     <!-- Loading skeleton -->
-    <div v-else-if="!library.libraryReady" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
-      <div v-for="i in 18" :key="i" class="animate-pulse flex flex-col items-center gap-2">
-        <div class="w-full aspect-square rounded-full bg-white/[0.06]" />
-        <div class="h-3.5 bg-white/[0.06] rounded w-3/4" />
-        <div class="h-3 bg-white/[0.04] rounded w-1/2" />
-      </div>
-    </div>
+    <LoadingSkeleton v-else-if="!library.libraryReady" :count="18" variant="artist" />
 
     <!-- Artists grid -->
     <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
@@ -113,6 +107,7 @@ import { useScrollMemory } from '@/composables/useScrollMemory'
 import { useLibraryStore, type Artist } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import EmptyState from '@/components/EmptyState.vue'
+import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 
 const library = useLibraryStore()
 const player = usePlayerStore()

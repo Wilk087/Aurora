@@ -136,34 +136,13 @@
     </Teleport>
 
     <!-- ── Playlist submenu (Teleported, bounds-aware) ── -->
-    <Teleport to="body">
-      <div v-if="showPlaylistSub" class="fixed inset-0 z-[100]" @click="showPlaylistSub = false" />
-      <div
-        v-if="showPlaylistSub"
-        class="fixed z-[110] w-52 rounded-xl menu-panel py-1.5 shadow-2xl max-h-64 overflow-y-auto"
-        :style="playlistSubStyle"
-      >
-        <p class="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider" style="color: rgb(var(--app-text) / 0.35)">Add to playlist</p>
-        <button
-          @click.stop="createAndAddPlaylist"
-          class="ctx-item-accent w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2"
-        >
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
-          New Playlist
-        </button>
-        <div v-if="playlistStore.playlists.length > 0" class="border-t border-[var(--border)] my-1" />
-        <button
-          v-for="pl in playlistStore.sortedPlaylists"
-          :key="pl.id"
-          @click.stop="addToPlaylist(pl.id)"
-          class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors truncate"
-        >
-          {{ pl.name }}
-        </button>
-      </div>
-    </Teleport>
+    <PlaylistSubmenu
+      :show="showPlaylistSub"
+      :trigger-el="playlistBtnRef"
+      :track-ids="album.tracks.map(t => t.id)"
+      :suggested-name="album.name"
+      @update:show="(val: boolean) => { showPlaylistSub = val; if (!val) showCtx = false }"
+    />
 
     <!-- ── Plugin submenu (Teleported, bounds-aware) ── -->
     <Teleport to="body">
@@ -211,10 +190,9 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { menuPosition, subMenuPosition } from '@/utils/menuPosition'
 import { usePlayerStore } from '@/stores/player'
-import { usePlaylistStore } from '@/stores/playlist'
-import { useToast } from '@/composables/useToast'
 import ArtistLinks from '@/components/ArtistLinks.vue'
 import TagDialog from '@/components/TagDialog.vue'
+import PlaylistSubmenu from '@/components/PlaylistSubmenu.vue'
 import type { Album } from '@/stores/library'
 import { pluginAlbumContextMenuItems } from '@/plugins/api'
 import type { PluginAlbumContextMenuItem } from '@/types/plugin'
@@ -225,8 +203,6 @@ defineEmits(['click', 'play'])
 
 const router = useRouter()
 const player = usePlayerStore()
-const playlistStore = usePlaylistStore()
-const toast = useToast()
 
 const albumKey = computed(() => `${props.album.name}---${props.album.artist}`)
 
@@ -284,33 +260,9 @@ function openTagDialog() {
 // ── Playlist submenu (Teleported, bounds-aware) ───────────────────────────
 const showPlaylistSub = ref(false)
 const playlistBtnRef = ref<HTMLElement>()
-const playlistSubStyle = ref<Record<string, string>>({ top: '0px', left: '0px' })
 
 function togglePlaylistSub() {
-  if (showPlaylistSub.value) { showPlaylistSub.value = false; return }
-  if (playlistBtnRef.value) {
-    const rect = playlistBtnRef.value.getBoundingClientRect()
-    playlistSubStyle.value = subMenuPosition(rect, 212, 270)
-  }
-  showPlaylistSub.value = true
-}
-
-async function createAndAddPlaylist() {
-  const name = props.album.name || 'Untitled'
-  const pl = await playlistStore.createPlaylist(name)
-  await playlistStore.addTracks(pl.id, props.album.tracks.map(t => t.id))
-  toast.success(`Created "${name}" with ${props.album.tracks.length} tracks`)
-  showPlaylistSub.value = false
-  showCtx.value = false
-}
-
-async function addToPlaylist(playlistId: string) {
-  const pl = playlistStore.getPlaylistById(playlistId)
-  const trackIds = props.album.tracks.map(t => t.id)
-  await playlistStore.addTracks(playlistId, trackIds)
-  toast.success(`Added ${trackIds.length} tracks to ${pl?.name || 'playlist'}`)
-  showPlaylistSub.value = false
-  showCtx.value = false
+  showPlaylistSub.value = !showPlaylistSub.value
 }
 
 // ── Plugin submenus (Teleported, hover-intent with delay) ─────────────────

@@ -56,13 +56,7 @@
     </div>
 
     <!-- Loading skeleton -->
-    <div v-else-if="!library.libraryReady" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
-      <div v-for="i in 12" :key="i" class="animate-pulse">
-        <div class="aspect-square rounded-xl bg-white/[0.06]" />
-        <div class="mt-2.5 h-3.5 bg-white/[0.06] rounded w-3/4" />
-        <div class="mt-1.5 h-3 bg-white/[0.04] rounded w-1/2" />
-      </div>
-    </div>
+    <LoadingSkeleton v-else-if="!library.libraryReady" :count="12" />
 
     <!-- Albums grid -->
     <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-5">
@@ -114,6 +108,7 @@ import { useTagsStore } from '@/stores/tags'
 import { usePlayerStore } from '@/stores/player'
 import AlbumCard from '@/components/AlbumCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import LoadingSkeleton from '@/components/LoadingSkeleton.vue'
 
 const library = useLibraryStore()
 const tagsStore = useTagsStore()
