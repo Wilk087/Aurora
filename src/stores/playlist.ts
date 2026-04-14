@@ -59,6 +59,21 @@ export const usePlaylistStore = defineStore('playlist', () => {
     }
   }
 
+  async function editPlaylist(id: string, data: { name?: string; description?: string; customImage?: string | null }) {
+    const updated = await window.api.editPlaylist(id, data)
+    if (updated) {
+      const idx = playlists.value.findIndex(p => p.id === id)
+      if (idx >= 0) {
+        playlists.value = [
+          ...playlists.value.slice(0, idx),
+          updated,
+          ...playlists.value.slice(idx + 1),
+        ]
+      }
+    }
+    return updated
+  }
+
   async function addTracks(playlistId: string, trackIds: string[]) {
     const library = useLibraryStore()
     const trackMeta: Record<string, TrackMetaSnapshot> = {}
@@ -210,6 +225,7 @@ export const usePlaylistStore = defineStore('playlist', () => {
     getPlaylistById,
     getPlaylistTracks,
     setCustomImage,
+    editPlaylist,
     songKey,
   }
 })

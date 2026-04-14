@@ -85,6 +85,7 @@ contextBridge.exposeInMainWorld('api', {
   createPlaylist: (name: string) => ipcRenderer.invoke('playlists:create', name),
   deletePlaylist: (id: string) => ipcRenderer.invoke('playlists:delete', id),
   renamePlaylist: (id: string, name: string) => ipcRenderer.invoke('playlists:rename', id, name),
+  editPlaylist: (id: string, data: { name?: string; description?: string; customImage?: string | null }) => ipcRenderer.invoke('playlists:edit', id, data),
   addTracksToPlaylist: (id: string, trackIds: string[], trackMeta?: Record<string, { title: string; artist: string; album: string }>) => ipcRenderer.invoke('playlists:add-tracks', id, trackIds, trackMeta),
   removeTrackFromPlaylist: (id: string, trackId: string) => ipcRenderer.invoke('playlists:remove-track', id, trackId),
 

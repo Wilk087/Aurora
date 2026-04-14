@@ -104,6 +104,7 @@ interface TrackMetaSnapshot {
 interface Playlist {
   id: string
   name: string
+  description?: string
   trackIds: string[]
   trackMeta?: Record<string, TrackMetaSnapshot>
   createdAt: number
@@ -180,6 +181,7 @@ interface Window {
     createPlaylist: (name: string) => Promise<Playlist>
     deletePlaylist: (id: string) => Promise<Playlist[]>
     renamePlaylist: (id: string, name: string) => Promise<Playlist | null>
+    editPlaylist: (id: string, data: { name?: string; description?: string; customImage?: string | null }) => Promise<Playlist | null>
     addTracksToPlaylist: (id: string, trackIds: string[], trackMeta?: Record<string, TrackMetaSnapshot>) => Promise<Playlist | null>
     removeTrackFromPlaylist: (id: string, trackId: string) => Promise<Playlist | null>
     getMediaUrl: (filePath: string) => string

@@ -33,6 +33,7 @@
           {{ playlist.smart ? 'Smart Playlist' : 'Playlist' }}
         </p>
         <h1 class="text-3xl font-bold mb-2 truncate">{{ playlist.name }}</h1>
+        <p v-if="playlist.description" class="text-sm text-white/50 mb-2 line-clamp-2">{{ playlist.description }}</p>
         <p class="text-sm text-white/40 mb-4">
           {{ tracks.length }} {{ tracks.length === 1 ? 'song' : 'songs' }}
           <span v-if="totalDuration" class="ml-2">&middot; {{ formatDuration(totalDuration) }}</span>

@@ -658,6 +658,7 @@ interface TrackMetaSnapshot {
 interface Playlist {
   id: string
   name: string
+  description?: string
   trackIds: string[]
   trackMeta?: Record<string, TrackMetaSnapshot>
   createdAt: number
@@ -1656,6 +1657,30 @@ app.whenReady().then(async () => {
     const pl = playlists.find(p => p.id === id)
     if (pl) {
       pl.name = name
+      pl.updatedAt = Date.now()
+      await savePlaylists()
+    }
+    return pl || null
+  })
+
+  ipcMain.handle('playlists:edit', async (_, id: string, data: { name?: string; description?: string; customImage?: string | null }) => {
+    const pl = playlists.find(p => p.id === id)
+    if (pl) {
+      if (data.name !== undefined && data.name.trim()) pl.name = data.name.trim()
+      if (data.description !== undefined) {
+        if (data.description.trim()) {
+          pl.description = data.description.trim()
+        } else {
+          delete pl.description
+        }
+      }
+      if ('customImage' in data) {
+        if (data.customImage === null) {
+          delete pl.customImage
+        } else if (data.customImage) {
+          pl.customImage = data.customImage
+        }
+      }
       pl.updatedAt = Date.now()
       await savePlaylists()
     }
