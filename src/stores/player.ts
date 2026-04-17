@@ -822,22 +822,29 @@ export const usePlayerStore = defineStore('player', () => {
       })
     } else {
       const isExternal = track.path.startsWith('http://') || track.path.startsWith('https://')
-      if (isExternal) {
-        // Route external streams through audioStream (NOT connected to AudioContext).
-        // External CDNs (YouTube, radio) don't send CORS headers, so using the
-        // AudioContext-connected `audio` element would silence playback.
-        // Ask plugins if they want to resolve/replace the URL (e.g. re-fetch expired YouTube CDN URLs).
-        const resolvedPath = await resolveTrackUrl(track)
+      // Always run plugin URL resolvers — plugins may return a stream URL for
+      // non-HTTP paths (e.g. test://, yt://) that need remote resolution.
+      const resolvedPath = await resolveTrackUrl(track)
+      const resolvedIsStream = resolvedPath.startsWith('http://') || resolvedPath.startsWith('https://') || resolvedPath.startsWith('blob:')
+      const resolvedIsLocal  = resolvedPath.startsWith('/') || /^[a-zA-Z]:[/\\]/.test(resolvedPath)
+      if (isExternal || resolvedIsStream) {
+        // Route through audioStream (NOT connected to AudioContext) so CORS
+        // restrictions on external CDNs don't silence playback.
         if (!usingStream) { audio.pause(); audio.src = '' }
         usingStream = true
         audioStream.src = window.api.getMediaUrl(resolvedPath)
         audioStream.load()
-      } else {
+      } else if (resolvedIsLocal) {
         // Local file — use the main audio element connected to AudioContext
         if (usingStream) { audioStream.pause(); audioStream.src = '' }
         usingStream = false
-        audio.src = window.api.getMediaUrl(track.path)
+        audio.src = window.api.getMediaUrl(resolvedPath)
         audio.load()
+      } else {
+        // Custom scheme (e.g. test://) that no resolver handled — abort cleanly
+        console.warn('[Player] No resolver handled path:', resolvedPath)
+        isLoading.value = false
+        return
       }
     }
 
@@ -854,7 +861,8 @@ export const usePlayerStore = defineStore('player', () => {
       if (track.source === 'subsonic' && track.path.startsWith('subsonic://')) {
         const songId = track.path.replace('subsonic://', '')
         generateSubsonicWaveform(songId)
-      } else if (!track.path.startsWith('http://') && !track.path.startsWith('https://')) {
+      } else if (track.path.startsWith('/') || /^[a-zA-Z]:[/\\]/.test(track.path)) {
+        // Only attempt waveform generation for real local file paths
         generateWaveform(track.path)
       } else {
         waveformData.value = []

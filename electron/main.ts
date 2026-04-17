@@ -3135,184 +3135,53 @@ app.whenReady().then(async () => {
     return await ipcMain.emit(channel, ...args)
   })
 
-  // ── Plugin: yt-dlp stream extraction ──────────────────────────────────────
-  ipcMain.handle('plugin:ytdlp:check', async () => {
-    const { promisify } = await import('util')
-    const execFileAsync = promisify(execFile)
-    try {
-      const { stdout } = await execFileAsync('yt-dlp', ['--version'], { timeout: 5000 })
-      return { installed: true, version: stdout.trim() }
-    } catch {
-      return { installed: false, version: null }
-    }
+  // ── Generic Plugin Utilities ────────────────────────────────────────────────
+  ipcMain.handle('plugins:get-data-dir', async (_, pluginId: string) => {
+    const dir = join(dataPath, 'plugin-data', pluginId)
+    await mkdir(dir, { recursive: true })
+    return dir
   })
 
-  ipcMain.handle('plugin:ytdlp:search', async (_, query: string, limit = 5) => {
-    const { promisify } = await import('util')
-    const execFileAsync = promisify(execFile)
-    const { stdout } = await execFileAsync(
-      'yt-dlp',
-      ['--flat-playlist', '--dump-single-json', `ytsearch${limit}:${query}`],
-      { timeout: 30000 },
-    )
-    const data = JSON.parse(stdout)
-    return (data.entries || []).map((e: any) => ({
-      id: e.id,
-      title: e.title || '',
-      duration: e.duration || 0,
-      uploader: e.uploader || e.channel || '',
-      thumbnail: e.thumbnail || `https://i.ytimg.com/vi/${e.id}/mqdefault.jpg`,
-      url: e.url || `https://www.youtube.com/watch?v=${e.id}`,
-    }))
-  })
-
-  ipcMain.handle('plugin:ytdlp:get-url', async (_, videoUrl: string) => {
-    const { promisify } = await import('util')
-    const execFileAsync = promisify(execFile)
-    const { stdout } = await execFileAsync(
-      'yt-dlp',
-      ['-f', 'ba[ext=m4a]/ba[ext=webm]/ba', '--get-url', videoUrl],
-      { timeout: 30000 },
-    )
-    return stdout.trim().split('\n')[0] || null
-  })
-
-  ipcMain.handle('plugin:ytdlp:get-info', async (_, videoUrl: string) => {
-    const { promisify } = await import('util')
-    const execFileAsync = promisify(execFile)
-    const { stdout } = await execFileAsync(
-      'yt-dlp',
-      ['--dump-json', '--no-playlist', videoUrl],
-      { timeout: 30000 },
-    )
-    const item = JSON.parse(stdout)
-    return {
-      id: item.id,
-      title: item.title || '',
-      duration: item.duration || 0,
-      uploader: item.uploader || item.channel || '',
-      thumbnail: item.thumbnail || `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`,
-      url: item.webpage_url || videoUrl,
-    }
-  })
-
-  // ── IPC: WhisperX ELRC plugin ──────────────────────────────────────────────
-  const whisperxDataDir = join(dataPath, 'plugin-data', 'whisperx')
-  const whisperxVenvPython = process.platform === 'win32'
-    ? join(whisperxDataDir, 'venv', 'Scripts', 'python.exe')
-    : join(whisperxDataDir, 'venv', 'bin', 'python3')
-
-  ipcMain.handle('plugin:whisperx:get-data-dir', () => whisperxDataDir)
-
-  ipcMain.handle('plugin:whisperx:write-file', async (_, filename: string, content: string) => {
-    await mkdir(whisperxDataDir, { recursive: true })
-    const filePath = join(whisperxDataDir, filename)
+  ipcMain.handle('plugins:write-file', async (_, filePath: string, content: string, options: any = {}) => {
     await writeFile(filePath, content, 'utf-8')
-    if (filename.endsWith('.sh')) {
+    if (options.executable) {
       const { chmod } = await import('fs/promises')
-      await chmod(filePath, 0o755)
+      await chmod(filePath, 0o755).catch(() => {})
     }
     return filePath
   })
 
-  ipcMain.handle('plugin:whisperx:check-env', async () => {
+  ipcMain.handle('plugins:execute', async (_, command: string, args: string[] = [], options: any = {}) => {
     const { promisify } = await import('util')
     const execFileAsync = promisify(execFile)
-    const venvExists = existsSync(whisperxVenvPython)
-
-    // If venv exists, check its Python version first
-    if (venvExists) {
-      try {
-        const { stdout } = await execFileAsync(whisperxVenvPython, ['--version'], { timeout: 8000 })
-        // Check if it's a compatible version (3.9–3.13)
-        const m = stdout.match(/Python (\d+)\.(\d+)/)
-        if (m && (parseInt(m[1]) !== 3 || parseInt(m[2]) < 9 || parseInt(m[2]) > 13)) {
-          return { python: stdout.trim() + ' (incompatible — re-run installer to recreate venv)', whisperx: false, venvExists: true, dataDir: whisperxDataDir }
-        }
-        let wxInstalled = false
-        try {
-          await execFileAsync(whisperxVenvPython, ['-c', 'import whisperx'], { timeout: 10000 })
-          wxInstalled = true
-        } catch {}
-        return { python: stdout.trim(), whisperx: wxInstalled, venvExists: true, dataDir: whisperxDataDir }
-      } catch {
-        return { python: null, whisperx: false, venvExists: true, dataDir: whisperxDataDir }
-      }
+    try {
+      const { stdout, stderr } = await execFileAsync(command, args, options)
+      return { stdout, stderr, error: null }
+    } catch (err: any) {
+      return { stdout: err?.stdout, stderr: err?.stderr, error: err?.message, code: err?.code }
     }
-
-    // No venv yet — find a compatible system Python (WhisperX requires 3.9–3.13)
-    const isWin = process.platform === 'win32'
-    const candidates = isWin
-      ? ['python3.13', 'python3.12', 'python3.11', 'python3.10', 'python3.9', 'python']
-      : ['python3.13', 'python3.12', 'python3.11', 'python3.10', 'python3.9', 'python3', 'python']
-
-    for (const candidate of candidates) {
-      try {
-        const { stdout } = await execFileAsync(candidate, ['--version'], { timeout: 5000 })
-        const m = stdout.match(/Python (\d+)\.(\d+)/)
-        if (m) {
-          const major = parseInt(m[1]), minor = parseInt(m[2])
-          if (major === 3 && minor >= 9 && minor <= 13) {
-            return { python: stdout.trim(), whisperx: false, venvExists: false, dataDir: whisperxDataDir }
-          }
-        }
-      } catch {}
-    }
-
-    // No compatible Python found at all — report the system Python version for info
-    for (const candidate of (isWin ? ['python'] : ['python3', 'python'])) {
-      try {
-        const { stdout } = await execFileAsync(candidate, ['--version'], { timeout: 5000 })
-        return { python: stdout.trim() + ' (incompatible — need 3.9–3.13)', whisperx: false, venvExists: false, dataDir: whisperxDataDir }
-      } catch {}
-    }
-
-    return { python: null, whisperx: false, venvExists: false, dataDir: whisperxDataDir }
   })
 
-  ipcMain.handle('plugin:whisperx:generate-elrc',
-    async (event, audioPath: string, lyricsText: string, modelSize: string, language: string, device: string) => {
-      const scriptPath = join(whisperxDataDir, 'align.py')
-      if (!existsSync(scriptPath)) return { error: 'Setup not complete. Run the installer first.' }
-      const pythonExe = existsSync(whisperxVenvPython) ? whisperxVenvPython
-        : (process.platform === 'win32' ? 'python' : 'python3')
-      const args = [scriptPath, audioPath, '--model', modelSize, '--language', language || 'auto', '--device', device]
-      if (lyricsText?.trim()) args.push('--lyrics', lyricsText.trim())
-
-      return new Promise<{ result?: string; error?: string }>((resolve) => {
-        const child = spawn(pythonExe, args, { timeout: 600000 })
-        let lastResult: string | null = null
-        let buf = ''
-
+  ipcMain.handle('plugins:spawn', async (event, id: string, command: string, args: string[] = [], options: any = {}) => {
+    return new Promise<{ code: number | null; error?: string }>((resolve) => {
+      try {
+        const child = spawn(command, args, options)
+        
         child.stdout.on('data', (chunk: Buffer) => {
-          buf += chunk.toString()
-          const lines = buf.split('\n')
-          buf = lines.pop() ?? ''
-          for (const line of lines) {
-            if (!line.trim()) continue
-            try {
-              const parsed = JSON.parse(line)
-              event.sender.send('plugin:whisperx:progress', parsed)
-              if (parsed.result) lastResult = parsed.result
-            } catch {}
-          }
+          event.sender.send(`plugins:spawn-stdout:${id}`, chunk.toString())
         })
-
+        
         child.stderr.on('data', (chunk: Buffer) => {
-          // WhisperX writes model-loading info to stderr — relay as informational
-          const text = chunk.toString().trim()
-          if (text) event.sender.send('plugin:whisperx:progress', { status: text, stderr: true })
+          event.sender.send(`plugins:spawn-stderr:${id}`, chunk.toString())
         })
-
-        child.on('close', (code) => {
-          if (code === 0 && lastResult) resolve({ result: lastResult })
-          else resolve({ error: `Process exited with code ${code}` })
-        })
-
-        child.on('error', (err: Error) => resolve({ error: err.message }))
-      })
-    },
-  )
+        
+        child.on('close', (code) => resolve({ code }))
+        child.on('error', (err) => resolve({ code: null, error: err.message }))
+      } catch (err: any) {
+        resolve({ code: null, error: err.message })
+      }
+    })
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
