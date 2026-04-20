@@ -176,6 +176,7 @@ interface Window {
     applyTagsSync: (merged: { trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }) => Promise<{ trackTags: Record<string, string[]>; albumTags: Record<string, string[]> }>
     updateDiscordPresence: (data: any) => Promise<void>
     toggleDiscordRPC: (enabled: boolean, clientId?: string) => Promise<void>
+    setTrayEnabled: (enabled: boolean) => Promise<void>
     getPlaylists: () => Promise<Playlist[]>
     getPlaylist: (id: string) => Promise<Playlist | null>
     createPlaylist: (name: string) => Promise<Playlist>

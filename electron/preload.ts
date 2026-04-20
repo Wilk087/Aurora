@@ -68,6 +68,7 @@ contextBridge.exposeInMainWorld('api', {
   // Discord RPC
   updateDiscordPresence: (data: any) => ipcRenderer.invoke('discord:update-presence', data),
   toggleDiscordRPC: (enabled: boolean, clientId?: string) => ipcRenderer.invoke('discord:toggle', enabled, clientId),
+  setTrayEnabled: (enabled: boolean) => ipcRenderer.invoke('tray:set-enabled', enabled),
 
   // Open-with / file association
   getOpenFiles: (): Promise<string[]> => ipcRenderer.invoke('app:get-open-files'),

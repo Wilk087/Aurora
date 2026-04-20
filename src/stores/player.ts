@@ -379,6 +379,9 @@ export const usePlayerStore = defineStore('player', () => {
   // ── iOS-style sliders ──────────────────────────────────────────────────
   const iosSliders = ref(true)
 
+  // ── Tray icon ──────────────────────────────────────────────────────
+  const trayEnabled = ref(true) // default on
+
   // ── Transparency ───────────────────────────────────────────────────
   const transparencyEnabled = ref(true) // default on
 
@@ -624,6 +627,7 @@ export const usePlayerStore = defineStore('player', () => {
     if (typeof s.pauseAnimatedOnBlur === 'boolean') pauseAnimatedOnBlur.value = s.pauseAnimatedOnBlur
     if (typeof s.adaptiveAccent === 'boolean') adaptiveAccent.value = s.adaptiveAccent
     if (typeof s.iosSliders === 'boolean') iosSliders.value = s.iosSliders
+    if (s.trayEnabled === false) trayEnabled.value = false
     if (s.transparencyEnabled === false) transparencyEnabled.value = false
     if (s.autoFullscreen === true) autoFullscreen.value = true
     if (s.autoFullscreenDelay !== undefined) autoFullscreenDelay.value = s.autoFullscreenDelay
@@ -1401,6 +1405,12 @@ export const usePlayerStore = defineStore('player', () => {
     window.api.mergeSettings({ iosSliders: enabled })
   }
 
+  function setTrayEnabled(enabled: boolean) {
+    trayEnabled.value = enabled
+    window.api.mergeSettings({ trayEnabled: enabled })
+    window.api.setTrayEnabled(enabled)
+  }
+
   function setTransparencyEnabled(enabled: boolean) {
     transparencyEnabled.value = enabled
     window.api.mergeSettings({ transparencyEnabled: enabled })
@@ -1632,6 +1642,9 @@ export const usePlayerStore = defineStore('player', () => {
     // iOS sliders
     iosSliders,
     setIOSSliders,
+    // Tray
+    trayEnabled,
+    setTrayEnabled,
     // Transparency
     transparencyEnabled,
     setTransparencyEnabled,

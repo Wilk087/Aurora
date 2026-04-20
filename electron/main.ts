@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, protocol, net, shell, screen, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, protocol, net, shell, screen, Menu, Tray, nativeImage } from 'electron'
 import { join, extname, basename, dirname } from 'path'
 import { readdir, readFile, writeFile, rename, mkdir, stat, rm, copyFile, unlink, appendFile } from 'fs/promises'
 import { existsSync, createReadStream, readFileSync, watch as fsWatch } from 'fs'
@@ -293,6 +293,7 @@ if (disabledFeatures.length > 0) {
 let mainWindow: BrowserWindow | null = null
 let isRelaunching = false
 let isQuitting = false // prevents before-quit re-entry after sync completes
+let tray: Tray | null = null
 
 const AUDIO_EXTENSIONS = new Set([
   '.mp3', '.flac', '.ogg', '.opus', '.wav', '.m4a', '.aac', '.wma', '.alac',
@@ -1115,6 +1116,49 @@ async function createWindow() {
   logger.info('Window created')
 }
 
+// ── System tray ───────────────────────────────────────────────────────────
+function createTray() {
+  if (tray) return
+  const iconPath = app.isPackaged
+    ? join(process.resourcesPath, 'icon.png')
+    : join(__dirname, '../build/icon.png')
+  const icon = nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 })
+  tray = new Tray(icon)
+  tray.setToolTip('Aurora')
+  const menu = Menu.buildFromTemplate([
+    {
+      label: 'Show Aurora',
+      click: () => {
+        if (!mainWindow) return
+        mainWindow.show()
+        mainWindow.focus()
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit',
+      click: () => {
+        app.quit()
+      },
+    },
+  ])
+  tray.setContextMenu(menu)
+  tray.on('click', () => {
+    if (!mainWindow) return
+    if (mainWindow.isVisible()) {
+      mainWindow.focus()
+    } else {
+      mainWindow.show()
+      mainWindow.focus()
+    }
+  })
+}
+
+function destroyTray() {
+  tray?.destroy()
+  tray = null
+}
+
 // ── Single-instance lock + file-open handling ──────────────────────────────
 const AUDIO_EXTS = new Set(['.mp3', '.flac', '.ogg', '.opus', '.wav', '.m4a', '.aac', '.wma'])
 
@@ -1324,6 +1368,11 @@ app.whenReady().then(async () => {
   })
 
   await createWindow()
+
+  // ── Tray icon ──────────────────────────────────────────────────────────
+  loadSettings().then((s) => {
+    if (s.trayEnabled !== false) createTray()
+  })
 
   // ── Animated covers ────────────────────────────────────────────────────
   registerAnimatedCoverIPC()
@@ -1913,7 +1962,24 @@ app.whenReady().then(async () => {
     if (mainWindow?.isMaximized()) mainWindow.unmaximize()
     else mainWindow?.maximize()
   })
-  ipcMain.on('window:close', () => mainWindow?.close())
+  ipcMain.on('window:close', () => {
+    if (tray) {
+      mainWindow?.hide()
+    } else {
+      mainWindow?.close()
+    }
+  })
+  ipcMain.handle('tray:set-enabled', (_, enabled: boolean) => {
+    if (enabled) {
+      createTray()
+    } else {
+      if (mainWindow && !mainWindow.isVisible()) {
+        mainWindow.show()
+        mainWindow.focus()
+      }
+      destroyTray()
+    }
+  })
   ipcMain.on('app:relaunch', () => {
     isRelaunching = true
     app.relaunch()
@@ -3211,5 +3277,6 @@ app.on('window-all-closed', async () => {
   stopRemoteServer()
   destroyDiscordRPC()
   destroyMpris()
+  destroyTray()
   if (!isRelaunching) app.quit()
 })

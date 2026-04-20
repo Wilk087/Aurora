@@ -597,6 +597,23 @@
     <section v-show="showSection('general', 'Behavior')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Behavior</h2>
       <div class="space-y-4">
+        <!-- Tray icon toggle -->
+        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">System Tray Icon</p>
+            <p class="text-xs text-white/30 mt-0.5">Show Aurora in the system tray; closing the window hides it instead of quitting</p>
+          </div>
+          <button
+            @click="toggleTray"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="player.trayEnabled ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
+              :class="player.trayEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
         <!-- Auto-fullscreen toggle -->
         <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
           <div>
@@ -2132,6 +2149,11 @@ async function clearAnimatedCoverCache() {
 }
 
 // ── Behavior ──────────────────────────────
+function toggleTray() {
+  player.setTrayEnabled(!player.trayEnabled)
+  toast.success(`System tray icon ${player.trayEnabled ? 'enabled' : 'disabled'}`)
+}
+
 function toggleAutoFullscreen() {
   player.setAutoFullscreen(!player.autoFullscreen)
   toast.success(`Auto-fullscreen ${player.autoFullscreen ? 'enabled' : 'disabled'}`)
