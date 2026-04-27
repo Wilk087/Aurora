@@ -1,7 +1,7 @@
 # Maintainer: Wilk087
 # NOTE: Update pkgver to match the version in package.json
 pkgname=aurora-player
-pkgver=2.7.0
+pkgver=2.8.0
 pkgrel=1
 pkgdesc="A beautiful local music player for Linux"
 arch=('x86_64')
