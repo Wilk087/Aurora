@@ -21,7 +21,7 @@
           VITE_APP_VERSION = version;
           APP_VERSION = version;
 
-          npmDepsHash = "sha256-y/vSUR/8sZ7ItHeeeHfig9BHz6CSCstIx3F5KG4ZlFo="; 
+          npmDepsHash = "sha256-rOWXF0tMN21pucIF7U5qhTl5kJzFl2N1N+GYESBx1XE="; 
 
           forceGitDeps = true;
 
