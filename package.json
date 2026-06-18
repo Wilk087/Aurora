@@ -1,6 +1,6 @@
 {
   "name": "aurora-player",
-  "version": "2.8.0",
+  "version": "2.9.0-lyrics-dev",
   "private": true,
   "description": "A beautiful local music player for Linux and Windows",
   "author": {

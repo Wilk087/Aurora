@@ -780,14 +780,20 @@ async function parseTrack(filePath: string): Promise<any> {
 }
 
 // ── Lyrics ─────────────────────────────────────────────────────────────────
-async function findLocalLyrics(audioPath: string): Promise<string | null> {
+async function findLocalLyrics(audioPath: string): Promise<{ lrc: string; translation?: string } | null> {
   const dir = dirname(audioPath)
   const name = basename(audioPath, extname(audioPath))
   const lrcPath = join(dir, `${name}.lrc`)
+  const tranPath = join(dir, `${name}.translation.lrc`)
 
   try {
     if (existsSync(lrcPath)) {
-      return await readFile(lrcPath, 'utf-8')
+      const lrc = await readFile(lrcPath, 'utf-8')
+      let translation: string | undefined
+      try {
+        if (existsSync(tranPath)) translation = await readFile(tranPath, 'utf-8')
+      } catch {}
+      return { lrc, translation }
     }
   } catch {}
 
@@ -840,6 +846,132 @@ async function fetchLRCLIB(track: { title: string; artist: string; album: string
     logger.error('LRCLIB fetch error:', err)
   }
   return null
+}
+
+function neteaseFetch(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    httpsRequest(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://music.163.com/',
+        'Cookie': 'os=pc; appver=8.7.01',
+      },
+    }, (res) => {
+      let data = ''
+      res.on('data', (chunk) => (data += chunk))
+      res.on('end', () => resolve(data))
+      res.on('error', reject)
+    }).on('error', reject).end()
+  })
+}
+
+async function fetchNetease(track: { title: string; artist: string; duration: number }): Promise<{ lrc: string; translation?: string } | null> {
+  try {
+    const query = encodeURIComponent(`${track.artist} ${track.title}`)
+    const searchUrl = `https://music.163.com/api/search/get/?s=${query}&type=1&limit=5`
+    const searchRes = await neteaseFetch(searchUrl)
+    const searchData = JSON.parse(searchRes)
+
+    if (searchData.code !== 200 || !Array.isArray(searchData.result?.songs) || searchData.result.songs.length === 0) return null
+
+    // Pick best match by duration (within 5 s), otherwise take top result
+    const songs = searchData.result.songs as Array<{ id: number; name: string; duration: number }>
+    const trackMs = track.duration * 1000
+    const best = songs.find(s => Math.abs(s.duration - trackMs) < 5000) ?? songs[0]
+
+    const lyricsUrl = `https://music.163.com/api/song/lyric?id=${best.id}&lv=1&kv=1&tv=-1`
+    const lyricsRes = await neteaseFetch(lyricsUrl)
+    const lyricsData = JSON.parse(lyricsRes)
+
+    const lrc: string = lyricsData.lrc?.lyric ?? ''
+    if (!lrc.trim()) return null
+
+    const tlyric: string = lyricsData.tlyric?.lyric ?? ''
+    return { lrc, translation: tlyric.trim() ? tlyric : undefined }
+  } catch (err) {
+    logger.error('Netease fetch error:', err)
+    return null
+  }
+}
+
+/** Try LRCLIB first; fall back to Netease if nothing found. */
+async function fetchOnlineLyricsAll(track: { title: string; artist: string; album: string; duration: number }): Promise<{ lrc: string; translation?: string } | null> {
+  const lrclibResult = await fetchLRCLIB(track)
+  if (lrclibResult) return { lrc: lrclibResult }
+  logger.info(`[lyrics] LRCLIB miss, trying Netease: ${track.artist} – ${track.title}`)
+  return await fetchNetease(track)
+}
+
+/**
+ * Translate all text lines in an LRC string to targetLang via Google Translate.
+ * Lines are batched in one request (newline-separated) to minimise latency.
+ * Returns a new LRC with the same timestamps but translated text, or null on failure.
+ */
+async function translateLrc(lrcContent: string, targetLang: string): Promise<string | null> {
+  try {
+    const tsRegex = /\[(\d{1,3}:\d{2}(?:[.:]\d{1,3})?)\]/g
+    const lines: Array<{ timestamps: string[]; text: string }> = []
+
+    for (const rawLine of lrcContent.split('\n')) {
+      const trimmed = rawLine.trim()
+      const timestamps: string[] = []
+      let lastIdx = 0
+      let m: RegExpExecArray | null
+      tsRegex.lastIndex = 0
+      while ((m = tsRegex.exec(trimmed)) !== null) {
+        timestamps.push(m[0])
+        lastIdx = m.index + m[0].length
+      }
+      if (timestamps.length === 0) continue
+      const text = trimmed.substring(lastIdx).trim()
+      if (text) lines.push({ timestamps, text })
+    }
+
+    if (lines.length === 0) return null
+
+    const combined = lines.map(l => l.text).join('\n')
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(targetLang)}&dt=t&q=${encodeURIComponent(combined)}`
+
+    const rawResult = await new Promise<string>((resolve, reject) => {
+      httpsGet(url, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+        timeout: 15000,
+      }, (res) => {
+        let data = ''
+        res.on('data', (chunk) => (data += chunk))
+        res.on('end', () => resolve(data))
+        res.on('error', reject)
+      }).on('error', reject)
+    })
+
+    const parsed = JSON.parse(rawResult)
+    const translated = (parsed[0] as Array<[string, string]>).map((c) => c[0]).join('')
+    const translatedLines = translated.split('\n')
+
+    const rebuilt = lines
+      .map((line, i) => {
+        const text = (translatedLines[i] ?? '').trim()
+        return text ? line.timestamps.join('') + text : null
+      })
+      .filter(Boolean)
+      .join('\n')
+
+    return rebuilt || null
+  } catch (err) {
+    logger.error('translateLrc error:', err)
+    return null
+  }
+}
+
+async function saveTranslationFile(audioPath: string, translationContent: string): Promise<void> {
+  const dir = dirname(audioPath)
+  const name = basename(audioPath, extname(audioPath))
+  const tranPath = join(dir, `${name}.translation.lrc`)
+  try {
+    await writeFile(tranPath, translationContent, 'utf-8')
+  } catch (err) {
+    logger.error('Failed to save .translation.lrc file:', err)
+  }
 }
 
 async function saveLyricsFile(audioPath: string, lrcContent: string): Promise<void> {
@@ -1505,23 +1637,39 @@ app.whenReady().then(async () => {
 
   // ── IPC: Lyrics ──
   ipcMain.handle('lyrics:get', async (_, trackPath: string) => {
-    // Skip local lyrics lookup for remote/subsonic tracks
     if (trackPath.startsWith('subsonic://')) return null
-    return await findLocalLyrics(trackPath)
+    const local = await findLocalLyrics(trackPath)
+    if (!local) return null
+    const settings = await loadSettings()
+    const targetLang: string = settings.lyricsTranslationLang ?? 'auto'
+    if (targetLang !== 'auto') {
+      // Translate original lyrics directly → best quality, no double-translation
+      const translation = await translateLrc(local.lrc, targetLang)
+      return { lrc: local.lrc, translation: translation ?? undefined }
+    }
+    return local // auto: use Netease tlyric as-is (may be undefined)
   })
 
   ipcMain.handle('lyrics:fetch-online', async (_, trackInfo: { path: string; title: string; artist: string; album: string; duration: number }) => {
-    const online = await fetchLRCLIB(trackInfo)
+    const result = await fetchOnlineLyricsAll(trackInfo)
+    // Save the raw result to disk (always store Netease tlyric if available)
     if (trackInfo.path && !trackInfo.path.startsWith('subsonic://')) {
-      if (online) {
-        // Save the fetched lyrics as .lrc file next to the audio
-        await saveLyricsFile(trackInfo.path, online)
+      if (result) {
+        await saveLyricsFile(trackInfo.path, result.lrc)
+        if (result.translation) await saveTranslationFile(trackInfo.path, result.translation)
       } else {
-        // Save a sentinel so we don't hit LRCLIB again for this instrumental track
         await saveLyricsFile(trackInfo.path, '[instrumental]')
       }
     }
-    return online
+    if (!result) return null
+    // Apply language preference: translate original → target lang, or pass tlyric through
+    const settings = await loadSettings()
+    const targetLang: string = settings.lyricsTranslationLang ?? 'auto'
+    if (targetLang !== 'auto') {
+      const translation = await translateLrc(result.lrc, targetLang)
+      return { lrc: result.lrc, translation: translation ?? undefined }
+    }
+    return result
   })
 
   // ── IPC: App paths (for Settings display) ──
@@ -2551,7 +2699,7 @@ app.whenReady().then(async () => {
       try {
         const lyrics = await findLocalLyrics(track.path)
         if (lyrics) {
-          const normalized = lyrics.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+          const normalized = lyrics.lrc.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
           // Strip LRC timestamps so we only search the lyric text itself
           const clean = normalized.replace(/\[\d+:\d+[\.\:]\d+\]/g, ' ')
           if (clean.includes(q)) matchingIds.push(track.id)

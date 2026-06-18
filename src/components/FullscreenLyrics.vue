@@ -1,5 +1,14 @@
 <template>
   <div class="fullscreen-lyrics h-full w-full flex flex-col items-center justify-center relative">
+    <!-- Translation toggle -->
+    <button
+      v-if="hasTranslations"
+      @click="player.setShowLyricsTranslation(!player.showLyricsTranslation)"
+      class="absolute top-4 right-4 z-10 px-2.5 py-1.5 rounded-lg text-sm font-medium transition-colors"
+      :class="player.showLyricsTranslation ? 'bg-accent/20 text-accent' : 'bg-white/[0.08] text-white/30 hover:text-white/60'"
+      title="Toggle translation"
+    >T</button>
+
     <!-- Loading -->
     <div v-if="loading" class="text-white/30 text-lg">Loading lyrics...</div>
 
@@ -84,6 +93,11 @@
             <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>
           </span>
         </p>
+        <!-- Translation line -->
+        <p
+          v-if="player.showLyricsTranslation && line.translation && line.translation.toLowerCase().trim() !== line.text.toLowerCase().trim()"
+          class="fs-translation-line text-xl font-semibold mt-1"
+        >{{ line.translation }}</p>
         <div v-if="selectedLines.has(i)" class="absolute left-2 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-accent" />
       </div>
 
@@ -142,7 +156,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, inject } from 'vue'
 import { usePlayerStore } from '@/stores/player'
-import { parseLRC, findCurrentLine, findCurrentWord, type LyricLine } from '@/utils/lrcParser'
+import { parseLRC, mergeTranslations, findCurrentLine, findCurrentWord, type LyricLine } from '@/utils/lrcParser'
 import LyricsCard from '@/components/LyricsCard.vue'
 import LrcSyncer from '@/components/LrcSyncer.vue'
 
@@ -159,6 +173,9 @@ const lineRefs = ref<Record<number, HTMLElement>>({})
 const showSyncer = ref(false)
 
 const plainLyricsLines = computed(() => plainLyricsText.value.split('\n').map(l => l.trim()))
+const hasTranslations = computed(() =>
+  lyrics.value.some(l => l.translation && l.translation.toLowerCase().trim() !== l.text.toLowerCase().trim())
+)
 
 // Load lyrics when track changes
 watch(
@@ -176,33 +193,35 @@ watch(
 
     loading.value = true
     try {
-      const lrc = await window.api.getLyrics(path)
-      if (lrc) {
-        if (lrc === '[instrumental]') return // cached sentinel: no lyrics exist, skip online fetch
-        const parsed = parseLRC(lrc)
+      const local = await window.api.getLyrics(path)
+      if (local) {
+        if (local.lrc === '[instrumental]') return
+        let parsed = parseLRC(local.lrc)
         if (parsed.length > 0) {
+          if (local.translation) parsed = mergeTranslations(parsed, local.translation)
           lyrics.value = parsed
           return
         }
-        plainLyricsText.value = lrc
+        plainLyricsText.value = local.lrc
         return
       }
 
       loading.value = false
       searchingOnline.value = true
-      const onlineLrc = await window.api.fetchOnlineLyrics({
+      const online = await window.api.fetchOnlineLyrics({
         path: track.path,
         title: track.title,
         artist: track.artist,
         album: track.album,
         duration: track.duration,
       })
-      if (onlineLrc) {
-        const parsed = parseLRC(onlineLrc)
+      if (online) {
+        let parsed = parseLRC(online.lrc)
         if (parsed.length > 0) {
+          if (online.translation) parsed = mergeTranslations(parsed, online.translation)
           lyrics.value = parsed
         } else {
-          plainLyricsText.value = onlineLrc
+          plainLyricsText.value = online.lrc
         }
       }
     } catch (err) {
@@ -338,6 +357,9 @@ watch(() => player.currentTrack?.path, () => {
 
 .fs-lyric-line:hover {
   color: rgba(255, 255, 255, 0.3);
+}
+.fs-translation-line {
+  /* inherits color and transform from parent .fs-lyric-line state classes */
 }
 
 .fs-slide-up-enter-active,

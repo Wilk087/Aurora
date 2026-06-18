@@ -451,6 +451,50 @@
           </div>
         </div>
 
+        <!-- Lyrics translation -->
+        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">Show Lyrics Translation</p>
+            <p class="text-xs text-white/30 mt-0.5">Display translated lyrics below each line when available</p>
+          </div>
+          <button
+            @click="player.setShowLyricsTranslation(!player.showLyricsTranslation)"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="player.showLyricsTranslation ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
+              :class="player.showLyricsTranslation ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
+
+        <!-- Translation language -->
+        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">Translation Language</p>
+            <p class="text-xs text-white/30 mt-0.5">Auto shows the source translation (usually Chinese). A specific language translates from the original.</p>
+          </div>
+          <select
+            :value="player.lyricsTranslationLang"
+            @change="player.setLyricsTranslationLang(($event.target as HTMLSelectElement).value)"
+            class="ml-4 px-3 py-1.5 rounded-lg bg-white/[0.08] border border-white/[0.1] text-sm text-white/80 outline-none focus:border-accent/50 transition-colors cursor-pointer"
+          >
+            <option value="auto">Auto (from source)</option>
+            <option value="en">English</option>
+            <option value="es">Spanish</option>
+            <option value="fr">French</option>
+            <option value="de">German</option>
+            <option value="pt">Portuguese</option>
+            <option value="ru">Russian</option>
+            <option value="it">Italian</option>
+            <option value="ja">Japanese</option>
+            <option value="ko">Korean</option>
+            <option value="zh-CN">Chinese (Simplified)</option>
+            <option value="zh-TW">Chinese (Traditional)</option>
+          </select>
+        </div>
+
         <!-- Lyrics offset -->
         <div class="px-4 py-3 rounded-xl bg-white/[0.05]">
           <div class="flex items-center justify-between mb-2">
@@ -1616,7 +1660,7 @@ const sectionKeywords: Record<string, string[]> = {
   'Discord Rich Presence': ['discord', 'rpc', 'activity', 'presence', 'status'],
   'Search': ['search lyrics', 'lyrics search'],
   'Audio Output': ['audio', 'output', 'device', 'speaker', 'sound', 'sink'],
-  'Playback': ['playback', 'queue', 'shuffle', 'crossfade', 'player', 'volume', 'gapless'],
+  'Playback': ['playback', 'queue', 'shuffle', 'crossfade', 'player', 'volume', 'gapless', 'lyrics', 'translation', 'translate', 'language'],
   'Appearance': ['theme', 'color', 'accent', 'font', 'ui', 'dark', 'window', 'opacity', 'blur'],
   'Animated Covers': ['animation', 'cover', 'album art', 'animated'],
   'Behavior': ['behavior', 'window', 'minimize', 'tray', 'startup', 'close'],

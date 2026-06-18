@@ -1,5 +1,14 @@
 <template>
   <div class="lyrics-container h-full flex flex-col items-center justify-center overflow-hidden relative">
+    <!-- Translation toggle -->
+    <button
+      v-if="hasTranslations"
+      @click="player.setShowLyricsTranslation(!player.showLyricsTranslation)"
+      class="absolute top-3 right-3 z-10 px-2 py-1 rounded-lg text-xs font-medium transition-colors"
+      :class="player.showLyricsTranslation ? 'bg-accent/20 text-accent' : 'bg-white/[0.06] text-white/30 hover:text-white/60'"
+      title="Toggle translation"
+    >T</button>
+
     <!-- Loading -->
     <div v-if="loading" class="text-white/30 text-sm">Loading lyrics...</div>
 
@@ -85,6 +94,11 @@
           <span class="text-sm tracking-widest">···</span>
           <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>
         </span>
+        <!-- Translation line -->
+        <p
+          v-if="player.showLyricsTranslation && line.translation && line.translation.toLowerCase().trim() !== line.text.toLowerCase().trim()"
+          class="sl-translation-line mt-0.5 text-base font-normal"
+        >{{ line.translation }}</p>
         <!-- Selection indicator -->
         <div v-if="selectedLines.has(i)" class="absolute left-1 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-accent" />
       </div>
@@ -144,7 +158,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { usePlayerStore } from '@/stores/player'
-import { parseLRC, findCurrentLine, findCurrentWord, type LyricLine } from '@/utils/lrcParser'
+import { parseLRC, mergeTranslations, findCurrentLine, findCurrentWord, type LyricLine } from '@/utils/lrcParser'
 import LyricsCard from '@/components/LyricsCard.vue'
 import LrcSyncer from '@/components/LrcSyncer.vue'
 
@@ -161,6 +175,9 @@ const lineRefs = ref<Record<number, HTMLElement>>({})
 const showSyncer = ref(false)
 
 const plainLyricsLines = computed(() => plainLyricsText.value.split('\n').map(l => l.trim()))
+const hasTranslations = computed(() =>
+  lyrics.value.some(l => l.translation && l.translation.toLowerCase().trim() !== l.text.toLowerCase().trim())
+)
 // Load lyrics when track changes
 watch(
   () => player.currentTrack?.path,
@@ -179,36 +196,37 @@ watch(
     loading.value = true
     try {
       // 1. Try local .lrc file first
-      const lrc = await window.api.getLyrics(path)
-      if (lrc) {
-        if (lrc === '[instrumental]') return // cached sentinel: no lyrics exist, skip online fetch
-        const parsed = parseLRC(lrc)
+      const local = await window.api.getLyrics(path)
+      if (local) {
+        if (local.lrc === '[instrumental]') return // cached sentinel: no lyrics exist, skip online fetch
+        let parsed = parseLRC(local.lrc)
         if (parsed.length > 0) {
+          if (local.translation) parsed = mergeTranslations(parsed, local.translation)
           lyrics.value = parsed
           return
         }
         // Local file exists but has no timestamps → treat as plain
-        plainLyricsText.value = lrc
+        plainLyricsText.value = local.lrc
         return
       }
 
-      // 2. Search online via LRCLIB
+      // 2. Search online via LRCLIB → Netease
       loading.value = false
       searchingOnline.value = true
-      const onlineLrc = await window.api.fetchOnlineLyrics({
+      const online = await window.api.fetchOnlineLyrics({
         path: track.path,
         title: track.title,
         artist: track.artist,
         album: track.album,
         duration: track.duration,
       })
-      if (onlineLrc) {
-        const parsed = parseLRC(onlineLrc)
+      if (online) {
+        let parsed = parseLRC(online.lrc)
         if (parsed.length > 0) {
+          if (online.translation) parsed = mergeTranslations(parsed, online.translation)
           lyrics.value = parsed
         } else {
-          // Got plain/unsynced lyrics from online
-          plainLyricsText.value = onlineLrc
+          plainLyricsText.value = online.lrc
         }
       }
     } catch (err) {
@@ -336,6 +354,9 @@ watch(() => player.currentTrack?.path, () => {
 }
 .sl-lyric-line.is-hidden {
   color: rgba(255, 255, 255, 0.08);
+}
+.sl-translation-line {
+  /* inherits color from parent .sl-lyric-line state classes */
 }
 
 .slide-up-enter-active,

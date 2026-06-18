@@ -325,6 +325,8 @@ export const usePlayerStore = defineStore('player', () => {
 
   // ── Lyrics offset ───────────────────────────────────────────────────────
   const lyricsOffset = ref(0) // in seconds (positive = lyrics earlier, negative = later)
+  const showLyricsTranslation = ref(true)
+  const lyricsTranslationLang = ref('auto')
 
   // ── Waveform data ──────────────────────────────────────────────────────
   const waveformData = ref<number[]>([])
@@ -622,6 +624,8 @@ export const usePlayerStore = defineStore('player', () => {
     if (s.repeatMode && ['off', 'all', 'one'].includes(s.repeatMode)) repeatMode.value = s.repeatMode
     if (s.muted === true) { isMuted.value = true; audio.muted = true; audioStream.muted = true }
     if (s.lyricsOffset !== undefined) lyricsOffset.value = s.lyricsOffset
+    if (typeof s.showLyricsTranslation === 'boolean') showLyricsTranslation.value = s.showLyricsTranslation
+    if (typeof s.lyricsTranslationLang === 'string') lyricsTranslationLang.value = s.lyricsTranslationLang
     if (typeof s.waveformEnabled === 'boolean') waveformEnabled.value = s.waveformEnabled
     if (typeof s.animatedCoversEnabled === 'boolean') animatedCoversEnabled.value = s.animatedCoversEnabled
     if (typeof s.pauseAnimatedOnBlur === 'boolean') pauseAnimatedOnBlur.value = s.pauseAnimatedOnBlur
@@ -1360,6 +1364,16 @@ export const usePlayerStore = defineStore('player', () => {
     window.api.mergeSettings({ lyricsOffset: offset })
   }
 
+  function setShowLyricsTranslation(enabled: boolean) {
+    showLyricsTranslation.value = enabled
+    window.api.mergeSettings({ showLyricsTranslation: enabled })
+  }
+
+  function setLyricsTranslationLang(lang: string) {
+    lyricsTranslationLang.value = lang
+    window.api.mergeSettings({ lyricsTranslationLang: lang })
+  }
+
   function setWaveformEnabled(enabled: boolean) {
     waveformEnabled.value = enabled
     window.api.mergeSettings({ waveformEnabled: enabled })
@@ -1625,6 +1639,10 @@ export const usePlayerStore = defineStore('player', () => {
     // Lyrics offset
     lyricsOffset,
     setLyricsOffset,
+    showLyricsTranslation,
+    setShowLyricsTranslation,
+    lyricsTranslationLang,
+    setLyricsTranslationLang,
     // Waveform
     waveformData,
     waveformEnabled,
