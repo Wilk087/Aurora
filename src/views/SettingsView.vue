@@ -1351,28 +1351,60 @@
 
     <!-- ── Themes ──────────────────────────────────────────────────── -->
     <section v-show="showSection('appearance', 'Themes')" class="mb-8">
-      <h2 class="text-lg font-semibold text-white mb-4">
-        Themes
-        <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/15 text-amber-500 uppercase tracking-wider align-middle">WIP</span>
-      </h2>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold text-white">Themes</h2>
+        <button
+          @click="hubDefaultTab = 'Themes'; activeTab = 'hub'"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-white/40 hover:text-white/70 hover:bg-white/[0.06] transition-all"
+        >
+          Browse Hub
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+          </svg>
+        </button>
+      </div>
 
       <div class="space-y-4">
         <!-- Theme picker -->
         <div class="px-4 py-3 rounded-xl bg-white/[0.05]">
           <p class="text-sm text-white/80 mb-3">Active Theme</p>
-          <div class="grid grid-cols-2 gap-2">
-            <button
+          <div class="space-y-1.5">
+            <div
               v-for="t in themeStore.themes"
               :key="t.id"
-              @click="themeStore.applyTheme(t)"
-              class="px-3 py-2.5 rounded-lg text-left transition-all border"
+              class="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all border group"
               :class="themeStore.currentTheme.id === t.id
-                ? 'bg-accent/10 border-accent/30 text-white'
-                : 'bg-white/[0.03] border-transparent hover:bg-white/[0.06] text-white/60 hover:text-white/80'"
+                ? 'bg-accent/10 border-accent/20'
+                : 'bg-white/[0.03] border-transparent hover:bg-white/[0.05]'"
+              @click="themeStore.applyTheme(t)"
             >
-              <p class="text-sm font-medium truncate">{{ t.name }}</p>
-              <p class="text-[10px] text-white/30 truncate">{{ t.author }}</p>
-            </button>
+              <!-- Accent swatch -->
+              <div
+                class="w-7 h-7 rounded-lg shrink-0 border border-white/10"
+                :style="{ background: `rgb(${t.colors.accent})` }"
+              />
+              <!-- Info -->
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-sm font-medium truncate" :class="themeStore.currentTheme.id === t.id ? 'text-white' : 'text-white/70'">{{ t.name }}</span>
+                  <svg v-if="themeStore.currentTheme.id === t.id" class="w-3.5 h-3.5 text-accent shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clip-rule="evenodd"/>
+                  </svg>
+                </div>
+                <p class="text-[10px] text-white/30 mt-px">by {{ t.author }}<span v-if="t.description" class="ml-1.5 text-white/20">· {{ t.description }}</span></p>
+              </div>
+              <!-- Remove (non-default themes) -->
+              <button
+                v-if="t.id !== 'aurora-default'"
+                @click.stop="themeStore.removeTheme(t.id)"
+                class="p-1.5 rounded-lg text-white/20 hover:text-red-400 hover:bg-white/[0.06] transition-all opacity-0 group-hover:opacity-100 shrink-0"
+                title="Remove theme"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1402,13 +1434,13 @@
           </div>
         </div>
 
-        <!-- Reset -->
+        <!-- Footer actions -->
         <div class="flex items-center gap-3">
           <button
             @click="themeStore.resetTheme()"
             class="px-4 py-2 rounded-full text-xs font-medium bg-white/[0.08] hover:bg-white/[0.12] text-white/70 hover:text-white/90 transition-colors"
           >
-            Reset to Default Theme
+            Reset to Default
           </button>
           <button
             @click="themeStore.openThemesFolder()"
@@ -1428,15 +1460,23 @@
 
     <!-- ── Hub ───────────────────────────────────────────────────────── -->
     <section v-show="showSection('hub', 'Hub')" class="mb-8">
-      <HubPanel />
+      <HubPanel :default-tab="hubDefaultTab" />
     </section>
 
     <!-- ── Plugins ──────────────────────────────────────────────────── -->
     <section v-show="showSection('plugins', 'Plugins')" class="mb-8">
-      <h2 class="text-lg font-semibold text-white mb-4">
-        Plugins
-        <span class="ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-500/15 text-amber-500 uppercase tracking-wider align-middle">WIP</span>
-      </h2>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold text-white">Plugins</h2>
+        <button
+          @click="hubDefaultTab = 'Plugins'; activeTab = 'hub'"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-white/40 hover:text-white/70 hover:bg-white/[0.06] transition-all"
+        >
+          Browse Hub
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" />
+          </svg>
+        </button>
+      </div>
 
       <div class="space-y-4">
         <!-- Installed plugins -->
@@ -1448,7 +1488,7 @@
           >
             <div class="flex items-center justify-between px-4 py-3">
               <div class="min-w-0">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
                   <p class="text-sm font-medium text-white truncate">{{ manifest.name }}</p>
                   <span class="text-[10px] text-white/20 shrink-0">v{{ manifest.version }}</span>
                   <span
@@ -1456,6 +1496,12 @@
                     class="text-[10px] font-medium text-amber-400/80 bg-amber-400/10 px-1.5 py-0.5 rounded shrink-0"
                     :title="`Requires Aurora v${manifest.minAuroraVersion} or newer (installed: v${appVersion})`"
                   >requires v{{ manifest.minAuroraVersion }}+</span>
+                  <button
+                    v-if="pluginHasUpdate(manifest.id)"
+                    @click.stop="hubDefaultTab = 'Plugins'; activeTab = 'hub'"
+                    class="px-1.5 py-px rounded text-[10px] font-medium bg-accent/15 text-accent hover:bg-accent/25 transition-colors shrink-0"
+                    title="Update available in Hub"
+                  >Update in Hub ↗</button>
                 </div>
                 <p v-if="manifest.description" class="text-xs text-white/30 mt-0.5">{{ manifest.description }}</p>
                 <p class="text-[10px] text-white/20 mt-0.5">by {{ manifest.author }}</p>
@@ -1569,9 +1615,15 @@
           </div>
         </div>
 
-        <div v-else class="px-4 py-6 rounded-xl bg-white/[0.03] text-center">
-          <p class="text-sm text-white/30">No plugins installed</p>
-          <p class="text-xs text-white/20 mt-1">Drop plugin folders into the plugins directory to get started</p>
+        <div v-else class="px-4 py-8 rounded-xl bg-white/[0.03] text-center">
+          <p class="text-sm text-white/40 mb-1">No plugins installed</p>
+          <p class="text-xs text-white/25 mb-4">Browse Aurora Hub to find and install community plugins.</p>
+          <button
+            @click="hubDefaultTab = 'Plugins'; activeTab = 'hub'"
+            class="px-4 py-2 rounded-full text-xs font-medium bg-accent/15 hover:bg-accent/25 text-accent transition-colors"
+          >
+            Browse Hub
+          </button>
         </div>
 
         <div class="flex items-center gap-3">
@@ -1663,6 +1715,7 @@ import { usePlaylistStore } from '@/stores/playlist'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useThemeStore } from '@/stores/theme'
 import { usePluginStore } from '@/stores/plugins'
+import { useRegistryStore } from '@/stores/registry'
 import { useSyncStore } from '@/stores/sync'
 import { useToast } from '@/composables/useToast'
 import { getPluginSettingsSchema, notifyPluginSettingChanged } from '@/plugins'
@@ -1676,6 +1729,7 @@ const playlistStore = usePlaylistStore()
 const favoritesStore = useFavoritesStore()
 const themeStore = useThemeStore()
 const pluginStore = usePluginStore()
+const registryStore = useRegistryStore()
 const syncStore = useSyncStore()
 const toast = useToast()
 
@@ -1736,6 +1790,11 @@ function formatSyncTime(ts: number): string {
 
 // ── Tab navigation ─────────────────────────────────────────────────────
 const activeTab = ref('general')
+const hubDefaultTab = ref<'Plugins' | 'Themes'>('Plugins')
+
+function pluginHasUpdate(pluginId: string): boolean {
+  return registryStore.pluginsWithStatus.find(p => p.id === pluginId)?.updateAvailable ?? false
+}
 const tabs = [
   { id: 'general', label: 'General' },
   { id: 'appearance', label: 'Appearance' },

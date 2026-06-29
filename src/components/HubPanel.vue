@@ -41,9 +41,7 @@
           :key="t"
           @click="activeTab = t as 'Plugins' | 'Themes'"
           class="px-3 py-1 rounded-md text-xs font-medium transition-all"
-          :class="activeTab === t
-            ? 'bg-accent/15 text-accent'
-            : 'text-white/40 hover:text-white/70'"
+          :class="activeTab === t ? 'bg-accent/15 text-accent' : 'text-white/40 hover:text-white/70'"
         >
           {{ t }}
           <span v-if="t === 'Plugins' && updateCountPlugins > 0" class="ml-1 px-1 py-px rounded text-[10px] bg-accent/20 text-accent">{{ updateCountPlugins }}</span>
@@ -63,10 +61,10 @@
       <button @click="refresh" class="px-4 py-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-sm text-white/60 transition-colors">Try again</button>
     </div>
 
-    <!-- Empty initial state (not yet fetched) -->
+    <!-- Empty initial state -->
     <div v-else-if="!hasFetched" class="py-12 text-center">
       <p class="text-white/30 text-sm mb-3">Fetch the registry to browse community {{ activeTab.toLowerCase() }}</p>
-      <button @click="fetch" class="px-4 py-1.5 rounded-lg bg-accent/15 hover:bg-accent/25 text-sm text-accent transition-colors">Browse Hub</button>
+      <button @click="doFetch" class="px-4 py-1.5 rounded-lg bg-accent/15 hover:bg-accent/25 text-sm text-accent transition-colors">Browse Hub</button>
     </div>
 
     <!-- No search results -->
@@ -81,7 +79,7 @@
         :key="item.id"
         class="flex items-start gap-4 px-4 py-3.5 rounded-xl bg-white/[0.04] border border-white/[0.05] hover:bg-white/[0.06] transition-colors group"
       >
-        <!-- Color swatch for themes, plugin icon otherwise -->
+        <!-- Swatch / icon -->
         <div
           v-if="activeTab === 'Themes' && (item as any).preview"
           class="w-9 h-9 rounded-lg shrink-0 mt-0.5 border border-white/10"
@@ -108,12 +106,15 @@
             </span>
           </div>
           <p class="text-xs text-white/45 mt-0.5 line-clamp-2">{{ item.description }}</p>
+          <!-- Post-install hint -->
+          <p v-if="justInstalled.has(item.id) && activeTab === 'Plugins'" class="text-[11px] text-accent/80 mt-1">
+            Installed — enable it in the <strong>Plugins</strong> tab
+          </p>
+          <p v-else-if="justInstalled.has(item.id) && activeTab === 'Themes'" class="text-[11px] text-accent/80 mt-1">
+            Installed — select it in <strong>Appearance → Themes</strong>
+          </p>
           <div v-if="item.tags && item.tags.length" class="flex flex-wrap gap-1 mt-1.5">
-            <span
-              v-for="tag in item.tags.slice(0, 5)"
-              :key="tag"
-              class="px-1.5 py-px rounded text-[10px] bg-white/[0.05] text-white/35"
-            >{{ tag }}</span>
+            <span v-for="tag in item.tags.slice(0, 5)" :key="tag" class="px-1.5 py-px rounded text-[10px] bg-white/[0.05] text-white/35">{{ tag }}</span>
           </div>
         </div>
 
@@ -132,7 +133,7 @@
 
           <button
             v-if="(item as any).updateAvailable"
-            @click="activeTab === 'Plugins' ? registry.updatePlugin(item as any) : registry.updateTheme(item as any)"
+            @click="handleUpdate(item)"
             :disabled="registry.isInstalling(item.id)"
             class="px-3 py-1.5 rounded-lg text-xs font-medium bg-accent/15 hover:bg-accent/25 text-accent disabled:opacity-50 disabled:cursor-not-allowed transition-all min-w-[72px] text-center"
           >
@@ -142,7 +143,7 @@
 
           <button
             v-else-if="!(item as any).installed"
-            @click="activeTab === 'Plugins' ? registry.installPlugin(item as any) : registry.installTheme(item as any)"
+            @click="handleInstall(item)"
             :disabled="registry.isInstalling(item.id)"
             class="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/[0.07] hover:bg-white/[0.12] text-white/70 disabled:opacity-50 disabled:cursor-not-allowed transition-all min-w-[72px] text-center"
           >
@@ -150,14 +151,14 @@
             <span v-else>Install</span>
           </button>
 
-          <span v-else class="px-3 py-1.5 text-xs text-white/20 min-w-[72px] text-center">
+          <span v-else-if="!justInstalled.has(item.id)" class="px-3 py-1.5 text-xs text-white/20 min-w-[72px] text-center">
             Installed
           </span>
         </div>
       </div>
     </div>
 
-    <!-- Footer: registry link + last updated -->
+    <!-- Footer -->
     <p v-if="hasFetched && !registry.error" class="text-xs text-white/20 mt-4 text-center">
       <span v-if="registry.updatedAt">Registry updated {{ formatDate(registry.updatedAt) }} · </span>
       Submit yours at
@@ -167,16 +168,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRegistryStore } from '@/stores/registry'
 import { useToast } from '@/composables/useToast'
+
+const props = defineProps<{
+  defaultTab?: 'Plugins' | 'Themes'
+}>()
 
 const registry = useRegistryStore()
 const toast = useToast()
 
-const activeTab = ref<'Plugins' | 'Themes'>('Plugins')
+const activeTab = ref<'Plugins' | 'Themes'>(props.defaultTab ?? 'Plugins')
 const search = ref('')
 const hasFetched = ref(false)
+const justInstalled = ref(new Set<string>())
+
+watch(() => props.defaultTab, (val) => {
+  if (val) activeTab.value = val
+})
 
 const items = computed(() =>
   activeTab.value === 'Plugins' ? registry.pluginsWithStatus : registry.themesWithStatus
@@ -196,7 +206,7 @@ const filtered = computed(() => {
 const updateCountPlugins = computed(() => registry.pluginsWithStatus.filter(p => p.updateAvailable).length)
 const updateCountThemes = computed(() => registry.themesWithStatus.filter(t => t.updateAvailable).length)
 
-async function fetch() {
+async function doFetch() {
   await registry.fetch()
   hasFetched.value = true
 }
@@ -205,6 +215,45 @@ async function refresh() {
   await registry.fetch(true)
   hasFetched.value = true
   if (!registry.error) toast.success('Registry refreshed')
+}
+
+async function handleInstall(item: any) {
+  try {
+    if (activeTab.value === 'Plugins') {
+      await registry.installPlugin(item)
+      markJustInstalled(item.id)
+    } else {
+      await registry.installTheme(item)
+      markJustInstalled(item.id)
+    }
+  } catch (err: any) {
+    toast.error(`Install failed: ${err?.message ?? 'Unknown error'}`)
+  }
+}
+
+async function handleUpdate(item: any) {
+  try {
+    if (activeTab.value === 'Plugins') {
+      await registry.updatePlugin(item)
+      toast.success(`${item.name} updated`)
+    } else {
+      await registry.updateTheme(item)
+      toast.success(`${item.name} updated — select it in Appearance → Themes`)
+    }
+  } catch (err: any) {
+    toast.error(`Update failed: ${err?.message ?? 'Unknown error'}`)
+  }
+}
+
+function markJustInstalled(id: string) {
+  const next = new Set(justInstalled.value)
+  next.add(id)
+  justInstalled.value = next
+  setTimeout(() => {
+    const s = new Set(justInstalled.value)
+    s.delete(id)
+    justInstalled.value = s
+  }, 15_000)
 }
 
 function openUrl(url: string) {
@@ -223,7 +272,6 @@ function formatDate(iso: string) {
   }
 }
 
-// Auto-fetch on first mount if registry is empty (uses cached data when available)
 onMounted(async () => {
   if (registry.plugins.length === 0 && registry.themes.length === 0) {
     await registry.fetch()
