@@ -29,7 +29,7 @@ installGlobalLogHandlers()
 // ── Discord Rich Presence ──────────────────────────────────────────────────
 // Uses discord-rpc to show what's currently playing
 // Default client ID – users can create their own Discord App at discord.com/developers
-let discordClientId = '1338909498498850836'
+let discordClientId = '1471146991600926815'
 let rpcClient: any = null
 let rpcReady = false
 
@@ -195,6 +195,8 @@ async function updateDiscordPresence(data: {
       type: 2,
       name: `${data.title} by ${data.artist}`,
       details: details.substring(0, 128),
+      smallImageKey: 'aurora_icon',
+      smallImageText: 'Aurora Player',
       largeImageKey: imageKey,
       largeImageText: imageText.substring(0, 128),
       instance: false,

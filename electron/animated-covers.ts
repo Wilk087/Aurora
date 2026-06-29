@@ -2,14 +2,15 @@
  * Animated Album Cover fetcher
  *
  * Uses the Apple Music catalog API to find "editorialVideo" (motion artwork)
- * for albums.  The public bearer token is extracted from Apple Music's web
- * player JS bundle — the same technique open-source clients like Cider use.
+ * for albums.  The bearer token is captured by intercepting network requests
+ * from a hidden BrowserWindow that loads Apple Music — this is necessary
+ * because Apple no longer embeds the token in any static JS bundle.
  *
  * Apple serves these as HLS streams, so we cache the stream URLs and return
  * them to the renderer which plays them via hls.js.
  */
 
-import { ipcMain, app } from 'electron'
+import { ipcMain, app, BrowserWindow, session } from 'electron'
 import { join } from 'path'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { get as httpsGet } from 'https'
@@ -38,6 +39,7 @@ let urlCachePath = '' // JSON file mapping album key → { url, ts }
 let negativeCachePath = ''
 let appleToken = ''
 let tokenFetchedAt = 0
+let tokenFetchPromise: Promise<string> | null = null
 let urlCache: Record<string, { url: string; ts: number }> = {}
 let negativeLookups: Record<string, number> = {} // key → timestamp
 
@@ -123,53 +125,88 @@ function fetchText(url: string, headers: Record<string, string> = {}): Promise<s
 }
 
 // ── Apple Music Token ───────────────────────────────────────────────────────
+// Apple no longer embeds the developer token in any static JS bundle.
+// Instead we load Apple Music in a hidden BrowserWindow and intercept the
+// Authorization header from its first request to amp-api — the same token
+// the web player uses to query the catalog.
+function fetchAppleMusicTokenViaWindow(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const appleSession = session.fromPartition('persist:apple-music-token', { cache: true })
+    const filter = { urls: ['https://amp-api.music.apple.com/*', 'https://amp-api-edge.music.apple.com/*'] }
+
+    let resolved = false
+    let win: BrowserWindow | null = null
+
+    const cleanup = () => {
+      try { appleSession.webRequest.onSendHeaders(filter, null as any) } catch {}
+      if (win && !win.isDestroyed()) { win.destroy(); win = null }
+    }
+
+    const timeout = setTimeout(() => {
+      if (!resolved) {
+        resolved = true
+        cleanup()
+        reject(new Error('Timed out waiting for Apple Music token'))
+      }
+    }, 30_000)
+
+    appleSession.webRequest.onSendHeaders(filter, (details) => {
+      if (resolved) return
+      const headers = details.requestHeaders as Record<string, string>
+      // HTTP/2 headers are lowercase in Electron's webRequest API
+      const auth = headers['Authorization'] ?? headers['authorization']
+      if (auth?.startsWith('Bearer eyJ')) {
+        resolved = true
+        clearTimeout(timeout)
+        appleToken = auth.replace('Bearer ', '')
+        tokenFetchedAt = Date.now()
+        logger.info('Apple Music token captured from hidden window')
+        cleanup()
+        resolve(appleToken)
+      }
+    })
+
+    win = new BrowserWindow({
+      show: false,
+      webPreferences: {
+        session: appleSession,
+        nodeIntegration: false,
+        contextIsolation: true,
+      },
+    })
+
+    logger.info('Opening hidden Apple Music window to capture token...')
+
+    win.on('closed', () => {
+      if (!resolved) {
+        resolved = true
+        clearTimeout(timeout)
+        cleanup()
+        reject(new Error('Apple Music window closed before token was captured'))
+      }
+    })
+
+    win.loadURL('https://music.apple.com/us/browse').catch((err) => {
+      if (!resolved) {
+        resolved = true
+        clearTimeout(timeout)
+        cleanup()
+        reject(err)
+      }
+    })
+  })
+}
+
 async function getAppleMusicToken(): Promise<string> {
   if (appleToken && Date.now() - tokenFetchedAt < TOKEN_MAX_AGE) {
     return appleToken
   }
-
-  // Fetch the Apple Music web player page to find JS bundle
-  const html = await fetchText('https://music.apple.com/us/browse')
-
-  // Find JS bundle URLs — Apple uses both relative (/assets/index~xxx.js)
-  // and absolute (https://...assets/index...js) paths depending on version
-  const relativeMatches = html.match(/(?:src|href)=["']?(\/assets\/index[^"'\s>]*\.js)/g)
-  const absoluteMatches = html.match(/https:\/\/[^"'\s]*?\/assets\/index[^"'\s]*?\.js/g)
-
-  const jsUrls: string[] = []
-  if (relativeMatches) {
-    for (const m of relativeMatches) {
-      const path = m.replace(/^(?:src|href)=["']?/, '')
-      jsUrls.push(`https://music.apple.com${path}`)
-    }
+  // Deduplicate concurrent callers — only one hidden window at a time
+  if (!tokenFetchPromise) {
+    tokenFetchPromise = fetchAppleMusicTokenViaWindow()
+      .finally(() => { tokenFetchPromise = null })
   }
-  if (absoluteMatches) {
-    for (const u of absoluteMatches) {
-      if (!jsUrls.includes(u)) jsUrls.push(u)
-    }
-  }
-
-  if (jsUrls.length === 0) {
-    throw new Error('Could not find Apple Music JS bundle URL')
-  }
-
-  // Try each JS bundle to find the token
-  for (const jsUrl of jsUrls) {
-    try {
-      const js = await fetchText(jsUrl)
-      // Apple embeds a JWT token (starts with "eyJ")
-      const tokenMatch = js.match(/eyJh[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/)
-      if (tokenMatch) {
-        appleToken = tokenMatch[0]
-        tokenFetchedAt = Date.now()
-        return appleToken
-      }
-    } catch {
-      continue
-    }
-  }
-
-  throw new Error('Could not extract Apple Music bearer token')
+  return tokenFetchPromise
 }
 
 // ── Normalise strings for lenient comparison ────────────────────────────────
@@ -293,7 +330,9 @@ async function searchStorefront(token: string, storefront: string, album: string
 }
 
 async function searchAnimatedCover(album: string, artist: string): Promise<string | null> {
+  logger.info(`Searching animated cover for "${album}" by "${artist}"`)
   const token = await getAppleMusicToken()
+  logger.info(`Got Apple Music token (length: ${token.length})`)
   const normAlbum = normalizeStr(album)
   const normArtist = normalizeStr(artist)
   const artistParts = normArtist
@@ -382,46 +421,42 @@ function clearCache() {
 }
 
 // ── Album artwork URL lookup (for Discord RPC) ───────────────────────────────
-// In-memory cache shared with the Discord RPC layer
+// Uses the public iTunes Search API — no token required, stable endpoint.
 const artworkUrlCache = new Map<string, string | null>()
 
-/**
- * Look up a 512×512 album artwork URL via the Apple Music catalog.
- * Uses the same token, normalization, and multi-storefront logic as animated covers.
- * Returns null if not found or on error.
- */
 export async function getAlbumArtworkUrl(artist: string, album: string): Promise<string | null> {
   const cacheKey = `${artist}---${album}`.toLowerCase()
   if (artworkUrlCache.has(cacheKey)) return artworkUrlCache.get(cacheKey)!
 
   try {
-    const token = await getAppleMusicToken()
     const normAlbum = normalizeStr(album)
     const normArtist = normalizeStr(artist)
     const artistParts = normArtist
       .split(/[,;&]|\bfeat\.?\b|\bft\.?\b|\bwith\b/i)
       .map(s => s.trim()).filter(Boolean)
 
-    const primary = getPrimaryStorefront()
-    const storefronts = [primary, ...FALLBACK_STOREFRONTS.filter(sf => sf !== primary)]
+    for (const term of [`${album} ${artist}`, album]) {
+      const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=album&limit=10&media=music`
+      const raw = await fetchText(url)
+      const data = JSON.parse(raw)
+      const results: any[] = data?.results ?? []
 
-    for (const sf of storefronts) {
-      try {
-        // Combined search first, then album-only fallback
-        for (const term of [`${album} ${artist}`, album]) {
-          const results = await searchAppleMusic(token, sf, term)
-          const matchId = findMatchId(results, normAlbum, normArtist, artistParts)
-          if (!matchId) continue
-          const match = results.find(r => r.id === matchId)
-          const artTemplate = match?.attributes.artwork?.url
-          if (artTemplate) {
-            const artUrl = artTemplate.replace('{w}', '512').replace('{h}', '512')
-            artworkUrlCache.set(cacheKey, artUrl)
-            return artUrl
-          }
+      for (const r of results) {
+        const rAlbum = normalizeStr(r.collectionName ?? '')
+        const rArtist = normalizeStr(r.artistName ?? '')
+        const albumMatch = rAlbum.includes(normAlbum) || normAlbum.includes(rAlbum)
+        const artistMatch = rArtist === normArtist
+          || rArtist.includes(normArtist)
+          || normArtist.includes(rArtist)
+          || artistParts.some(p => p.length > 2 && (rArtist.includes(p) || p.includes(rArtist)))
+        if (!albumMatch || !artistMatch) continue
+
+        const artUrl = (r.artworkUrl100 as string | undefined)
+          ?.replace('100x100bb', '512x512bb')
+        if (artUrl) {
+          artworkUrlCache.set(cacheKey, artUrl)
+          return artUrl
         }
-      } catch {
-        // Non-fatal — try next storefront
       }
     }
   } catch (err) {
