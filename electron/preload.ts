@@ -340,4 +340,12 @@ contextBridge.exposeInMainWorld('api', {
   netFetch: (url: string, options?: { method?: string; headers?: Record<string, string>; body?: string }):
     Promise<{ ok: boolean; status: number; text: string }> =>
     ipcRenderer.invoke('net:fetch', url, options),
+
+  // Aurora Hub registry
+  registryFetch: (forceRefresh?: boolean): Promise<any> =>
+    ipcRenderer.invoke('registry:fetch', forceRefresh ?? false),
+  registryInstallTheme: (downloadUrl: string): Promise<void> =>
+    ipcRenderer.invoke('registry:install-theme', downloadUrl),
+  registryInstallPlugin: (downloadUrl: string): Promise<any> =>
+    ipcRenderer.invoke('registry:install-plugin', downloadUrl),
 })

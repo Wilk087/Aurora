@@ -1426,6 +1426,11 @@
       </div>
     </section>
 
+    <!-- ── Hub ───────────────────────────────────────────────────────── -->
+    <section v-show="showSection('hub', 'Hub')" class="mb-8">
+      <HubPanel />
+    </section>
+
     <!-- ── Plugins ──────────────────────────────────────────────────── -->
     <section v-show="showSection('plugins', 'Plugins')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">
@@ -1663,6 +1668,7 @@ import { useToast } from '@/composables/useToast'
 import { getPluginSettingsSchema, notifyPluginSettingChanged } from '@/plugins'
 import type { PluginSettingField } from '@/types/plugin'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import HubPanel from '@/components/HubPanel.vue'
 
 const library = useLibraryStore()
 const player = usePlayerStore()
@@ -1734,6 +1740,7 @@ const tabs = [
   { id: 'general', label: 'General' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'integrations', label: 'Integrations' },
+  { id: 'hub', label: 'Hub' },
   { id: 'plugins', label: 'Plugins' },
   { id: 'sync', label: 'Sync' },
   { id: 'system', label: 'System' },
@@ -1763,6 +1770,7 @@ const sectionKeywords: Record<string, string[]> = {
   'Troubleshooting': ['troubleshoot', 'debug', 'logs', 'reset', 'diagnostic'],
   'Themes': ['themes', 'custom theme', 'css', 'custom css'],
   'Plugins': ['plugins', 'extensions', 'addons', 'add-ons'],
+  'Hub': ['hub', 'store', 'browse', 'community', 'install plugin', 'install theme', 'download', 'registry'],
   'About': ['about', 'version', 'update', 'changelog', 'app info'],
 }
 
@@ -1780,7 +1788,7 @@ const sectionTabMap: Record<string, string> = {
   'Behavior': 'general', 'Scrobbling': 'integrations', 'Navidrome / Subsonic': 'integrations',
   'Remote Control': 'integrations', 'Cache': 'system', 'Sync Folder': 'sync',
   'Export / Import': 'system', 'Troubleshooting': 'system', 'Themes': 'appearance',
-  'Plugins': 'plugins', 'About': 'system',
+  'Plugins': 'plugins', 'Hub': 'hub', 'About': 'system',
 }
 
 const anyVisible = computed(() =>

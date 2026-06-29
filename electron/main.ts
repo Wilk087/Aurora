@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, protocol, net, shell, screen, Menu, Tray, nativeImage } from 'electron'
 import { join, extname, basename, dirname } from 'path'
 import { readdir, readFile, writeFile, rename, mkdir, stat, rm, copyFile, unlink, appendFile } from 'fs/promises'
-import { existsSync, createReadStream, readFileSync, watch as fsWatch } from 'fs'
+import { existsSync, createReadStream, createWriteStream, readFileSync, watch as fsWatch } from 'fs'
 import { createHash } from 'crypto'
 import { request as httpsRequest, get as httpsGet } from 'https'
 import { execFile, spawn } from 'child_process'
@@ -105,6 +105,52 @@ function fetchJSON(url: string, retries = 2): Promise<string> {
       }
     })
   })
+}
+
+// ── Aurora Hub registry helpers ───────────────────────────────────────────
+const REGISTRY_URL = 'https://raw.githubusercontent.com/Wilk087/Aurora-Hub/main/index.json'
+
+/** Download a file from url to destPath, following redirects. */
+function downloadFile(url: string, destPath: string, redirects = 5): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (redirects <= 0) return reject(new Error('Too many redirects'))
+    const parsedUrl = new URL(url)
+    const getFunc = parsedUrl.protocol === 'https:' ? httpsGet : (require('http').get as typeof httpsGet)
+    getFunc(url, {
+      headers: { 'User-Agent': `AuroraPlayer/${app.getVersion()}` },
+      timeout: 30000,
+    }, (res) => {
+      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.resume()
+        downloadFile(res.headers.location, destPath, redirects - 1).then(resolve, reject)
+        return
+      }
+      if (res.statusCode && res.statusCode !== 200) {
+        res.resume()
+        reject(new Error(`Download failed: HTTP ${res.statusCode}`))
+        return
+      }
+      const file = createWriteStream(destPath)
+      res.pipe(file)
+      file.on('finish', () => file.close(() => resolve()))
+      file.on('error', (err) => { file.destroy(); unlink(destPath).catch(() => {}); reject(err) })
+      res.on('error', (err) => { file.destroy(); unlink(destPath).catch(() => {}); reject(err) })
+    }).on('error', reject)
+  })
+}
+
+/** Extract a zip archive to destDir using the system unzip / PowerShell. */
+async function extractZip(zipPath: string, destDir: string): Promise<void> {
+  const { promisify } = await import('util')
+  const execFileAsync = promisify(execFile)
+  if (process.platform === 'win32') {
+    await execFileAsync('powershell', [
+      '-NoProfile', '-NonInteractive', '-Command',
+      `Expand-Archive -LiteralPath '${zipPath}' -DestinationPath '${destDir}' -Force`,
+    ], { timeout: 60_000 })
+  } else {
+    await execFileAsync('unzip', ['-o', zipPath, '-d', destDir], { timeout: 60_000 })
+  }
 }
 
 /** Compare two semver strings. Returns > 0 if a > b, < 0 if a < b, 0 if equal. */
@@ -3410,6 +3456,72 @@ app.whenReady().then(async () => {
         resolve({ code: null, error: err.message })
       }
     })
+  })
+
+  // ── IPC: Aurora Hub registry ───────────────────────────────────────────
+  const registryCachePath = join(cachePath, 'registry-cache.json')
+  let registryMemCache: { data: any; fetchedAt: number } | null = null
+  const REGISTRY_TTL = 30 * 60 * 1000 // 30 minutes
+
+  ipcMain.handle('registry:fetch', async (_, forceRefresh = false) => {
+    if (!forceRefresh && registryMemCache && Date.now() - registryMemCache.fetchedAt < REGISTRY_TTL) {
+      return registryMemCache.data
+    }
+    try {
+      const raw = await fetchJSON(REGISTRY_URL)
+      const data = JSON.parse(raw)
+      registryMemCache = { data, fetchedAt: Date.now() }
+      try { await writeFile(registryCachePath, JSON.stringify({ data, fetchedAt: Date.now() })) } catch {}
+      return data
+    } catch (err) {
+      // Fall back to disk cache when offline
+      if (existsSync(registryCachePath)) {
+        try {
+          const cached = JSON.parse(await readFile(registryCachePath, 'utf-8'))
+          return cached.data
+        } catch {}
+      }
+      throw err
+    }
+  })
+
+  ipcMain.handle('registry:install-theme', async (_, downloadUrl: string) => {
+    const raw = await fetchJSON(downloadUrl)
+    const theme = JSON.parse(raw)
+    await mkdir(themesDir, { recursive: true })
+    await writeFile(join(themesDir, `${theme.id}.json`), JSON.stringify(theme, null, 2))
+    mainWindow?.webContents.send('themes:directory-changed')
+  })
+
+  ipcMain.handle('registry:install-plugin', async (_, downloadUrl: string) => {
+    const tmpDir = join(cachePath, 'tmp')
+    await mkdir(tmpDir, { recursive: true })
+    const ts = Date.now()
+    const zipPath = join(tmpDir, `aurora-hub-${ts}.zip`)
+    const extractDir = join(tmpDir, `aurora-hub-extract-${ts}`)
+
+    await downloadFile(downloadUrl, zipPath)
+    await mkdir(extractDir, { recursive: true })
+    await extractZip(zipPath, extractDir)
+
+    const rootDir = await findPluginRoot(extractDir)
+    if (!rootDir) throw new Error('Plugin zip does not contain a valid manifest.json')
+
+    const manifest = JSON.parse(await readFile(join(rootDir, 'manifest.json'), 'utf-8'))
+    const destDir = join(pluginsDir, manifest.id)
+    await mkdir(destDir, { recursive: true })
+
+    const files = await readdir(rootDir)
+    for (const f of files) {
+      const s = await stat(join(rootDir, f))
+      if (s.isFile()) await copyFile(join(rootDir, f), join(destDir, f))
+    }
+
+    // Cleanup temp files
+    try { await rm(zipPath) } catch {}
+    try { await rm(extractDir, { recursive: true, force: true }) } catch {}
+
+    return manifest
   })
 
   app.on('activate', () => {

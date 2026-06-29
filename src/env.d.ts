@@ -315,5 +315,11 @@ interface Window {
     parseFile: (filePath: string) => Promise<Track>
     onOpenFiles: (callback: (paths: string[]) => void) => void
     removeOpenFilesListener: () => void
+    // Plugin HTTP helper
+    netFetch: (url: string, options?: { method?: string; headers?: Record<string, string>; body?: string }) => Promise<{ ok: boolean; status: number; text: string }>
+    // Aurora Hub registry
+    registryFetch: (forceRefresh?: boolean) => Promise<any>
+    registryInstallTheme: (downloadUrl: string) => Promise<void>
+    registryInstallPlugin: (downloadUrl: string) => Promise<any>
   }
 }
