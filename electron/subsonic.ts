@@ -176,7 +176,7 @@ export function getStreamUrl(songId: string): string {
 }
 
 /** Get cover art URL */
-export function getCoverArtUrl(coverArtId: string, size: number = 512): string {
+export function getCoverArtUrl(coverArtId: string, size: number = 1200): string {
   const params = buildAuthParams()
   params.delete('f') // Binary endpoint — don't request JSON format
   params.set('id', coverArtId)
