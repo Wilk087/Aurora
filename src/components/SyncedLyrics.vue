@@ -1,14 +1,5 @@
 <template>
   <div class="lyrics-container h-full flex flex-col items-center justify-center overflow-hidden relative">
-    <!-- Translation toggle -->
-    <button
-      v-if="hasTranslations"
-      @click="player.setShowLyricsTranslation(!player.showLyricsTranslation)"
-      class="absolute top-3 right-3 z-10 px-2 py-1 rounded-lg text-xs font-medium transition-colors"
-      :class="player.showLyricsTranslation ? 'bg-accent/20 text-accent' : 'bg-white/[0.06] text-white/30 hover:text-white/60'"
-      title="Toggle translation"
-    >T</button>
-
     <!-- Loading -->
     <div v-if="loading" class="text-white/30 text-sm">Loading lyrics...</div>
 
@@ -96,7 +87,7 @@
         </span>
         <!-- Translation line -->
         <p
-          v-if="player.showLyricsTranslation && line.translation && line.translation.toLowerCase().trim() !== line.text.toLowerCase().trim()"
+          v-if="line.translation && line.translation.toLowerCase().trim() !== line.text.toLowerCase().trim()"
           class="sl-translation-line mt-0.5 text-base font-normal"
         >{{ line.translation }}</p>
         <!-- Selection indicator -->
@@ -175,9 +166,7 @@ const lineRefs = ref<Record<number, HTMLElement>>({})
 const showSyncer = ref(false)
 
 const plainLyricsLines = computed(() => plainLyricsText.value.split('\n').map(l => l.trim()))
-const hasTranslations = computed(() =>
-  lyrics.value.some(l => l.translation && l.translation.toLowerCase().trim() !== l.text.toLowerCase().trim())
-)
+
 // Load lyrics when track changes
 watch(
   () => player.currentTrack?.path,
