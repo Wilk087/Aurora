@@ -746,35 +746,66 @@ export const usePlayerStore = defineStore('player', () => {
   })
 
   // ── Discord Rich Presence sync ───────────────────────────────────────────
-  let discordFormat = 'title-artist'
   let discordEnabled = true
+  let discordNameFormat = '{title} by {artist}'
+  let discordDetailsFormat = '{title}'
+  let discordStateFormat = 'by {artist}'
+  let discordSmallImage: 'aurora' | 'artist' | 'none' = 'aurora'
+  let discordShowTimestamps = true
+  let discordSongLink = false
 
-  // Load settings once
   window.api.getSettings().then((s: any) => {
-    if (s.discordRPCFormat) discordFormat = s.discordRPCFormat
     if (s.discordRPC === false) discordEnabled = false
+    if (s.discordNameFormat !== undefined) discordNameFormat = s.discordNameFormat
+    if (s.discordDetailsFormat !== undefined) discordDetailsFormat = s.discordDetailsFormat
+    if (s.discordStateFormat !== undefined) discordStateFormat = s.discordStateFormat
+    if (s.discordSmallImage) discordSmallImage = s.discordSmallImage
+    if (s.discordShowTimestamps === false) discordShowTimestamps = false
+    if (s.discordSongLink === true) discordSongLink = true
   })
 
+  let discordUpdateTimer: ReturnType<typeof setTimeout> | null = null
   function sendDiscordUpdate() {
-    if (!discordEnabled) return
-    const track = currentTrack.value
-    if (!track || !isPlaying.value) {
-      window.api.updateDiscordPresence(null)
-      return
-    }
-    window.api.updateDiscordPresence({
-      title: track.title,
-      artist: track.artist,
-      album: track.album,
-      isPlaying: isPlaying.value,
-      duration: duration.value,
-      elapsed: currentTime.value,
-      format: discordFormat,
-    })
+    if (discordUpdateTimer) clearTimeout(discordUpdateTimer)
+    discordUpdateTimer = setTimeout(() => {
+      discordUpdateTimer = null
+      if (!discordEnabled) return
+      const track = currentTrack.value
+      if (!track || !isPlaying.value) {
+        window.api.updateDiscordPresence(null)
+        return
+      }
+      window.api.updateDiscordPresence({
+        title: track.title,
+        artist: track.artist,
+        album: track.album,
+        isPlaying: isPlaying.value,
+        duration: duration.value,
+        elapsed: currentTime.value,
+        nameFormat: discordNameFormat,
+        detailsFormat: discordDetailsFormat,
+        stateFormat: discordStateFormat,
+        smallImage: discordSmallImage,
+        showTimestamps: discordShowTimestamps,
+        songLink: discordSongLink,
+      })
+    }, 600)
   }
 
-  function setDiscordFormat(fmt: string) {
-    discordFormat = fmt
+  function setDiscordSettings(opts: {
+    nameFormat?: string
+    detailsFormat?: string
+    stateFormat?: string
+    smallImage?: 'aurora' | 'artist' | 'none'
+    showTimestamps?: boolean
+    songLink?: boolean
+  }) {
+    if (opts.nameFormat !== undefined) discordNameFormat = opts.nameFormat
+    if (opts.detailsFormat !== undefined) discordDetailsFormat = opts.detailsFormat
+    if (opts.stateFormat !== undefined) discordStateFormat = opts.stateFormat
+    if (opts.smallImage !== undefined) discordSmallImage = opts.smallImage
+    if (opts.showTimestamps !== undefined) discordShowTimestamps = opts.showTimestamps
+    if (opts.songLink !== undefined) discordSongLink = opts.songLink
     sendDiscordUpdate()
   }
 
@@ -787,11 +818,7 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
-  // Update Discord on track change and play/pause
-  watch(currentTrack, () => {
-    // Small delay to let isPlaying settle
-    setTimeout(sendDiscordUpdate, 500)
-  })
+  watch(currentTrack, sendDiscordUpdate)
 
   watch(isPlaying, () => {
     sendDiscordUpdate()
@@ -1627,7 +1654,7 @@ export const usePlayerStore = defineStore('player', () => {
     playNext,
     playLater,
     moveInQueue,
-    setDiscordFormat,
+    setDiscordSettings,
     setDiscordEnabled,
     // Audio output
     outputDeviceId,

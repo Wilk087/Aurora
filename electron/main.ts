@@ -15,7 +15,7 @@ import {
   getStreamUrl, getCoverArtUrl,
 } from './subsonic'
 import { startRemoteServer, stopRemoteServer, registerRemoteIPC, isRemoteEnabled } from './remote'
-import { registerAnimatedCoverIPC, getAlbumArtworkUrl } from './animated-covers'
+import { registerAnimatedCoverIPC, getAlbumArtworkUrl, getArtistArtworkUrl } from './animated-covers'
 import { logger, installGlobalLogHandlers, initLogger, getLogPath } from './logger'
 import { getAppPaths } from './paths'
 
@@ -28,7 +28,6 @@ installGlobalLogHandlers()
 
 // ── Discord Rich Presence ──────────────────────────────────────────────────
 // Uses discord-rpc to show what's currently playing
-// Default client ID – users can create their own Discord App at discord.com/developers
 let discordClientId = '1471146991600926815'
 let rpcClient: any = null
 let rpcReady = false
@@ -124,6 +123,13 @@ async function getAlbumArtUrl(artist: string, album: string): Promise<string | n
   return getAlbumArtworkUrl(artist, album)
 }
 
+
+function rpcInterpolate(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? '').trim()
+}
+
+let presenceGeneration = 0
+
 async function updateDiscordPresence(data: {
   title: string
   artist: string
@@ -131,9 +137,16 @@ async function updateDiscordPresence(data: {
   isPlaying: boolean
   duration: number
   elapsed: number
-  format: string
+  nameFormat: string
+  detailsFormat: string
+  stateFormat: string
+  smallImage: 'aurora' | 'artist' | 'none'
+  showTimestamps: boolean
+  songLink: boolean
 } | null) {
   if (!rpcClient || !rpcReady) return
+
+  const gen = ++presenceGeneration
 
   try {
     if (!data || !data.isPlaying) {
@@ -141,72 +154,72 @@ async function updateDiscordPresence(data: {
       return
     }
 
-    // Build display strings based on format
-    let details = ''
-    let state = ''
-
-    switch (data.format) {
-      case 'title-artist':
-        details = data.title
-        state = `by ${data.artist}`
-        break
-      case 'artist-title':
-        details = data.artist
-        state = data.title
-        break
-      case 'title-album':
-        details = data.title
-        state = `on ${data.album}`
-        break
-      case 'full':
-        details = `${data.title} by ${data.artist}`
-        state = data.album
-        break
-      case 'minimal':
-        details = data.title
-        state = ''
-        break
-      default:
-        details = data.title
-        state = `by ${data.artist}`
-    }
-
-    const now = Date.now()
-    const endTimestamp = data.duration > 0
-      ? now + (data.duration - data.elapsed) * 1000
-      : undefined
-
-    // Look up album cover art URL for Discord to display
-    let imageKey = 'aurora_icon'
-    let imageText = 'Aurora Player'
-    try {
-      const artUrl = await getAlbumArtUrl(data.artist, data.album)
-      if (artUrl) {
-        imageKey = artUrl
-        imageText = data.album || 'Aurora Player'
-      }
-    } catch {}
-
-    const startTimestamp = data.duration > 0
-      ? now - data.elapsed * 1000
-      : undefined
+    const vars = { title: data.title, artist: data.artist, album: data.album }
+    const name = rpcInterpolate(data.nameFormat || '{title} by {artist}', vars) || data.title
+    const details = rpcInterpolate(data.detailsFormat || '{title}', vars) || data.title
+    const state = rpcInterpolate(data.stateFormat || '', vars)
 
     const activity: any = {
       type: 2,
-      name: `${data.title} by ${data.artist}`,
+      name: name.substring(0, 128),
       details: details.substring(0, 128),
-      smallImageKey: 'aurora_icon',
-      smallImageText: 'Aurora Player',
-      largeImageKey: imageKey,
-      largeImageText: imageText.substring(0, 128),
+      largeImageKey: 'aurora_icon',
+      largeImageText: 'Aurora Player',
       instance: false,
     }
 
     if (state) activity.state = state.substring(0, 128)
-    if (data.isPlaying && startTimestamp) activity.startTimestamp = startTimestamp
-    if (data.isPlaying && endTimestamp) activity.endTimestamp = endTimestamp
 
+    if (data.smallImage === 'aurora') {
+      activity.smallImageKey = 'aurora_icon'
+      activity.smallImageText = 'Aurora Player'
+    }
+
+    if (data.showTimestamps && data.duration > 0) {
+      const now = Date.now()
+      activity.startTimestamp = now - data.elapsed * 1000
+      activity.endTimestamp = now + (data.duration - data.elapsed) * 1000
+    }
+
+    if (data.songLink) {
+      activity.buttons = [{
+        label: 'Find on song.link',
+        url: `https://song.link/?q=${encodeURIComponent(`${data.title} ${data.artist}`)}`,
+      }]
+    }
+
+    // Send immediately with fallback image so presence updates without waiting for art
     await rpcClient.user?.setActivity(activity)
+    if (gen !== presenceGeneration) return
+
+    // Fetch album art in background and update if it arrives
+    let updatedArt = false
+    try {
+      const artUrl = await getAlbumArtUrl(data.artist, data.album)
+      if (gen !== presenceGeneration) return
+      if (artUrl) {
+        activity.largeImageKey = artUrl
+        activity.largeImageText = (data.album || 'Aurora Player').substring(0, 128)
+        updatedArt = true
+      }
+    } catch {}
+
+    // Fetch artist art in background if requested
+    if (data.smallImage === 'artist') {
+      try {
+        const artistUrl = await getArtistArtworkUrl(data.artist)
+        if (gen !== presenceGeneration) return
+        if (artistUrl) {
+          activity.smallImageKey = artistUrl
+          activity.smallImageText = data.artist.substring(0, 128)
+          updatedArt = true
+        }
+      } catch {}
+    }
+
+    if (updatedArt && gen === presenceGeneration) {
+      await rpcClient.user?.setActivity(activity)
+    }
   } catch (err) {
     logger.error('Discord RPC update error:', err)
   }

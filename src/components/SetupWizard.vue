@@ -219,42 +219,9 @@
                       :modelValue="discordEnabled"
                       @update:modelValue="toggleDiscord"
                     />
-
-                    <div v-if="discordEnabled" class="px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.06] space-y-3">
-                      <div>
-                        <p class="text-xs text-white/50 mb-1">Display Format</p>
-                        <select
-                          v-model="discordFormat"
-                          @change="saveDiscordFormat"
-                          class="w-full px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white/80 outline-none focus:border-accent/40 transition-colors appearance-none cursor-pointer"
-                        >
-                          <option value="title-artist">Song Title — by Artist</option>
-                          <option value="artist-title">Artist — Song Title</option>
-                          <option value="title-album">Song Title — on Album</option>
-                          <option value="full">Full — Title by Artist + Album</option>
-                          <option value="minimal">Minimal — Song Title only</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <p class="text-xs text-white/50 mb-1">Custom Application ID <span class="text-white/25">(optional)</span></p>
-                        <p class="text-[11px] text-white/25 mb-2">
-                          Create an app at
-                          <a
-                            href="#"
-                            @click.prevent="openExternal('https://discord.com/developers/applications')"
-                            class="text-accent/70 hover:text-accent transition-colors underline underline-offset-2"
-                          >discord.com/developers/applications</a>
-                          to customize the name shown. Your app name becomes "Playing <strong class="text-white/40">YourAppName</strong>".
-                        </p>
-                        <input
-                          v-model="discordClientId"
-                          type="text"
-                          placeholder="e.g. 1234567890123456789"
-                          class="w-full px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white/80 placeholder:text-white/20 outline-none focus:border-accent/40 transition-colors"
-                        />
-                      </div>
-                    </div>
+                    <p v-if="discordEnabled" class="text-xs text-white/30 px-1">
+                      Format, timestamps, song.link button and more can be customized in Settings → Integrations.
+                    </p>
                   </div>
                 </div>
 
@@ -516,8 +483,6 @@ const stepImages: Record<number, string | null> = {
 
 // ── Discord RPC state ────────────────────
 const discordEnabled = ref(true)
-const discordFormat = ref('title-artist')
-const discordClientId = ref('')
 
 // ── Subsonic state ───────────────────────
 const subsonicUrl = ref('')
@@ -561,8 +526,6 @@ onMounted(async () => {
   try {
     const settings = await window.api.getSettings()
     discordEnabled.value = settings.discordRPC !== false
-    discordFormat.value = settings.discordRPCFormat || 'title-artist'
-    discordClientId.value = settings.discordClientId || ''
     subsonicUrl.value = settings.subsonicUrl || ''
     subsonicUsername.value = settings.subsonicUsername || ''
     subsonicPassword.value = settings.subsonicPassword || ''
@@ -591,15 +554,8 @@ async function toggleDiscord(enabled: boolean) {
   const settings = await window.api.getSettings()
   settings.discordRPC = enabled
   await window.api.saveSettings(settings)
-  await window.api.toggleDiscordRPC(enabled, discordClientId.value || undefined)
+  await window.api.toggleDiscordRPC(enabled)
   player.setDiscordEnabled(enabled)
-}
-
-async function saveDiscordFormat() {
-  const settings = await window.api.getSettings()
-  settings.discordRPCFormat = discordFormat.value
-  await window.api.saveSettings(settings)
-  player.setDiscordFormat(discordFormat.value)
 }
 
 async function openExternal(url: string) {
@@ -652,17 +608,6 @@ async function toggleRemote(enabled: boolean) {
 
 // ── Navigation ───────────────────────────
 async function nextStep() {
-  // Save Discord client ID when leaving the Discord step
-  if (step.value === 4 && discordClientId.value) {
-    const settings = await window.api.getSettings()
-    settings.discordClientId = discordClientId.value
-    await window.api.saveSettings(settings)
-    if (discordEnabled.value) {
-      await window.api.toggleDiscordRPC(false)
-      await window.api.toggleDiscordRPC(true, discordClientId.value)
-    }
-  }
-
   if (step.value < lastStep) {
     step.value++
   } else {

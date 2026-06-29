@@ -232,50 +232,140 @@
           </button>
         </div>
 
-        <!-- Display Format -->
+        <!-- Custom Format -->
         <div v-if="discordEnabled" class="px-4 py-3 rounded-xl bg-white/[0.05]">
-          <p class="text-sm text-white/80 mb-3">Display Format</p>
-          <div class="space-y-2">
+          <p class="text-sm text-white/80 mb-0.5">Custom Format</p>
+          <p class="text-xs text-white/30 mb-3">Use tokens to build your own layout. Leave State blank to hide it.</p>
+
+          <!-- Token chips -->
+          <div class="flex gap-1.5 mb-3">
+            <button
+              v-for="token in ['{title}', '{artist}', '{album}']"
+              :key="token"
+              @click="insertToken(token)"
+              class="px-2 py-0.5 rounded bg-white/[0.08] hover:bg-accent/20 text-xs text-white/50 hover:text-accent font-mono transition-colors"
+            >{{ token }}</button>
+          </div>
+
+          <div class="space-y-2 mb-3">
+            <div>
+              <p class="text-xs text-white/40 mb-1">Listening to <span class="text-white/20">(shows after "Listening to" in Discord)</span></p>
+              <input
+                ref="nameInputRef"
+                v-model="discordNameFormat"
+                @focus="activeFormatInput = 'name'"
+                type="text"
+                placeholder="{title} by {artist}"
+                class="w-full px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white/80 placeholder:text-white/20 outline-none focus:border-accent/40 transition-colors font-mono select-text"
+              />
+            </div>
+            <div>
+              <p class="text-xs text-white/40 mb-1">Details <span class="text-white/20">(bold line)</span></p>
+              <input
+                ref="detailsInputRef"
+                v-model="discordDetailsFormat"
+                @focus="activeFormatInput = 'details'"
+                type="text"
+                placeholder="{title}"
+                class="w-full px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white/80 placeholder:text-white/20 outline-none focus:border-accent/40 transition-colors font-mono select-text"
+              />
+            </div>
+            <div>
+              <p class="text-xs text-white/40 mb-1">State <span class="text-white/20">(dim line)</span></p>
+              <input
+                ref="stateInputRef"
+                v-model="discordStateFormat"
+                @focus="activeFormatInput = 'state'"
+                type="text"
+                placeholder="by {artist}"
+                class="w-full px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white/80 placeholder:text-white/20 outline-none focus:border-accent/40 transition-colors font-mono select-text"
+              />
+            </div>
+          </div>
+
+          <!-- Live preview -->
+          <div class="px-3 py-2.5 rounded-lg bg-black/20 border border-white/[0.06] mb-3">
+            <p class="text-[10px] text-white/25 uppercase tracking-wider mb-1.5">Preview</p>
+            <p class="text-[10px] text-white/25 mb-0.5">Listening to <span class="text-white/50 font-medium">{{ discordPreviewName }}</span></p>
+            <p class="text-sm text-white/80 font-medium truncate">{{ discordPreviewDetails }}</p>
+            <p v-if="discordPreviewState" class="text-xs text-white/40 mt-0.5 truncate">{{ discordPreviewState }}</p>
+            <div v-if="discordSongLink" class="mt-2.5 space-y-1.5">
+              <div class="flex items-center gap-1.5 px-2.5 py-1 rounded border border-white/[0.15] bg-white/[0.04] text-xs text-white/50 truncate min-w-0">
+                <svg class="w-3 h-3 shrink-0 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                Find on song.link
+              </div>
+              <p class="text-[10px] text-white/20">Buttons are only visible to others viewing your profile, not to yourself</p>
+            </div>
+          </div>
+
+          <div class="flex justify-end">
+            <button
+              @click="saveDiscordFormat"
+              class="px-4 py-1.5 rounded-lg bg-accent hover:bg-accent-hover text-sm font-medium text-white transition-colors"
+            >Apply</button>
+          </div>
+        </div>
+
+        <!-- Small Badge Image -->
+        <div v-if="discordEnabled" class="px-4 py-3 rounded-xl bg-white/[0.05]">
+          <p class="text-sm text-white/80 mb-3">Small Badge Image</p>
+          <div class="space-y-1.5">
             <label
-              v-for="option in rpcFormatOptions"
-              :key="option.value"
-              class="flex items-start gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-colors"
-              :class="discordFormat === option.value ? 'bg-white/[0.06] border border-accent/30' : 'hover:bg-white/[0.03] border border-transparent'"
+              v-for="opt in discordSmallImageOptions"
+              :key="opt.value"
+              class="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors"
+              :class="discordSmallImage === opt.value ? 'bg-white/[0.06] border border-accent/30' : 'hover:bg-white/[0.03] border border-transparent'"
             >
               <input
                 type="radio"
-                name="rpc-format"
-                :value="option.value"
-                v-model="discordFormat"
-                @change="onFormatChange"
-                class="mt-0.5 accent-accent"
+                name="discord-small-image"
+                :value="opt.value"
+                v-model="discordSmallImage"
+                @change="saveDiscordSettings({ smallImage: discordSmallImage })"
+                class="accent-accent"
               />
-              <div class="min-w-0">
-                <p class="text-sm text-white/80">{{ option.label }}</p>
-                <p class="text-xs text-white/30 mt-0.5">{{ option.preview }}</p>
+              <div>
+                <p class="text-sm text-white/80">{{ opt.label }}</p>
+                <p class="text-xs text-white/30">{{ opt.desc }}</p>
               </div>
             </label>
           </div>
         </div>
 
-        <!-- Client ID -->
-        <div v-if="discordEnabled" class="px-4 py-3 rounded-xl bg-white/[0.05]">
-          <p class="text-sm text-white/80 mb-1">Discord Application ID</p>
-          <p class="text-xs text-white/30 mb-3">Create an app at <span class="text-accent/70 select-text">discord.com/developers/applications</span> to customize the name shown in Discord. The app name becomes "Playing <strong>YourAppName</strong>".</p>
-          <div class="flex items-center gap-2">
-            <input
-              v-model="discordClientId"
-              type="text"
-              placeholder="e.g. 1234567890123456789"
-              class="flex-1 px-3 py-2 rounded-lg bg-white/[0.06] border border-white/[0.08] text-sm text-white/80 placeholder:text-white/20 outline-none focus:border-accent/40 transition-colors select-text"
-            />
-            <button
-              @click="saveClientId"
-              class="px-4 py-2 rounded-lg bg-accent hover:bg-accent-hover text-sm font-medium text-white transition-colors"
-            >
-              Save
-            </button>
+        <!-- Timestamps -->
+        <div v-if="discordEnabled" class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">Show Timestamps</p>
+            <p class="text-xs text-white/30 mt-0.5">Display elapsed and remaining time on the activity card</p>
           </div>
+          <button
+            @click="discordShowTimestamps = !discordShowTimestamps; saveDiscordSettings({ showTimestamps: discordShowTimestamps })"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="discordShowTimestamps ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
+              :class="discordShowTimestamps ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
+
+        <!-- song.link -->
+        <div v-if="discordEnabled" class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">Add song.link Button</p>
+            <p class="text-xs text-white/30 mt-0.5">Lets others find the song on any streaming service</p>
+          </div>
+          <button
+            @click="discordSongLink = !discordSongLink; saveDiscordSettings({ songLink: discordSongLink })"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="discordSongLink ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
+              :class="discordSongLink ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
         </div>
       </div>
     </section>
@@ -1561,7 +1651,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, reactive, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, reactive, watch, nextTick } from 'vue'
 import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { usePlaylistStore } from '@/stores/playlist'
@@ -1784,8 +1874,23 @@ async function updatePluginSetting(pluginId: string, key: string, value: any) {
 }
 
 const discordEnabled = ref(true)
-const discordFormat = ref('title-artist')
-const discordClientId = ref('')
+const discordNameFormat = ref('{title} by {artist}')
+const discordDetailsFormat = ref('{title}')
+const discordStateFormat = ref('by {artist}')
+const discordSmallImage = ref<'aurora' | 'artist' | 'none'>('aurora')
+const discordShowTimestamps = ref(true)
+const discordSongLink = ref(false)
+const nameInputRef = ref<HTMLInputElement | null>(null)
+const detailsInputRef = ref<HTMLInputElement | null>(null)
+const stateInputRef = ref<HTMLInputElement | null>(null)
+let activeFormatInput: 'name' | 'details' | 'state' = 'details'
+
+const rpcPreviewVars: Record<string, string> = { title: 'Song Title', artist: 'Artist Name', album: 'Album Name' }
+const rpcInterp = (t: string) => t.replace(/\{(\w+)\}/g, (_, k) => rpcPreviewVars[k] ?? `{${k}}`).trim()
+
+const discordPreviewName = computed(() => rpcInterp(discordNameFormat.value || '{title} by {artist}') || 'Song Title by Artist Name')
+const discordPreviewDetails = computed(() => rpcInterp(discordDetailsFormat.value || '{title}') || 'Song Title')
+const discordPreviewState = computed(() => rpcInterp(discordStateFormat.value || ''))
 
 // Audio output
 const selectedDevice = ref('')
@@ -1883,32 +1988,10 @@ const lyricsOffsetDisplay = computed(() => {
   return v >= 0 ? `+${v.toFixed(1)}` : v.toFixed(1)
 })
 
-const rpcFormatOptions = [
-  {
-    value: 'title-artist',
-    label: 'Song Title — by Artist',
-    preview: 'e.g. "Bohemian Rhapsody" · by Queen',
-  },
-  {
-    value: 'artist-title',
-    label: 'Artist — Song Title',
-    preview: 'e.g. "Queen" · Bohemian Rhapsody',
-  },
-  {
-    value: 'title-album',
-    label: 'Song Title — on Album',
-    preview: 'e.g. "Bohemian Rhapsody" · on A Night at the Opera',
-  },
-  {
-    value: 'full',
-    label: 'Full — Title by Artist + Album',
-    preview: 'e.g. "Bohemian Rhapsody by Queen" · A Night at the Opera',
-  },
-  {
-    value: 'minimal',
-    label: 'Minimal — Song Title only',
-    preview: 'e.g. "Bohemian Rhapsody"',
-  },
+const discordSmallImageOptions: { value: 'aurora' | 'artist' | 'none'; label: string; desc: string }[] = [
+  { value: 'aurora', label: 'Aurora Logo', desc: 'Shows the Aurora Player icon as a badge' },
+  { value: 'artist', label: 'Artist Artwork', desc: 'Shows the artist photo fetched from Apple Music' },
+  { value: 'none', label: 'None', desc: 'No badge image' },
 ]
 
 onMounted(async () => {
@@ -1916,8 +1999,12 @@ onMounted(async () => {
 
   const settings = await window.api.getSettings()
   discordEnabled.value = settings.discordRPC !== false
-  discordFormat.value = settings.discordRPCFormat || 'title-artist'
-  discordClientId.value = settings.discordClientId || ''
+  discordNameFormat.value = settings.discordNameFormat ?? '{title} by {artist}'
+  discordDetailsFormat.value = settings.discordDetailsFormat ?? '{title}'
+  discordStateFormat.value = settings.discordStateFormat ?? 'by {artist}'
+  discordSmallImage.value = settings.discordSmallImage || 'aurora'
+  discordShowTimestamps.value = settings.discordShowTimestamps !== false
+  discordSongLink.value = settings.discordSongLink === true
 
 
   // Load audio / playback settings
@@ -2051,25 +2138,44 @@ function formatDeviceTime(timestamp: number): string {
 async function toggleDiscord() {
   discordEnabled.value = !discordEnabled.value
   await window.api.mergeSettings({ discordRPC: discordEnabled.value })
-  await window.api.toggleDiscordRPC(discordEnabled.value, discordClientId.value || undefined)
+  await window.api.toggleDiscordRPC(discordEnabled.value)
   player.setDiscordEnabled(discordEnabled.value)
   toast.success(`Discord RPC ${discordEnabled.value ? 'enabled' : 'disabled'}`)
 }
 
-async function onFormatChange() {
-  await window.api.mergeSettings({ discordRPCFormat: discordFormat.value })
-  player.setDiscordFormat(discordFormat.value)
-  toast.success('Discord format updated')
+async function saveDiscordFormat() {
+  const opts = {
+    nameFormat: discordNameFormat.value,
+    detailsFormat: discordDetailsFormat.value,
+    stateFormat: discordStateFormat.value,
+  }
+  await window.api.mergeSettings({ discordNameFormat: opts.nameFormat, discordDetailsFormat: opts.detailsFormat, discordStateFormat: opts.stateFormat })
+  player.setDiscordSettings(opts)
+  toast.success('Discord format saved')
 }
 
-async function saveClientId() {
-  await window.api.mergeSettings({ discordClientId: discordClientId.value || '' })
-  // Reconnect with new client ID
-  if (discordEnabled.value) {
-    await window.api.toggleDiscordRPC(false)
-    await window.api.toggleDiscordRPC(true, discordClientId.value || undefined)
-  }
-  toast.success('Discord Client ID saved')
+async function saveDiscordSettings(opts: { smallImage?: 'aurora' | 'artist' | 'none'; showTimestamps?: boolean; songLink?: boolean }) {
+  const mapped: Record<string, any> = {}
+  if (opts.smallImage !== undefined) mapped.discordSmallImage = opts.smallImage
+  if (opts.showTimestamps !== undefined) mapped.discordShowTimestamps = opts.showTimestamps
+  if (opts.songLink !== undefined) mapped.discordSongLink = opts.songLink
+  await window.api.mergeSettings(mapped)
+  player.setDiscordSettings(opts)
+}
+
+function insertToken(token: string) {
+  const inputRef = activeFormatInput === 'name' ? nameInputRef.value : activeFormatInput === 'details' ? detailsInputRef.value : stateInputRef.value
+  const current = activeFormatInput === 'name' ? discordNameFormat.value : activeFormatInput === 'details' ? discordDetailsFormat.value : discordStateFormat.value
+  const start = inputRef?.selectionStart ?? current.length
+  const end = inputRef?.selectionEnd ?? current.length
+  const newVal = current.slice(0, start) + token + current.slice(end)
+  if (activeFormatInput === 'name') discordNameFormat.value = newVal
+  else if (activeFormatInput === 'details') discordDetailsFormat.value = newVal
+  else discordStateFormat.value = newVal
+  nextTick(() => {
+    inputRef?.focus()
+    inputRef?.setSelectionRange(start + token.length, start + token.length)
+  })
 }
 
 async function removeFolder(folder: string) {

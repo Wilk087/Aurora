@@ -125,10 +125,11 @@ function fetchText(url: string, headers: Record<string, string> = {}): Promise<s
 }
 
 // ── Apple Music Token ───────────────────────────────────────────────────────
-// Apple no longer embeds the developer token in any static JS bundle.
-// Instead we load Apple Music in a hidden BrowserWindow and intercept the
-// Authorization header from its first request to amp-api — the same token
-// the web player uses to query the catalog.
+// Apple Music developer token capture.
+// Strategy 1: intercept the Authorization header from network requests to amp-api.
+// Strategy 2: after the page loads, extract the token from MusicKit's JS state.
+// Strategy 1 can miss when the service worker serves amp-api responses from cache
+// (no outgoing network request), so strategy 2 is the reliable fallback.
 function fetchAppleMusicTokenViaWindow(): Promise<string> {
   return new Promise((resolve, reject) => {
     const appleSession = session.fromPartition('persist:apple-music-token', { cache: true })
@@ -136,6 +137,17 @@ function fetchAppleMusicTokenViaWindow(): Promise<string> {
 
     let resolved = false
     let win: BrowserWindow | null = null
+
+    const done = (token: string, source: string) => {
+      if (resolved) return
+      resolved = true
+      clearTimeout(timeout)
+      appleToken = token
+      tokenFetchedAt = Date.now()
+      logger.info(`Apple Music token captured via ${source}`)
+      cleanup()
+      resolve(token)
+    }
 
     const cleanup = () => {
       try { appleSession.webRequest.onSendHeaders(filter, null as any) } catch {}
@@ -150,19 +162,13 @@ function fetchAppleMusicTokenViaWindow(): Promise<string> {
       }
     }, 30_000)
 
+    // Strategy 1: network interception (works when page makes fresh API calls)
     appleSession.webRequest.onSendHeaders(filter, (details) => {
       if (resolved) return
       const headers = details.requestHeaders as Record<string, string>
-      // HTTP/2 headers are lowercase in Electron's webRequest API
       const auth = headers['Authorization'] ?? headers['authorization']
       if (auth?.startsWith('Bearer eyJ')) {
-        resolved = true
-        clearTimeout(timeout)
-        appleToken = auth.replace('Bearer ', '')
-        tokenFetchedAt = Date.now()
-        logger.info('Apple Music token captured from hidden window')
-        cleanup()
-        resolve(appleToken)
+        done(auth.replace('Bearer ', ''), 'network interception')
       }
     })
 
@@ -175,13 +181,36 @@ function fetchAppleMusicTokenViaWindow(): Promise<string> {
       },
     })
 
+    // Strategy 2: extract token from MusicKit JS after page loads.
+    // MusicKit.getInstance().developerToken is set during initialization even
+    // when amp-api responses are served from service worker cache.
+    win.webContents.on('did-finish-load', () => {
+      if (resolved) return
+      win?.webContents.executeJavaScript(`
+        new Promise(resolve => {
+          let attempts = 0
+          ;(function poll() {
+            try {
+              const t = window.MusicKit && window.MusicKit.getInstance().developerToken
+              if (t && t.startsWith('eyJ')) { resolve(t); return }
+            } catch {}
+            if (++attempts < 30) setTimeout(poll, 500)
+            else resolve(null)
+          })()
+        })
+      `).then((token: unknown) => {
+        if (typeof token === 'string' && token.startsWith('eyJ')) {
+          done(token, 'MusicKit JS state')
+        }
+      }).catch(() => {})
+    })
+
     logger.info('Opening hidden Apple Music window to capture token...')
 
     win.on('closed', () => {
       if (!resolved) {
         resolved = true
         clearTimeout(timeout)
-        cleanup()
         reject(new Error('Apple Music window closed before token was captured'))
       }
     })
@@ -420,24 +449,68 @@ function clearCache() {
   saveNegativeCache()
 }
 
-// ── Album artwork URL lookup (for Discord RPC) ───────────────────────────────
-// Uses the public iTunes Search API — no token required, stable endpoint.
+// ── Album + Artist artwork URL lookup (for Discord RPC) ─────────────────────
+// Uses the public iTunes Search API for albums and Apple Music catalog for artists.
 const artworkUrlCache = new Map<string, string | null>()
+const artistArtworkCache = new Map<string, string | null>()
+
+export async function getArtistArtworkUrl(artist: string): Promise<string | null> {
+  const cacheKey = artist.toLowerCase()
+  if (artistArtworkCache.has(cacheKey)) return artistArtworkCache.get(cacheKey)!
+
+  try {
+    const token = await getAppleMusicToken()
+    const normArtist = normalizeStr(artist)
+    const primary = getPrimaryStorefront()
+    const storefronts = [primary, ...FALLBACK_STOREFRONTS.filter(sf => sf !== primary)]
+
+    for (const sf of storefronts) {
+      try {
+        const url = `https://amp-api.music.apple.com/v1/catalog/${sf}/search?types=artists&term=${encodeURIComponent(artist)}&limit=10`
+        const raw = await fetchText(url, {
+          Authorization: `Bearer ${token}`,
+          Origin: 'https://music.apple.com',
+        })
+        const artists: any[] = JSON.parse(raw)?.results?.artists?.data ?? []
+        for (const a of artists) {
+          const aName = normalizeStr(a.attributes?.name ?? '')
+          if (aName === normArtist || aName.includes(normArtist) || normArtist.includes(aName)) {
+            const artTemplate = a.attributes?.artwork?.url as string | undefined
+            if (artTemplate) {
+              const artUrl = artTemplate.replace('{w}', '512').replace('{h}', '512')
+              artistArtworkCache.set(cacheKey, artUrl)
+              return artUrl
+            }
+          }
+        }
+      } catch { continue }
+    }
+    // Token obtained and all storefronts searched — genuinely not found
+    artistArtworkCache.set(cacheKey, null)
+  } catch (err) {
+    // Token fetch or other transient error — don't cache, allow retry
+    logger.error('Discord artist art lookup error:', err)
+  }
+
+  return null
+}
 
 export async function getAlbumArtworkUrl(artist: string, album: string): Promise<string | null> {
   const cacheKey = `${artist}---${album}`.toLowerCase()
   if (artworkUrlCache.has(cacheKey)) return artworkUrlCache.get(cacheKey)!
 
-  try {
-    const normAlbum = normalizeStr(album)
-    const normArtist = normalizeStr(artist)
-    const artistParts = normArtist
-      .split(/[,;&]|\bfeat\.?\b|\bft\.?\b|\bwith\b/i)
-      .map(s => s.trim()).filter(Boolean)
+  const normAlbum = normalizeStr(album)
+  const normArtist = normalizeStr(artist)
+  const artistParts = normArtist
+    .split(/[,;&]|\bfeat\.?\b|\bft\.?\b|\bwith\b/i)
+    .map(s => s.trim()).filter(Boolean)
 
-    for (const term of [`${album} ${artist}`, album]) {
+  let searched = false
+  for (const term of [`${album} ${artist}`, album]) {
+    try {
       const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=album&limit=10&media=music`
       const raw = await fetchText(url)
+      searched = true
       const data = JSON.parse(raw)
       const results: any[] = data?.results ?? []
 
@@ -458,12 +531,12 @@ export async function getAlbumArtworkUrl(artist: string, album: string): Promise
           return artUrl
         }
       }
-    }
-  } catch (err) {
-    logger.error('Discord album art lookup error:', err)
+    } catch { /* network error for this term, try next */ }
   }
 
-  artworkUrlCache.set(cacheKey, null)
+  // Only cache null if we actually got a response — not on total network failure
+  if (searched) artworkUrlCache.set(cacheKey, null)
+  else logger.warn(`Discord album art: network error for ${artist} — ${album}`)
   return null
 }
 
