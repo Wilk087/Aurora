@@ -326,7 +326,8 @@ export const usePlayerStore = defineStore('player', () => {
   // ── Lyrics offset ───────────────────────────────────────────────────────
   const lyricsOffset = ref(0) // in seconds (positive = lyrics earlier, negative = later)
   const showLyricsTranslation = ref(true)
-  const lyricsTranslationLang = ref('auto')
+  // 'system' resolves to the OS display language in the main process
+  const lyricsTranslationLang = ref('system')
 
   // ── Waveform data ──────────────────────────────────────────────────────
   const waveformData = ref<number[]>([])
@@ -403,6 +404,16 @@ export const usePlayerStore = defineStore('player', () => {
 
   // ── LRC sync mode (pause at end of track instead of advancing) ────────
   const lrcSyncMode = ref(false)
+
+  // ── Playback rate (used by the lyrics syncer for slow-motion stamping) ──
+  const playbackRate = ref(1)
+  function setPlaybackRate(rate: number) {
+    playbackRate.value = rate
+    for (const el of [audio, audioNext, audioStream]) {
+      el.playbackRate = rate
+      el.defaultPlaybackRate = rate
+    }
+  }
 
   // ── Sleep timer ─────────────────────────────────────────────────────────
   const sleepTimerMode = ref<null | 'song' | 'album' | 'time'>(null)
@@ -1712,6 +1723,8 @@ export const usePlayerStore = defineStore('player', () => {
     playbackError,
     // LRC sync mode
     lrcSyncMode,
+    playbackRate,
+    setPlaybackRate,
     // Sleep timer
     sleepTimerMode,
     sleepTimerRemaining,

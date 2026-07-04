@@ -1,8 +1,8 @@
 <template>
   <Teleport to="body">
-    <!-- Backdrop -->
+    <!-- Backdrop (rounded to match the window so it doesn't paint over the transparent corners) -->
     <Transition name="fade">
-      <div v-if="show" class="fixed inset-0 z-[80] bg-black/50" @click="$emit('close')" />
+      <div v-if="show" class="queue-backdrop fixed inset-0 z-[80] bg-black/50" @click="$emit('close')" />
     </Transition>
 
     <!-- Panel -->
@@ -335,8 +335,16 @@ function goToAlbum(track: Track) {
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border-left: 1px solid var(--border);
-  border-radius: var(--win-radius, 0);
+  /* Only the right corners touch the (rounded) window edge — rounding the
+     left corners would cut visible notches into the middle of the window. */
+  border-radius: 0 var(--win-radius, 0) var(--win-radius, 0) 0;
   overflow: hidden;
+}
+
+/* Match the window rounding so the dimmed overlay doesn't show square
+   corners over the transparent window corners (visible on Linux/KDE). */
+.queue-backdrop {
+  border-radius: var(--win-radius, 0);
 }
 
 /* Themed interactive elements */

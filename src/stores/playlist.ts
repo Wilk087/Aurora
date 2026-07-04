@@ -5,16 +5,47 @@ import { evaluateSmartPlaylist } from '@/utils/smartPlaylistMatcher'
 import { songKey } from '@/utils/smartPlaylistMatcher'
 import { useTagsStore } from './tags'
 
-export type PlaylistSortOrder = 'updated' | 'created' | 'name' | 'tracks'
+export type PlaylistSortOrder = 'updated' | 'created' | 'name' | 'tracks' | 'custom'
+
+const SORT_ORDERS: PlaylistSortOrder[] = ['updated', 'created', 'name', 'tracks', 'custom']
 
 export const usePlaylistStore = defineStore('playlist', () => {
   const playlists = ref<Playlist[]>([])
   const loaded = ref(false)
   const playlistSortOrder = ref<PlaylistSortOrder>('updated')
+  /** Playlist IDs in user-defined order (used when sort order is 'custom') */
+  const customOrder = ref<string[]>([])
 
   async function loadPlaylists() {
     playlists.value = await window.api.getPlaylists()
     loaded.value = true
+    try {
+      const settings = await window.api.getSettings()
+      if (SORT_ORDERS.includes(settings.playlistSortOrder)) {
+        playlistSortOrder.value = settings.playlistSortOrder
+      }
+      if (Array.isArray(settings.playlistCustomOrder)) {
+        customOrder.value = settings.playlistCustomOrder.filter((v: unknown): v is string => typeof v === 'string')
+      }
+    } catch { /* defaults are fine */ }
+  }
+
+  function setSortOrder(order: PlaylistSortOrder) {
+    playlistSortOrder.value = order
+    window.api.mergeSettings({ playlistSortOrder: order })
+  }
+
+  /** Move a playlist within the custom order (drag & drop in the sidebar). */
+  function moveInCustomOrder(fromId: string, toId: string) {
+    if (fromId === toId) return
+    // Start from the currently displayed custom order so unknown IDs keep their place
+    const ids = sortedInCustomOrder.value.map(p => p.id)
+    const from = ids.indexOf(fromId)
+    const to = ids.indexOf(toId)
+    if (from < 0 || to < 0) return
+    ids.splice(to, 0, ids.splice(from, 1)[0])
+    customOrder.value = ids
+    window.api.mergeSettings({ playlistCustomOrder: ids })
   }
 
   async function createPlaylist(name: string): Promise<Playlist> {
@@ -188,9 +219,22 @@ export const usePlaylistStore = defineStore('playlist', () => {
       .filter((t): t is Track => !!t)
   }
 
+  /** Playlists in custom order — saved order first, unknown (new) playlists appended by recency */
+  const sortedInCustomOrder = computed(() => {
+    const orderIdx = new Map(customOrder.value.map((id, i) => [id, i]))
+    return [...playlists.value].sort((a, b) => {
+      const ia = orderIdx.get(a.id) ?? Number.MAX_SAFE_INTEGER
+      const ib = orderIdx.get(b.id) ?? Number.MAX_SAFE_INTEGER
+      if (ia !== ib) return ia - ib
+      return b.updatedAt - a.updatedAt
+    })
+  })
+
   const sortedPlaylists = computed(() => {
     const list = [...playlists.value]
     switch (playlistSortOrder.value) {
+      case 'custom':
+        return sortedInCustomOrder.value
       case 'name':
         return list.sort((a, b) => a.name.localeCompare(b.name))
       case 'created':
@@ -213,6 +257,8 @@ export const usePlaylistStore = defineStore('playlist', () => {
     loaded,
     sortedPlaylists,
     playlistSortOrder,
+    setSortOrder,
+    moveInCustomOrder,
     loadPlaylists,
     createPlaylist,
     createSmartPlaylist,

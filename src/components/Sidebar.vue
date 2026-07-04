@@ -35,110 +35,175 @@
       </div>
     </div>
 
-    <!-- Navigation -->
-    <div class="px-2 space-y-0.5">
-      <p class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">
-        Library
-      </p>
-
-      <router-link
-        v-for="item in navItems"
-        :key="item.path"
-        :to="item.path"
-        class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all no-drag"
-        :class="
-          $route.path === item.path
-            ? 'bg-white/[0.1] text-white'
-            : 'text-white/60 hover:text-white/80 hover:bg-white/[0.05]'
-        "
-      >
-        <span class="w-5 h-5 flex items-center justify-center" v-html="item.icon" />
-        <span>{{ item.label }}</span>
-      </router-link>
-    </div>
-
-    <!-- Plugin sidebar items -->
-    <div v-if="pluginSidebarItems.length > 0" class="px-2 mt-4 space-y-0.5">
-      <p class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">
-        Plugins
-      </p>
-      <button
-        v-for="(item, idx) in pluginSidebarItems"
-        :key="'plugin-' + idx"
-        @click="item.onClick()"
-        class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all no-drag text-white/60 hover:text-white/80 hover:bg-white/[0.05]"
-      >
-        <span class="w-5 h-5 flex items-center justify-center" v-html="item.icon" />
-        <span>{{ item.label }}</span>
-      </button>
-    </div>
-
-    <!-- Now Playing shortcut -->
-    <div v-if="player.currentTrack" class="px-2 mt-4 space-y-0.5">
-      <p class="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">
-        Now Playing
-      </p>
-
-      <router-link
-        to="/now-playing"
-        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all no-drag"
-        :class="
-          $route.path === '/now-playing'
-            ? 'bg-white/[0.1] text-white'
-            : 'text-white/60 hover:text-white/80 hover:bg-white/[0.05]'
-        "
-      >
-        <div class="w-8 h-8 rounded-md overflow-hidden bg-white/10 shrink-0">
-          <img
-            v-if="player.currentTrack.coverArt"
-            :src="getCoverUrl(player.currentTrack.coverArt)"
-            class="w-full h-full object-cover"
-          />
-          <div v-else class="w-full h-full flex items-center justify-center">
-            <svg class="w-4 h-4 text-white/30" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
-            </svg>
-          </div>
-        </div>
-        <div class="min-w-0">
-          <p class="text-xs font-medium truncate">{{ player.currentTrack.title }}</p>
-          <p class="text-[10px] text-white/40 truncate">{{ player.currentTrack.artist }}</p>
-        </div>
-      </router-link>
-    </div>
-
-    <!-- Playlists list -->
-    <div v-if="playlistStore.sortedPlaylists.length > 0" class="px-2 mt-4 space-y-0.5">
-      <div class="flex items-center justify-between px-3 py-1">
-        <p class="text-[10px] font-semibold uppercase tracking-wider text-white/30">
-          Playlists
-        </p>
-        <button
-          @click="cycleSort"
-          class="text-[10px] text-white/30 hover:text-white/60 transition-colors uppercase tracking-wider"
-          :title="'Sort: ' + sortLabel"
+    <!-- Reorderable sections (drag a section header to rearrange) -->
+    <div class="space-y-4">
+      <template v-for="section in sectionOrder" :key="section">
+        <!-- Navigation -->
+        <div
+          v-if="section === 'library'"
+          class="px-2 space-y-0.5 rounded-lg transition-all"
+          :class="sectionDropClass('library')"
+          @dragover.prevent="onSectionDragOver('library')"
+          @drop.prevent="onSectionDrop('library')"
         >
-          {{ sortLabel }}
-        </button>
-      </div>
+          <p
+            class="section-header px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30 cursor-grab active:cursor-grabbing"
+            draggable="true"
+            @dragstart="onSectionDragStart('library', $event)"
+            @dragend="onSectionDragEnd"
+          >
+            Library
+          </p>
 
-      <router-link
-        v-for="pl in playlistStore.sortedPlaylists"
-        :key="pl.id"
-        :to="`/playlist/${pl.id}`"
-        class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm transition-all no-drag truncate"
-        :class="
-          $route.path === `/playlist/${pl.id}`
-            ? 'bg-white/[0.1] text-white'
-            : 'text-white/50 hover:text-white/70 hover:bg-white/[0.05]'
-        "
-        @contextmenu.prevent="openPlaylistCtx($event, pl)"
-      >
-        <svg class="w-4 h-4 shrink-0 opacity-40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
-        </svg>
-        <span class="truncate">{{ pl.name }}</span>
-      </router-link>
+          <router-link
+            v-for="item in orderedNavItems"
+            :key="item.path"
+            :to="item.path"
+            class="nav-item flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all no-drag"
+            :class="[
+              $route.path === item.path
+                ? 'bg-white/[0.1] text-white'
+                : 'text-white/60 hover:text-white/80 hover:bg-white/[0.05]',
+              navDropTarget === item.path ? 'ring-1 ring-accent/40 bg-accent/[0.05]' : '',
+              draggedNav === item.path ? 'opacity-30' : '',
+            ]"
+            draggable="true"
+            @dragstart="onNavDragStart(item.path, $event)"
+            @dragover.prevent.stop="onNavDragOver(item.path)"
+            @dragleave="navDropTarget === item.path && (navDropTarget = null)"
+            @drop.prevent.stop="onNavDrop(item.path)"
+            @dragend="onNavDragEnd"
+          >
+            <span class="w-5 h-5 flex items-center justify-center" v-html="item.icon" />
+            <span>{{ item.label }}</span>
+          </router-link>
+        </div>
+
+        <!-- Plugin sidebar items -->
+        <div
+          v-if="section === 'plugins' && pluginSidebarItems.length > 0"
+          class="px-2 space-y-0.5 rounded-lg transition-all"
+          :class="sectionDropClass('plugins')"
+          @dragover.prevent="onSectionDragOver('plugins')"
+          @drop.prevent="onSectionDrop('plugins')"
+        >
+          <p
+            class="section-header px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30 cursor-grab active:cursor-grabbing"
+            draggable="true"
+            @dragstart="onSectionDragStart('plugins', $event)"
+            @dragend="onSectionDragEnd"
+          >
+            Plugins
+          </p>
+          <button
+            v-for="(item, idx) in pluginSidebarItems"
+            :key="'plugin-' + idx"
+            @click="item.onClick()"
+            class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all no-drag text-white/60 hover:text-white/80 hover:bg-white/[0.05]"
+          >
+            <span class="w-5 h-5 flex items-center justify-center" v-html="item.icon" />
+            <span>{{ item.label }}</span>
+          </button>
+        </div>
+
+        <!-- Now Playing shortcut -->
+        <div
+          v-if="section === 'now-playing' && player.currentTrack"
+          class="px-2 space-y-0.5 rounded-lg transition-all"
+          :class="sectionDropClass('now-playing')"
+          @dragover.prevent="onSectionDragOver('now-playing')"
+          @drop.prevent="onSectionDrop('now-playing')"
+        >
+          <p
+            class="section-header px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30 cursor-grab active:cursor-grabbing"
+            draggable="true"
+            @dragstart="onSectionDragStart('now-playing', $event)"
+            @dragend="onSectionDragEnd"
+          >
+            Now Playing
+          </p>
+
+          <router-link
+            to="/now-playing"
+            class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all no-drag"
+            :class="
+              $route.path === '/now-playing'
+                ? 'bg-white/[0.1] text-white'
+                : 'text-white/60 hover:text-white/80 hover:bg-white/[0.05]'
+            "
+          >
+            <div class="w-8 h-8 rounded-md overflow-hidden bg-white/10 shrink-0">
+              <img
+                v-if="player.currentTrack.coverArt"
+                :src="getCoverUrl(player.currentTrack.coverArt)"
+                class="w-full h-full object-cover"
+              />
+              <div v-else class="w-full h-full flex items-center justify-center">
+                <svg class="w-4 h-4 text-white/30" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+                </svg>
+              </div>
+            </div>
+            <div class="min-w-0">
+              <p class="text-xs font-medium truncate">{{ player.currentTrack.title }}</p>
+              <p class="text-[10px] text-white/40 truncate">{{ player.currentTrack.artist }}</p>
+            </div>
+          </router-link>
+        </div>
+
+        <!-- Playlists list -->
+        <div
+          v-if="section === 'playlists' && playlistStore.sortedPlaylists.length > 0"
+          class="px-2 space-y-0.5 rounded-lg transition-all"
+          :class="sectionDropClass('playlists')"
+          @dragover.prevent="onSectionDragOver('playlists')"
+          @drop.prevent="onSectionDrop('playlists')"
+        >
+          <div class="flex items-center justify-between px-3 py-1">
+            <p
+              class="section-header text-[10px] font-semibold uppercase tracking-wider text-white/30 cursor-grab active:cursor-grabbing"
+              draggable="true"
+              @dragstart="onSectionDragStart('playlists', $event)"
+              @dragend="onSectionDragEnd"
+            >
+              Playlists
+            </p>
+            <button
+              @click="cycleSort"
+              class="text-[10px] text-white/30 hover:text-white/60 transition-colors uppercase tracking-wider"
+              :title="'Sort: ' + sortLabel + (isCustomSort ? ' — drag playlists to arrange' : '')"
+            >
+              {{ sortLabel }}
+            </button>
+          </div>
+
+          <router-link
+            v-for="pl in playlistStore.sortedPlaylists"
+            :key="pl.id"
+            :to="`/playlist/${pl.id}`"
+            class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-sm transition-all no-drag truncate"
+            :class="[
+              $route.path === `/playlist/${pl.id}`
+                ? 'bg-white/[0.1] text-white'
+                : 'text-white/50 hover:text-white/70 hover:bg-white/[0.05]',
+              playlistDropTarget === pl.id ? 'ring-1 ring-accent/40 bg-accent/[0.05]' : '',
+              draggedPlaylist === pl.id ? 'opacity-30' : '',
+            ]"
+            :draggable="isCustomSort"
+            @dragstart="onPlaylistDragStart(pl.id, $event)"
+            @dragover.prevent.stop="onPlaylistDragOver(pl.id)"
+            @dragleave="playlistDropTarget === pl.id && (playlistDropTarget = null)"
+            @drop.prevent.stop="onPlaylistDrop(pl.id)"
+            @dragend="onPlaylistDragEnd"
+            @contextmenu.prevent="openPlaylistCtx($event, pl)"
+          >
+            <svg class="w-4 h-4 shrink-0 opacity-40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" />
+            </svg>
+            <span class="truncate">{{ pl.name }}</span>
+          </router-link>
+        </div>
+      </template>
     </div>
 
     <!-- Playlist context menu -->
@@ -235,7 +300,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, computed } from 'vue'
+import { ref, reactive, watch, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
@@ -252,6 +317,144 @@ const library = useLibraryStore()
 const playlistStore = usePlaylistStore()
 
 // pluginSidebarItems is a reactive shallowRef imported from the plugin API
+
+// ── Sidebar arrangement (sections + nav items are drag-reorderable) ────
+const SECTION_IDS = ['library', 'plugins', 'now-playing', 'playlists'] as const
+type SectionId = (typeof SECTION_IDS)[number]
+
+const sectionOrder = ref<SectionId[]>([...SECTION_IDS])
+const navOrder = ref<string[]>([]) // nav item paths; empty = default order
+
+const orderedNavItems = computed(() => {
+  if (navOrder.value.length === 0) return navItems
+  const idx = new Map(navOrder.value.map((p, i) => [p, i]))
+  // Unknown (newly added) items keep their default position at the end
+  return [...navItems].sort(
+    (a, b) =>
+      (idx.get(a.path) ?? navOrder.value.length + navItems.findIndex(n => n.path === a.path)) -
+      (idx.get(b.path) ?? navOrder.value.length + navItems.findIndex(n => n.path === b.path)),
+  )
+})
+
+onMounted(async () => {
+  try {
+    const settings = await window.api.getSettings()
+    if (Array.isArray(settings.sidebarSectionOrder)) {
+      const saved = settings.sidebarSectionOrder.filter((s: unknown): s is SectionId =>
+        (SECTION_IDS as readonly string[]).includes(s as string),
+      )
+      const missing = SECTION_IDS.filter(s => !saved.includes(s))
+      sectionOrder.value = [...saved, ...missing]
+    }
+    if (Array.isArray(settings.sidebarNavOrder)) {
+      navOrder.value = settings.sidebarNavOrder.filter((v: unknown): v is string => typeof v === 'string')
+    }
+  } catch { /* defaults are fine */ }
+})
+
+// Section drag & drop
+const draggedSection = ref<SectionId | null>(null)
+const sectionDropTarget = ref<SectionId | null>(null)
+
+function sectionDropClass(id: SectionId): string {
+  return sectionDropTarget.value === id && draggedSection.value !== id
+    ? 'ring-1 ring-accent/40 bg-accent/[0.04]'
+    : ''
+}
+
+function onSectionDragStart(id: SectionId, e: DragEvent) {
+  draggedSection.value = id
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', `section:${id}`)
+  }
+}
+
+function onSectionDragOver(id: SectionId) {
+  if (!draggedSection.value || draggedSection.value === id) return
+  sectionDropTarget.value = id
+}
+
+function onSectionDrop(id: SectionId) {
+  const from = draggedSection.value
+  sectionDropTarget.value = null
+  draggedSection.value = null
+  if (!from || from === id) return
+  const order = [...sectionOrder.value]
+  order.splice(order.indexOf(id), 0, order.splice(order.indexOf(from), 1)[0])
+  sectionOrder.value = order
+  window.api.mergeSettings({ sidebarSectionOrder: order })
+}
+
+function onSectionDragEnd() {
+  draggedSection.value = null
+  sectionDropTarget.value = null
+}
+
+// Nav item drag & drop (within the Library section)
+const draggedNav = ref<string | null>(null)
+const navDropTarget = ref<string | null>(null)
+
+function onNavDragStart(path: string, e: DragEvent) {
+  draggedNav.value = path
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', `nav:${path}`)
+  }
+}
+
+function onNavDragOver(path: string) {
+  if (!draggedNav.value || draggedNav.value === path) return
+  navDropTarget.value = path
+}
+
+function onNavDrop(path: string) {
+  const from = draggedNav.value
+  navDropTarget.value = null
+  draggedNav.value = null
+  if (!from || from === path) return
+  const order = orderedNavItems.value.map(i => i.path)
+  order.splice(order.indexOf(path), 0, order.splice(order.indexOf(from), 1)[0])
+  navOrder.value = order
+  window.api.mergeSettings({ sidebarNavOrder: order })
+}
+
+function onNavDragEnd() {
+  draggedNav.value = null
+  navDropTarget.value = null
+}
+
+// Playlist drag & drop (only when the sort order is 'custom')
+const isCustomSort = computed(() => playlistStore.playlistSortOrder === 'custom')
+const draggedPlaylist = ref<string | null>(null)
+const playlistDropTarget = ref<string | null>(null)
+
+function onPlaylistDragStart(id: string, e: DragEvent) {
+  if (!isCustomSort.value) return
+  draggedPlaylist.value = id
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', `playlist:${id}`)
+  }
+}
+
+function onPlaylistDragOver(id: string) {
+  if (!draggedPlaylist.value || draggedPlaylist.value === id) return
+  playlistDropTarget.value = id
+}
+
+function onPlaylistDrop(id: string) {
+  const from = draggedPlaylist.value
+  playlistDropTarget.value = null
+  draggedPlaylist.value = null
+  if (!from || from === id) return
+  playlistStore.moveInCustomOrder(from, id)
+}
+
+function onPlaylistDragEnd() {
+  draggedPlaylist.value = null
+  playlistDropTarget.value = null
+}
 
 // ── Delete confirmation dialog ─────────────────────────────────────────
 const deleteDialog = reactive({ show: false, playlistName: '', playlistId: '' })
@@ -316,17 +519,18 @@ function getCoverUrl(path: string) {
   return window.api.getMediaUrl(path)
 }
 
-const sortOrders: PlaylistSortOrder[] = ['updated', 'created', 'name', 'tracks']
+const sortOrders: PlaylistSortOrder[] = ['updated', 'created', 'name', 'tracks', 'custom']
 const sortLabels: Record<PlaylistSortOrder, string> = {
   updated: 'Recent',
   created: 'Created',
   name: 'A–Z',
   tracks: 'Count',
+  custom: 'Custom',
 }
 const sortLabel = computed(() => sortLabels[playlistStore.playlistSortOrder])
 function cycleSort() {
   const idx = sortOrders.indexOf(playlistStore.playlistSortOrder)
-  playlistStore.playlistSortOrder = sortOrders[(idx + 1) % sortOrders.length]
+  playlistStore.setSortOrder(sortOrders[(idx + 1) % sortOrders.length])
 }
 
 function onSearchEscape() {
@@ -362,6 +566,11 @@ watch(() => library.searchQuery, (q) => {
 })
 
 const navItems = [
+  {
+    label: 'Home',
+    path: '/home',
+    icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75" /></svg>',
+  },
   {
     label: 'Songs',
     path: '/',

@@ -35,7 +35,7 @@
               :hotkeys="[
                 { keys: ['Space'], description: 'Stamp current line / word' },
                 { keys: ['Tab'], description: 'Add instrumental break' },
-                { keys: ['←', '→'], description: 'Seek back / forward 2 s' },
+                { keys: ['←', '→'], description: 'Seek back / forward 5 s' },
                 { keys: ['Ctrl', 'Z'], description: 'Undo last stamp' },
                 { keys: ['Esc'], description: 'Close without saving' },
               ]"
@@ -115,6 +115,18 @@
             </svg>
           </button>
 
+          <!-- Playback speed — slow it down for precise stamping -->
+          <button
+            @click="cycleSpeed"
+            class="px-2.5 py-1.5 rounded-lg text-xs font-mono font-medium transition-all"
+            :class="player.playbackRate !== 1
+              ? 'bg-accent/20 text-accent'
+              : 'bg-white/[0.08] hover:bg-white/[0.12] text-white/60 hover:text-white/80'"
+            title="Playback speed"
+          >
+            {{ speedLabel }}
+          </button>
+
           <div class="ml-4 flex items-center gap-2">
             <button
               @click="handleAddInstrumental"
@@ -153,23 +165,42 @@
               v-for="(line, i) in lines"
               :key="i"
               :ref="el => { if (el) lineElRefs[i] = el as HTMLElement }"
-              class="py-2 px-4 rounded-xl transition-all duration-200 cursor-pointer"
-              :class="getLineClass(i)"
+              class="group py-2 px-4 rounded-xl transition-all duration-200 cursor-pointer"
+              :class="[getLineClass(i), i === playingLineIndex ? 'lrc-live' : '']"
               @click="stampLine(i)"
             >
               <div class="flex items-center gap-3">
                 <span
                   class="text-[10px] font-mono min-w-[52px] text-center px-1.5 py-0.5 rounded"
-                  :class="line.time !== null ? 'bg-accent/20 text-accent' : 'bg-white/5 text-white/20'"
+                  :class="line.time !== null ? 'bg-accent/20 text-accent hover:bg-accent/35' : 'bg-white/5 text-white/20'"
+                  :title="line.time !== null ? 'Jump to this timestamp' : ''"
+                  @click.stop="line.time !== null ? player.seek(line.time) : stampLine(i)"
                 >
                   {{ line.time !== null ? formatTime(line.time) : '--:--' }}
                 </span>
-                <p v-if="line.text" class="text-sm leading-relaxed" :class="getTextClass(i)">
+                <p v-if="line.text" class="text-sm leading-relaxed flex-1 min-w-0" :class="getTextClass(i)">
                   {{ line.text }}
                 </p>
-                <p v-else class="text-sm leading-relaxed italic" :class="getTextClass(i)">
+                <p v-else class="text-sm leading-relaxed italic flex-1 min-w-0" :class="getTextClass(i)">
                   <span class="opacity-50">♪ instrumental</span>
                 </p>
+                <!-- Fine-tune a stamped timestamp by ±0.1 s -->
+                <div v-if="line.time !== null" class="hidden group-hover:flex items-center gap-1 shrink-0">
+                  <button
+                    @click.stop="nudgeLine(i, -0.1)"
+                    class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-white/[0.08] hover:bg-white/[0.15] text-white/50 hover:text-white/80 transition-colors"
+                    title="0.1 s earlier"
+                  >
+                    −0.1
+                  </button>
+                  <button
+                    @click.stop="nudgeLine(i, 0.1)"
+                    class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-white/[0.08] hover:bg-white/[0.15] text-white/50 hover:text-white/80 transition-colors"
+                    title="0.1 s later"
+                  >
+                    +0.1
+                  </button>
+                </div>
               </div>
             </div>
           </template>
@@ -181,12 +212,14 @@
               :key="li"
               :ref="el => { if (el) lineElRefs[li] = el as HTMLElement }"
               class="py-2 px-4 rounded-xl transition-all duration-200"
-              :class="getElrcLineClass(li)"
+              :class="[getElrcLineClass(li), li === playingElrcLineIndex ? 'lrc-live' : '']"
             >
               <div class="flex items-start gap-3">
                 <span
                   class="text-[10px] font-mono min-w-[52px] text-center px-1.5 py-0.5 rounded mt-0.5 shrink-0"
-                  :class="line.time !== null ? 'bg-accent/20 text-accent' : 'bg-white/5 text-white/20'"
+                  :class="line.time !== null ? 'bg-accent/20 text-accent cursor-pointer hover:bg-accent/35' : 'bg-white/5 text-white/20'"
+                  :title="line.time !== null ? 'Jump to this timestamp' : ''"
+                  @click.stop="line.time !== null && player.seek(line.time)"
                 >
                   {{ line.time !== null ? formatTime(line.time) : '--:--' }}
                 </span>
@@ -327,12 +360,60 @@ const allElrcStamped = computed(() =>
   elrcLines.value.length > 0 && stampedElrcWords.value === totalElrcWords.value,
 )
 
-// Toggle lrcSyncMode on the player so the track pauses at the end
+// Toggle lrcSyncMode on the player so the track pauses at the end.
+// Also restore normal playback speed when the syncer closes.
 watch(
   () => props.visible,
-  (vis) => { player.lrcSyncMode = vis },
+  (vis) => {
+    player.lrcSyncMode = vis
+    if (!vis) player.setPlaybackRate(1)
+  },
   { immediate: true },
 )
+
+// ── Playback speed (slow motion helps precise stamping) ───────────────
+const SPEEDS = [1, 0.75, 0.5]
+const speedLabel = computed(() => `${player.playbackRate}×`)
+
+function cycleSpeed() {
+  const idx = SPEEDS.indexOf(player.playbackRate)
+  player.setPlaybackRate(SPEEDS[(idx + 1) % SPEEDS.length])
+}
+
+// ── Live playhead: the stamped line currently "playing" ───────────────
+const playingLineIndex = computed(() => {
+  const t = currentTime.value
+  let best = -1
+  let bestTime = -Infinity
+  lines.value.forEach((l, i) => {
+    if (l.time !== null && l.time <= t && l.time > bestTime) {
+      best = i
+      bestTime = l.time
+    }
+  })
+  return best
+})
+
+const playingElrcLineIndex = computed(() => {
+  const t = currentTime.value
+  let best = -1
+  let bestTime = -Infinity
+  elrcLines.value.forEach((l, i) => {
+    if (l.time !== null && l.time <= t && l.time > bestTime) {
+      best = i
+      bestTime = l.time
+    }
+  })
+  return best
+})
+
+/** Fine-tune a stamped line's timestamp by ±delta seconds */
+function nudgeLine(index: number, delta: number) {
+  const line = lines.value[index]
+  if (!line || line.time === null) return
+  const max = duration.value > 0 ? duration.value : Infinity
+  line.time = Math.min(max, Math.max(0, line.time + delta))
+}
 
 // Parse plain lyrics when visible/lyrics change
 watch(
@@ -676,5 +757,10 @@ watch(
 }
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
+}
+
+/* Stamped line currently under the playhead — lets you feel the sync live */
+.lrc-live {
+  box-shadow: inset 2px 0 0 rgb(var(--accent));
 }
 </style>

@@ -964,11 +964,202 @@ async function fetchOnlineLyricsAll(track: { title: string; artist: string; albu
 }
 
 /**
- * Translate all text lines in an LRC string to targetLang via Google Translate.
- * Lines are batched in one request (newline-separated) to minimise latency.
- * Returns a new LRC with the same timestamps but translated text, or null on failure.
+ * Resolve the effective lyrics translation target language.
+ * 'system' (or an unset preference) falls back to the OS display language,
+ * 'auto' keeps the source-provided translation (e.g. Netease tlyric),
+ * anything else is a Google Translate language code — or 'romaji' for
+ * romanization of the original text instead of a translation.
+ */
+function resolveLyricsTargetLang(settings: any): string {
+  const pref = settings.lyricsTranslationLang
+  if (typeof pref === 'string' && pref !== '' && pref !== 'system') return pref
+  return systemDisplayLang()
+}
+
+/** The OS display language as a Google Translate language code */
+function systemDisplayLang(): string {
+  const locale = app.getLocale() || 'en'
+  if (locale.startsWith('zh')) return locale === 'zh-TW' || locale === 'zh-HK' ? 'zh-TW' : 'zh-CN'
+  return locale.split('-')[0]
+}
+
+// Translations are re-requested every time lyrics load, so cache them in memory
+const lyricsTranslationCache = new Map<string, string | null>()
+const LYRICS_TRANSLATION_CACHE_MAX = 60
+
+/** Matches any script outside Latin/punctuation — used to decide if romanization makes sense */
+const NON_LATIN_RE = /[\u0370-\u1dff\u2e80-\uffff]/
+
+/**
+ * Translate (or romanize) one batch of lines in a single Google Translate request.
+ * The lines are newline-joined so the whole batch shares translation context.
+ * Returns null on failure or empty output.
+ */
+async function googleTranslateChunk(
+  lines: string[],
+  targetLang: string,
+): Promise<{ translated: string[]; detected: string | null } | null> {
+  const romaji = targetLang === 'romaji'
+  const params = new URLSearchParams({ client: 'gtx', sl: 'auto', tl: romaji ? 'en' : targetLang })
+  params.append('dt', 't')
+  if (romaji) params.append('dt', 'rm') // rm = transliteration segments
+  // Romanization drops newlines, so mark line boundaries with a sentinel
+  // character that survives transliteration and split on it afterwards.
+  params.append('q', romaji ? lines.join('\n◆\n') : lines.join('\n'))
+  const url = `https://translate.googleapis.com/translate_a/single?${params.toString()}`
+
+  const rawResult = await new Promise<string>((resolve, reject) => {
+    httpsGet(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+      timeout: 15000,
+    }, (res) => {
+      let data = ''
+      res.on('data', (chunk) => (data += chunk))
+      res.on('end', () => resolve(data))
+      res.on('error', reject)
+    }).on('error', reject)
+  })
+
+  const parsed = JSON.parse(rawResult)
+  const segments = (parsed[0] ?? []) as Array<Array<string | null>>
+  // dt=t segments carry the translation at [0]; dt=rm appends a segment with
+  // the source-text romanization at [3].
+  const joined = romaji
+    ? segments.map(s => (typeof s?.[3] === 'string' ? s[3] : '')).join('')
+    : segments.map(s => (typeof s?.[0] === 'string' ? s[0] : '')).join('')
+  if (!joined.trim()) return null
+  const detected = typeof parsed[2] === 'string' ? parsed[2] : null
+
+  if (lines.length === 1) {
+    return { translated: [joined.replace(/[\n◆]/g, ' ').trim()], detected }
+  }
+
+  const translated = romaji
+    ? joined.split('◆').map(l => l.replace(/\n/g, ' ').trim())
+    : joined.split('\n')
+  if (translated.length === lines.length) return { translated, detected }
+
+  // Newlines were merged or dropped — fall back to per-line requests so
+  // every translated row stays aligned with its timestamp.
+  const out: string[] = []
+  for (const line of lines) {
+    const single = await googleTranslateChunk([line], targetLang).catch(() => null)
+    out.push(single?.translated[0] ?? line)
+  }
+  return { translated: out, detected }
+}
+
+/**
+ * Translate one batch of lines via Google's newer web endpoint (batchexecute).
+ * Unlike the legacy gtx endpoint it can translate *romanized* text (e.g. romaji
+ * Japanese) by transliterating internally — used as a fallback when gtx
+ * returns the input unchanged.
+ */
+async function batchexecuteTranslateChunk(
+  lines: string[],
+  targetLang: string,
+): Promise<{ translated: string[]; detected: string | null } | null> {
+  const inner = JSON.stringify([[lines.join('\n'), 'auto', targetLang, true], [null]])
+  const freq = JSON.stringify([[['MkEWBc', inner, null, 'generic']]])
+  const body = `f.req=${encodeURIComponent(freq)}`
+
+  const rawResult = await new Promise<string>((resolve, reject) => {
+    const req = httpsRequest('https://translate.google.com/_/TranslateWebserverUi/data/batchexecute?rpcids=MkEWBc&source-path=%2F&hl=en', {
+      method: 'POST',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+      },
+      timeout: 15000,
+    }, (res) => {
+      let data = ''
+      res.on('data', (chunk) => (data += chunk))
+      res.on('end', () => resolve(data))
+      res.on('error', reject)
+    })
+    req.on('error', reject)
+    req.write(body)
+    req.end()
+  })
+
+  // Envelope: [["wrb.fr","MkEWBc","<json-escaped payload>",...]] — extract and unescape
+  const m = rawResult.match(/\[\["wrb\.fr","MkEWBc","((?:[^"\\]|\\.)*)"/)
+  if (!m) return null
+  const payload = JSON.parse(JSON.parse(`"${m[1]}"`))
+  const segments = payload?.[1]?.[0]?.[0]?.[5]
+  if (!Array.isArray(segments)) return null
+  const joined = segments.map((s: unknown[]) => (typeof s?.[0] === 'string' ? s[0] : '')).join(' ')
+  if (!joined.trim()) return null
+  const detected = typeof payload?.[2] === 'string' ? payload[2] : null
+
+  if (lines.length === 1) return { translated: [joined.replace(/\n/g, ' ').trim()], detected }
+
+  const translated = joined.split('\n').map(l => l.trim())
+  if (translated.length === lines.length) return { translated, detected }
+
+  // Line boundaries lost — fall back to per-line requests
+  const out: string[] = []
+  for (const line of lines) {
+    const single = await batchexecuteTranslateChunk([line], targetLang).catch(() => null)
+    out.push(single?.translated[0] ?? line)
+  }
+  return { translated: out, detected }
+}
+
+/** Normalize a lyric line for comparisons */
+function normLine(s: string): string {
+  return s.toLowerCase().replace(/\s+/g, ' ').trim()
+}
+
+/** Letters/digits only — spacing and punctuation mangling shouldn't affect similarity */
+function compactLine(s: string): string {
+  // Strip ASCII punctuation/whitespace, keep letters, digits and all non-ASCII
+  return s.toLowerCase().replace(/[^a-z0-9¡-￿]/g, '')
+}
+
+/** True when at least `threshold` of the lines came back unchanged */
+function looksUntranslated(source: Array<{ text: string }>, translated: string[], threshold: number): boolean {
+  let same = 0
+  let total = 0
+  for (let i = 0; i < source.length; i++) {
+    if (!source[i].text.trim()) continue
+    total++
+    if (normLine(source[i].text) === normLine(translated[i] ?? '')) same++
+  }
+  return total > 0 && same / total >= threshold
+}
+
+/** Character-bigram Dice similarity (0–1) — cheap, language-independent */
+function diceSimilarity(a: string, b: string): number {
+  if (a === b) return 1
+  if (a.length < 2 || b.length < 2) return 0
+  const bigrams = (s: string) => {
+    const m = new Map<string, number>()
+    for (let i = 0; i < s.length - 1; i++) {
+      const g = s.slice(i, i + 2)
+      m.set(g, (m.get(g) ?? 0) + 1)
+    }
+    return m
+  }
+  const ma = bigrams(a)
+  const mb = bigrams(b)
+  let overlap = 0
+  ma.forEach((ca, g) => { overlap += Math.min(ca, mb.get(g) ?? 0) })
+  return (2 * overlap) / (a.length - 1 + b.length - 1)
+}
+
+/**
+ * Translate all text lines in an LRC string to targetLang via Google Translate,
+ * or romanize them when targetLang is 'romaji'. Lines are batched into chunks
+ * (newline-separated) so the translator sees surrounding context.
+ * Returns a new LRC with the same timestamps, or null when translation fails
+ * or is unnecessary (lyrics already in the target language / already Latin).
  */
 async function translateLrc(lrcContent: string, targetLang: string): Promise<string | null> {
+  const cacheKey = `${targetLang}\u0000${lrcContent}`
+  if (lyricsTranslationCache.has(cacheKey)) return lyricsTranslationCache.get(cacheKey) ?? null
+
+  let result: string | null = null
   try {
     const tsRegex = /\[(\d{1,3}:\d{2}(?:[.:]\d{1,3})?)\]/g
     const lines: Array<{ timestamps: string[]; text: string }> = []
@@ -988,40 +1179,141 @@ async function translateLrc(lrcContent: string, targetLang: string): Promise<str
       if (text) lines.push({ timestamps, text })
     }
 
-    if (lines.length === 0) return null
+    if (lines.length > 0 && !(targetLang === 'romaji' && !lines.some(l => NON_LATIN_RE.test(l.text)))) {
+      // Batch lines into chunks that stay well under the URL length limit
+      // while still giving the translator plenty of context per request.
+      const CHUNK_CHAR_BUDGET = 1200
+      const chunks: string[][] = []
+      let current: string[] = []
+      let currentLen = 0
+      for (const line of lines) {
+        if (current.length > 0 && currentLen + line.text.length > CHUNK_CHAR_BUDGET) {
+          chunks.push(current)
+          current = []
+          currentLen = 0
+        }
+        current.push(line.text)
+        currentLen += line.text.length + 1
+      }
+      if (current.length > 0) chunks.push(current)
 
-    const combined = lines.map(l => l.text).join('\n')
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(targetLang)}&dt=t&q=${encodeURIComponent(combined)}`
+      const translatedLines: string[] = []
+      let failed = false
+      for (const chunk of chunks) {
+        const res = await googleTranslateChunk(chunk, targetLang)
+        if (!res) { failed = true; break }
+        translatedLines.push(...res.translated)
+      }
 
-    const rawResult = await new Promise<string>((resolve, reject) => {
-      httpsGet(url, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-        timeout: 15000,
-      }, (res) => {
-        let data = ''
-        res.on('data', (chunk) => (data += chunk))
-        res.on('end', () => resolve(data))
-        res.on('error', reject)
-      }).on('error', reject)
-    })
+      // gtx can't translate romanized text (e.g. romaji Japanese) and echoes it
+      // back unchanged — retry the untouched lines through the newer web
+      // endpoint, which transliterates internally before translating. It only
+      // does that for short inputs, so retry in small batches of deduped lines.
+      if (!failed && targetLang !== 'romaji' && looksUntranslated(lines, translatedLines, 0.7)) {
+        const seen = new Set<string>()
+        const retryTexts: string[] = []
+        for (let i = 0; i < lines.length; i++) {
+          if (normLine(lines[i].text) !== normLine(translatedLines[i] ?? '')) continue
+          const key = normLine(lines[i].text)
+          if (!seen.has(key)) {
+            seen.add(key)
+            retryTexts.push(lines[i].text)
+          }
+        }
 
-    const parsed = JSON.parse(rawResult)
-    const translated = (parsed[0] as Array<[string, string]>).map((c) => c[0]).join('')
-    const translatedLines = translated.split('\n')
+        const retryChunks: string[][] = []
+        let cur: string[] = []
+        let curLen = 0
+        for (const t of retryTexts) {
+          if (cur.length >= 4 || (cur.length > 0 && curLen + t.length > 200)) {
+            retryChunks.push(cur)
+            cur = []
+            curLen = 0
+          }
+          cur.push(t)
+          curLen += t.length + 1
+        }
+        if (cur.length > 0) retryChunks.push(cur)
 
-    const rebuilt = lines
-      .map((line, i) => {
-        const text = (translatedLines[i] ?? '').trim()
-        return text ? line.timestamps.join('') + text : null
-      })
-      .filter(Boolean)
-      .join('\n')
+        // Accept only clear rewrites — near-identical output means the line was
+        // already in the target language or got mangled, not translated.
+        const acceptRetry = (src: string, out: string) =>
+          out.length > 0 && diceSimilarity(compactLine(src), compactLine(out)) < 0.6
 
-    return rebuilt || null
+        const retryMap = new Map<string, string>()
+        for (const chunk of retryChunks) {
+          const res = await batchexecuteTranslateChunk(chunk, targetLang).catch(() => null)
+          if (!res) continue
+          chunk.forEach((src, i) => {
+            const out = (res.translated[i] ?? '').trim()
+            if (acceptRetry(src, out)) retryMap.set(normLine(src), out)
+          })
+        }
+
+        // Second pass: some chunks come back untransliterated — single lines
+        // are the most reliable input for the web endpoint, so retry leftovers
+        // one by one (deduped, capped to keep first-load latency bounded).
+        const leftovers = retryTexts.filter(t => !retryMap.has(normLine(t))).slice(0, 30)
+        for (const src of leftovers) {
+          const res = await batchexecuteTranslateChunk([src], targetLang).catch(() => null)
+          const out = (res?.translated[0] ?? '').trim()
+          if (acceptRetry(src, out)) retryMap.set(normLine(src), out)
+        }
+
+        for (let i = 0; i < lines.length; i++) {
+          const replacement = retryMap.get(normLine(lines[i].text))
+          if (replacement && normLine(lines[i].text) === normLine(translatedLines[i] ?? '')) {
+            translatedLines[i] = replacement
+          }
+        }
+      }
+
+      // If the output is still essentially identical, the lyrics really are in
+      // the target language already — skip the pointless duplicate translation.
+      const unchanged = targetLang !== 'romaji' && looksUntranslated(lines, translatedLines, 0.95)
+
+      if (!failed && !unchanged) {
+        result = lines
+          .map((line, i) => {
+            const text = (translatedLines[i] ?? '').trim()
+            return text ? line.timestamps.join('') + text : null
+          })
+          .filter(Boolean)
+          .join('\n') || null
+      }
+    }
   } catch (err) {
     logger.error('translateLrc error:', err)
-    return null
+    result = null
   }
+
+  if (lyricsTranslationCache.size >= LYRICS_TRANSLATION_CACHE_MAX) {
+    const oldest = lyricsTranslationCache.keys().next().value
+    if (oldest !== undefined) lyricsTranslationCache.delete(oldest)
+  }
+  lyricsTranslationCache.set(cacheKey, result)
+  return result
+}
+
+/**
+ * Apply the user's language preference to a lyrics result.
+ * - 'auto': pass through the source-provided translation (e.g. Netease tlyric)
+ * - 'romaji': romanize the original into `pronunciation` AND translate into
+ *   the system language (a hand-written translation still wins)
+ * - anything else: translate the original into that language
+ * A user-authored translation (tagged [by:user]) always wins as the translation.
+ */
+async function applyLyricsLanguage(
+  result: { lrc: string; translation?: string },
+  targetLang: string,
+): Promise<{ lrc: string; translation?: string; pronunciation?: string }> {
+  if (targetLang === 'auto') return result
+  const userTranslation = result.translation?.includes('[by:user]') ? result.translation : undefined
+  const romaji = targetLang === 'romaji'
+  const pronunciation = romaji ? (await translateLrc(result.lrc, 'romaji')) ?? undefined : undefined
+  const translationLang = romaji ? systemDisplayLang() : targetLang
+  const translation = userTranslation ?? (await translateLrc(result.lrc, translationLang)) ?? undefined
+  return { lrc: result.lrc, translation, pronunciation }
 }
 
 async function saveTranslationFile(audioPath: string, translationContent: string): Promise<void> {
@@ -1702,13 +1994,7 @@ app.whenReady().then(async () => {
     const local = await findLocalLyrics(trackPath)
     if (!local) return null
     const settings = await loadSettings()
-    const targetLang: string = settings.lyricsTranslationLang ?? 'auto'
-    if (targetLang !== 'auto') {
-      // Translate original lyrics directly → best quality, no double-translation
-      const translation = await translateLrc(local.lrc, targetLang)
-      return { lrc: local.lrc, translation: translation ?? undefined }
-    }
-    return local // auto: use Netease tlyric as-is (may be undefined)
+    return await applyLyricsLanguage(local, resolveLyricsTargetLang(settings))
   })
 
   ipcMain.handle('lyrics:fetch-online', async (_, trackInfo: { path: string; title: string; artist: string; album: string; duration: number }) => {
@@ -1725,12 +2011,7 @@ app.whenReady().then(async () => {
     if (!result) return null
     // Apply language preference: translate original → target lang, or pass tlyric through
     const settings = await loadSettings()
-    const targetLang: string = settings.lyricsTranslationLang ?? 'auto'
-    if (targetLang !== 'auto') {
-      const translation = await translateLrc(result.lrc, targetLang)
-      return { lrc: result.lrc, translation: translation ?? undefined }
-    }
-    return result
+    return await applyLyricsLanguage(result, resolveLyricsTargetLang(settings))
   })
 
   // ── IPC: App paths (for Settings display) ──
@@ -2749,6 +3030,12 @@ app.whenReady().then(async () => {
   ipcMain.handle('lyrics:save', async (_, trackPath: string, lrcContent: string) => {
     if (trackPath.startsWith('subsonic://')) return // Can't save to remote paths
     await saveLyricsFile(trackPath, lrcContent)
+  })
+
+  // ── IPC: Save a user-authored translation (.translation.lrc next to the track) ──
+  ipcMain.handle('lyrics:save-translation', async (_, trackPath: string, translationContent: string) => {
+    if (trackPath.startsWith('subsonic://')) return
+    await saveTranslationFile(trackPath, translationContent)
   })
 
   ipcMain.handle('lyrics:search', async (_, query: string, tracks: { id: string; path: string }[]) => {

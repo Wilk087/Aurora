@@ -560,29 +560,44 @@
         </div>
 
         <!-- Translation language -->
-        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
-          <div>
-            <p class="text-sm text-white/80">Translation Language</p>
-            <p class="text-xs text-white/30 mt-0.5">Auto shows the source translation (usually Chinese). A specific language translates from the original.</p>
+        <div class="px-4 py-3 rounded-xl bg-white/[0.05]">
+          <p class="text-sm text-white/80">Translation Language</p>
+          <p class="text-xs text-white/30 mt-0.5 mb-2">Lyrics are translated from the original. Romaji romanizes the original text instead (e.g. Japanese → rōmaji).</p>
+          <div class="relative" ref="langDropdownRef">
+            <button
+              @click.stop="showLangDropdown = !showLangDropdown"
+              class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm outline-none transition-colors"
+              style="background: rgb(var(--app-text) / 0.06); border: 1px solid var(--border); color: rgb(var(--app-text) / 0.70)"
+            >
+              <span class="truncate">{{ translationLangLabel }}</span>
+              <svg class="w-4 h-4 shrink-0 ml-2 transition-transform" :class="showLangDropdown ? 'rotate-180' : ''" style="color: rgb(var(--app-text) / 0.30)" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            <Teleport to="body">
+              <div v-if="showLangDropdown" class="fixed inset-0 z-[90]" @click="showLangDropdown = false" />
+              <Transition name="dropdown">
+                <div
+                  v-if="showLangDropdown"
+                  class="fixed rounded-xl menu-panel shadow-2xl py-1 z-[100] max-h-72 overflow-y-auto w-[min(100vw-2rem,24rem)]"
+                  :style="langDropdownStyle"
+                >
+                  <button
+                    v-for="opt in translationLangOptions"
+                    :key="opt.value"
+                    @click="selectTranslationLang(opt.value)"
+                    class="w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center justify-between"
+                    :class="player.lyricsTranslationLang === opt.value ? 'text-accent bg-white/[0.08]' : 'text-white/60 hover:text-white hover:bg-white/[0.06]'"
+                  >
+                    <span class="truncate mr-2">{{ opt.label }}</span>
+                    <svg v-if="player.lyricsTranslationLang === opt.value" class="w-3.5 h-3.5 text-accent shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+                    </svg>
+                  </button>
+                </div>
+              </Transition>
+            </Teleport>
           </div>
-          <select
-            :value="player.lyricsTranslationLang"
-            @change="player.setLyricsTranslationLang(($event.target as HTMLSelectElement).value)"
-            class="ml-4 px-3 py-1.5 rounded-lg bg-white/[0.08] border border-white/[0.1] text-sm text-white/80 outline-none focus:border-accent/50 transition-colors cursor-pointer"
-          >
-            <option value="auto">Auto (from source)</option>
-            <option value="en">English</option>
-            <option value="es">Spanish</option>
-            <option value="fr">French</option>
-            <option value="de">German</option>
-            <option value="pt">Portuguese</option>
-            <option value="ru">Russian</option>
-            <option value="it">Italian</option>
-            <option value="ja">Japanese</option>
-            <option value="ko">Korean</option>
-            <option value="zh-CN">Chinese (Simplified)</option>
-            <option value="zh-TW">Chinese (Traditional)</option>
-          </select>
         </div>
 
         <!-- Lyrics offset -->
@@ -1378,10 +1393,10 @@
                 : 'bg-white/[0.03] border-transparent hover:bg-white/[0.05]'"
               @click="themeStore.applyTheme(t)"
             >
-              <!-- Accent swatch -->
+              <!-- Theme preview swatch (background → accent, same as the Hub) -->
               <div
                 class="w-7 h-7 rounded-lg shrink-0 border border-white/10"
-                :style="{ background: `rgb(${t.colors.accent})` }"
+                :style="{ background: `linear-gradient(135deg, ${themeSwatchColor(t.colors.bgPrimary)} 0%, ${themeSwatchColor(t.colors.accent)} 100%)` }"
               />
               <!-- Info -->
               <div class="flex-1 min-w-0">
@@ -2054,6 +2069,62 @@ const lyricsOffsetDisplay = computed(() => {
   const v = player.lyricsOffset
   return v >= 0 ? `+${v.toFixed(1)}` : v.toFixed(1)
 })
+
+// Human-readable name of the OS language, shown next to the "System language" option
+const systemLangName = (() => {
+  try {
+    const base = navigator.language.split('-')[0]
+    return new Intl.DisplayNames([navigator.language], { type: 'language' }).of(base) ?? base
+  } catch {
+    return ''
+  }
+})()
+
+// Theme colors mix formats: accent is bare RGB channels ("139 92 246") while
+// backgrounds are full CSS colors ("rgba(10, 10, 10, 0.95)") — normalize both.
+function themeSwatchColor(c: string | undefined): string {
+  if (!c) return 'rgb(20 20 30)'
+  const trimmed = c.trim()
+  return /^[\d.\s/%]+$/.test(trimmed) ? `rgb(${trimmed})` : trimmed
+}
+
+// Translation language dropdown (styled like the output device selector)
+const translationLangOptions: { value: string; label: string }[] = [
+  { value: 'system', label: `System language${systemLangName ? ` (${systemLangName})` : ''}` },
+  { value: 'auto', label: 'Auto (from source)' },
+  { value: 'romaji', label: 'Romaji (romanize original)' },
+  { value: 'en', label: 'English' },
+  { value: 'es', label: 'Spanish' },
+  { value: 'fr', label: 'French' },
+  { value: 'de', label: 'German' },
+  { value: 'pt', label: 'Portuguese' },
+  { value: 'ru', label: 'Russian' },
+  { value: 'it', label: 'Italian' },
+  { value: 'ja', label: 'Japanese' },
+  { value: 'ko', label: 'Korean' },
+  { value: 'zh-CN', label: 'Chinese (Simplified)' },
+  { value: 'zh-TW', label: 'Chinese (Traditional)' },
+]
+
+const showLangDropdown = ref(false)
+const langDropdownRef = ref<HTMLElement | null>(null)
+const langDropdownStyle = computed(() => {
+  if (!langDropdownRef.value) return {}
+  const rect = langDropdownRef.value.getBoundingClientRect()
+  return {
+    top: `${rect.bottom + 6}px`,
+    left: `${Math.min(rect.left, window.innerWidth - 400)}px`,
+  }
+})
+
+const translationLangLabel = computed(() =>
+  translationLangOptions.find(o => o.value === player.lyricsTranslationLang)?.label ?? player.lyricsTranslationLang,
+)
+
+function selectTranslationLang(value: string) {
+  player.setLyricsTranslationLang(value)
+  showLangDropdown.value = false
+}
 
 const discordSmallImageOptions: { value: 'aurora' | 'artist' | 'none'; label: string; desc: string }[] = [
   { value: 'aurora', label: 'Aurora Logo', desc: 'Shows the Aurora Player icon as a badge' },

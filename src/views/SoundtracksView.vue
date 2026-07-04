@@ -4,7 +4,7 @@
       <div>
         <h1 class="text-3xl font-bold text-white mb-1">Soundtracks</h1>
         <p class="text-sm text-white/40">
-          {{ filteredAlbums.length }} album{{ filteredAlbums.length !== 1 ? 's' : '' }}<span v-if="activeTag"> tagged "{{ activeTag }}"</span>
+          {{ filteredAlbums.length }} album{{ filteredAlbums.length !== 1 ? 's' : '' }}<span v-if="library.searchQuery"> matching "{{ library.searchQuery }}"</span><span v-if="activeTag"> tagged "{{ activeTag }}"</span>
         </p>
       </div>
 
@@ -45,6 +45,18 @@
       </template>
       <p class="text-xs text-white/20 -mt-4">Right-click any album → Manage Tags</p>
     </EmptyState>
+
+    <!-- No results for search query -->
+    <div
+      v-else-if="library.libraryReady && library.searchQuery && filteredAlbums.length === 0"
+      class="flex flex-col items-center justify-center py-20"
+    >
+      <svg class="w-16 h-16 text-white/[0.06] mb-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+      </svg>
+      <h2 class="text-lg font-semibold text-white/60 mb-1">No soundtracks found</h2>
+      <p class="text-sm text-white/30">No soundtracks match "{{ library.searchQuery }}"</p>
+    </div>
 
     <!-- No results for active tag filter -->
     <div
@@ -143,10 +155,26 @@ const soundtrackTags = computed(() => {
   return Array.from(set).sort()
 })
 
+/** Strip diacritics for lenient matching, same as the library store search */
+function normalize(str: string): string {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
+/** Albums filtered by the global search query (if any) */
+const searchedAlbums = computed(() => {
+  if (!library.searchQuery) return soundtrackTaggedAlbums.value
+  const q = normalize(library.searchQuery)
+  return soundtrackTaggedAlbums.value.filter(item =>
+    normalize(item.album.name).includes(q) ||
+    normalize(item.album.artist).includes(q) ||
+    item.album.tracks.some(t => normalize(t.title).includes(q)),
+  )
+})
+
 /** Albums filtered by the active tag chip (if any) */
 const filteredAlbums = computed(() => {
-  if (!activeTag.value) return soundtrackTaggedAlbums.value
-  return soundtrackTaggedAlbums.value.filter(item => item.tags.includes(activeTag.value!))
+  if (!activeTag.value) return searchedAlbums.value
+  return searchedAlbums.value.filter(item => item.tags.includes(activeTag.value!))
 })
 
 function toggleTag(tag: string) {

@@ -37,9 +37,20 @@
         <!-- Cinematic Grain: film grain + orbiting spotlights -->
         <template v-else-if="animatedStyle === 'cinematic-grain'">
           <div class="absolute inset-0 transition-[background] duration-[2s] ease-out" :style="{ background: darkDominant }" />
-          <div class="spotlight spotlight-1" :style="{ background: `radial-gradient(ellipse at center, ${brightColors.c2}bb 0%, ${brightColors.c2}44 40%, transparent 70%)` }" />
-          <div class="spotlight spotlight-2" :style="{ background: `radial-gradient(ellipse at center, ${brightColors.c3}bb 0%, ${brightColors.c3}44 40%, transparent 70%)` }" />
+          <div class="spotlight spotlight-1" :style="{ background: `radial-gradient(ellipse at center, ${colorAlpha(2, 0.73)} 0%, ${colorAlpha(2, 0.27)} 40%, transparent 70%)` }" />
+          <div class="spotlight spotlight-2" :style="{ background: `radial-gradient(ellipse at center, ${colorAlpha(3, 0.73)} 0%, ${colorAlpha(3, 0.27)} 40%, transparent 70%)` }" />
+          <div class="spotlight spotlight-3" :style="{ background: `radial-gradient(ellipse at center, ${colorAlpha(4, 0.6)} 0%, ${colorAlpha(4, 0.2)} 40%, transparent 70%)` }" />
+          <div class="cinematic-vignette absolute inset-0 pointer-events-none" />
           <canvas ref="grainCanvas" class="absolute inset-0 w-full h-full opacity-[0.06] pointer-events-none" style="mix-blend-mode: overlay;" />
+        </template>
+
+        <!-- Aurora Flow: slow northern-lights curtains from cover colors -->
+        <template v-else-if="animatedStyle === 'aurora-flow'">
+          <div class="absolute inset-0 transition-[background] duration-[2s] ease-out" :style="{ background: darkDominant }" />
+          <div class="aurora-band aurora-band-1" :style="{ background: `linear-gradient(105deg, transparent 12%, ${colorAlpha(2, 0.33)} 34%, ${colorAlpha(2, 0.67)} 50%, ${colorAlpha(2, 0.33)} 66%, transparent 88%)` }" />
+          <div class="aurora-band aurora-band-2" :style="{ background: `linear-gradient(95deg, transparent 18%, ${colorAlpha(3, 0.27)} 38%, ${colorAlpha(3, 0.53)} 54%, ${colorAlpha(3, 0.27)} 70%, transparent 90%)` }" />
+          <div class="aurora-band aurora-band-3" :style="{ background: `linear-gradient(115deg, transparent 15%, ${colorAlpha(4, 0.27)} 36%, ${colorAlpha(4, 0.47)} 52%, ${colorAlpha(4, 0.27)} 68%, transparent 86%)` }" />
+          <div class="aurora-glow" :style="{ background: `radial-gradient(ellipse at 50% 110%, ${colorAlpha(2, 0.2)} 0%, transparent 60%)` }" />
         </template>
       </div>
       <div v-if="!effectiveVibrant" class="absolute inset-0 opacity-[0.03]" style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 256 256%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.9%22 /%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22 /%3E%3C/svg%3E')" />
@@ -59,7 +70,7 @@
           description="A full-screen experience built around your music and artwork."
           :items="[
             { label: 'Layout styles', description: 'Switch between Default, Modern, and Artwork layouts via the settings panel.' },
-            { label: 'Animated backgrounds', description: 'Choose from Lava Lamp, Sonar Ripple, or Cinematic Grain.' },
+            { label: 'Animated backgrounds', description: 'Choose from Lava Lamp, Sonar Ripple, Cinematic Grain, or Aurora Flow.' },
             { label: 'Vibrant mode', description: 'Blends translucent UI elements with the album colors.' },
             { label: 'Settings panel', description: 'Click the palette icon in the bottom bar to customise the view.' },
           ]"
@@ -843,11 +854,12 @@ const animatedPerStyle = ref<Record<StyleId, boolean>>({ default: false, modern:
 const hideControlsPerStyle = ref<Record<StyleId, boolean>>({ default: false, modern: false, artwork: false })
 
 // Animated background style selection (per immersive style)
-type AnimStyleId = 'lava-lamp' | 'sonar-ripple' | 'cinematic-grain'
+type AnimStyleId = 'lava-lamp' | 'sonar-ripple' | 'cinematic-grain' | 'aurora-flow'
 const animatedStyles = [
   { id: 'lava-lamp', label: 'Lava Lamp', desc: 'Drifting color blobs' },
   { id: 'sonar-ripple', label: 'Sonar Ripple', desc: 'Expanding halos from cover' },
   { id: 'cinematic-grain', label: 'Cinematic Grain', desc: 'Film grain & orbiting spotlights' },
+  { id: 'aurora-flow', label: 'Aurora Flow', desc: 'Flowing northern-lights curtains' },
 ] as const
 const animStylePerStyle = ref<Record<StyleId, AnimStyleId>>({ default: 'lava-lamp', modern: 'lava-lamp', artwork: 'lava-lamp' })
 const animatedStyle = computed({
@@ -1147,6 +1159,13 @@ const darkDominant = computed(() => {
   return `rgb(${Math.round(c.r * 0.2)},${Math.round(c.g * 0.15)},${Math.round(c.b * 0.25)})`
 })
 
+/** rgba() with a custom alpha from the extracted cover colors (1-based: 1 = dominant).
+ *  brightColors are full rgba() strings, so hex-alpha suffixes on them are invalid CSS. */
+function colorAlpha(index: number, alpha: number): string {
+  const c = rawColors.value[index - 1] ?? rawColors.value[0] ?? { r: 60, g: 25, b: 75 }
+  return `rgba(${c.r},${c.g},${c.b},${alpha})`
+}
+
 // Canvas refs for animated styles
 const sonarCanvas = ref<HTMLCanvasElement>()
 const grainCanvas = ref<HTMLCanvasElement>()
@@ -1296,8 +1315,12 @@ function exitFullscreen() {
 }
 
 function onKeydown(e: KeyboardEvent) {
-  // Don't intercept when LrcSyncer overlay is active
+  // Don't intercept when LrcSyncer or the translation editor overlay is active
   if (document.querySelector('[data-lrc-syncer-active]')) return
+  if (document.querySelector('[data-lyrics-translation-active]')) return
+  // Don't intercept while typing (e.g. plugin-injected inputs)
+  const tag = (e.target as HTMLElement)?.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
 
   if (e.key === 'Escape' || e.key === 'F11') {
     e.preventDefault()
@@ -1761,36 +1784,44 @@ onUnmounted(() => {
 .animated-blob {
   position: absolute;
   border-radius: 40% 60% 55% 45% / 55% 40% 60% 45%;
-  filter: blur(60px) saturate(1.4);
+  filter: blur(60px) saturate(1.45);
   opacity: 0.85;
-  will-change: transform;
+  will-change: transform, border-radius;
   transition: background 2s ease, width 1s ease, height 1s ease, top 1s ease, right 1s ease, bottom 1s ease, left 1s ease;
+}
+
+/* Organic shape morphing shared by all blobs (runs alongside the drift) */
+@keyframes blob-morph {
+  0%, 100% { border-radius: 40% 60% 55% 45% / 55% 40% 60% 45%; }
+  25% { border-radius: 58% 42% 40% 60% / 45% 58% 42% 55%; }
+  50% { border-radius: 45% 55% 62% 38% / 60% 42% 58% 40%; }
+  75% { border-radius: 52% 48% 44% 56% / 42% 56% 46% 58%; }
 }
 
 /* ========== MODERN: right-half positioning (Lava Lamp) ========== */
 .anim-modern .blob-a1 {
   width: 28%; height: 35%; top: -5%; right: 2%;
-  animation: drift-a1-m 20s ease-in-out infinite;
+  animation: drift-a1-m 20s ease-in-out infinite, blob-morph 13s ease-in-out infinite;
 }
 .anim-modern .blob-a2 {
   width: 18%; height: 22%; top: 8%; right: 20%; opacity: 0.7;
-  animation: drift-a2-m 15s ease-in-out infinite;
+  animation: drift-a2-m 15s ease-in-out infinite, blob-morph 9s ease-in-out infinite;
 }
 .anim-modern .blob-b1 {
   width: 26%; height: 32%; bottom: -3%; right: 12%;
-  animation: drift-b1-m 24s ease-in-out infinite;
+  animation: drift-b1-m 24s ease-in-out infinite, blob-morph 15s ease-in-out infinite reverse;
 }
 .anim-modern .blob-b2 {
   width: 16%; height: 20%; bottom: 15%; right: 30%; opacity: 0.7;
-  animation: drift-b2-m 17s ease-in-out infinite;
+  animation: drift-b2-m 17s ease-in-out infinite, blob-morph 10s ease-in-out infinite reverse;
 }
 .anim-modern .blob-c1 {
   width: 24%; height: 30%; top: 30%; right: 5%;
-  animation: drift-c1-m 22s ease-in-out infinite;
+  animation: drift-c1-m 22s ease-in-out infinite, blob-morph 14s ease-in-out infinite;
 }
 .anim-modern .blob-c2 {
   width: 15%; height: 18%; top: 45%; right: 28%; opacity: 0.7;
-  animation: drift-c2-m 16s ease-in-out infinite;
+  animation: drift-c2-m 16s ease-in-out infinite, blob-morph 11s ease-in-out infinite reverse;
 }
 
 /* Modern primary blobs — sweep within the right half */
@@ -1840,27 +1871,27 @@ onUnmounted(() => {
 /* ========== ARTWORK: full-screen positioning (Lava Lamp) ========== */
 .anim-artwork .blob-a1 {
   width: 45%; height: 50%; top: -8%; right: -5%;
-  animation: drift-a1-f 20s ease-in-out infinite;
+  animation: drift-a1-f 20s ease-in-out infinite, blob-morph 13s ease-in-out infinite;
 }
 .anim-artwork .blob-a2 {
   width: 28%; height: 30%; top: 5%; left: 8%; opacity: 0.7;
-  animation: drift-a2-f 15s ease-in-out infinite;
+  animation: drift-a2-f 15s ease-in-out infinite, blob-morph 9s ease-in-out infinite reverse;
 }
 .anim-artwork .blob-b1 {
   width: 42%; height: 46%; bottom: -6%; left: -3%;
-  animation: drift-b1-f 24s ease-in-out infinite;
+  animation: drift-b1-f 24s ease-in-out infinite, blob-morph 15s ease-in-out infinite reverse;
 }
 .anim-artwork .blob-b2 {
   width: 25%; height: 28%; bottom: 15%; right: 10%; opacity: 0.7;
-  animation: drift-b2-f 17s ease-in-out infinite;
+  animation: drift-b2-f 17s ease-in-out infinite, blob-morph 10s ease-in-out infinite;
 }
 .anim-artwork .blob-c1 {
   width: 38%; height: 42%; top: 25%; left: 30%;
-  animation: drift-c1-f 22s ease-in-out infinite;
+  animation: drift-c1-f 22s ease-in-out infinite, blob-morph 14s ease-in-out infinite;
 }
 .anim-artwork .blob-c2 {
   width: 22%; height: 24%; top: 55%; right: 25%; opacity: 0.7;
-  animation: drift-c2-f 16s ease-in-out infinite;
+  animation: drift-c2-f 16s ease-in-out infinite, blob-morph 11s ease-in-out infinite reverse;
 }
 
 /* Artwork primary blobs — sweep across entire screen */
@@ -1939,5 +1970,72 @@ onUnmounted(() => {
   50% { transform: translate(15%, -50%); }
   75% { transform: translate(-20%, -20%); }
   100% { transform: translate(0, 0); }
+}
+.spotlight-3 {
+  width: 45%; height: 45%;
+  top: 35%; left: 30%;
+  opacity: 0.5;
+  animation: orbit-3 44s linear infinite;
+}
+@keyframes orbit-3 {
+  0% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(-25%, -20%) scale(1.15); }
+  50% { transform: translate(10%, -35%) scale(0.9); }
+  75% { transform: translate(25%, 15%) scale(1.1); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+/* Slowly breathing vignette keeps the edges cinematic */
+.cinematic-vignette {
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, 0.55) 100%);
+  animation: vignette-breathe 16s ease-in-out infinite;
+}
+@keyframes vignette-breathe {
+  0%, 100% { opacity: 0.65; }
+  50% { opacity: 1; }
+}
+
+/* ── Aurora Flow: drifting northern-lights curtains ───────────── */
+.aurora-band {
+  position: absolute;
+  inset: -25%;
+  filter: blur(70px) saturate(1.35);
+  opacity: 0.75;
+  will-change: transform;
+  transition: background 2s ease;
+  transform-origin: 50% 60%;
+}
+/* Modern layout keeps the left side calm for the controls */
+.anim-modern .aurora-band {
+  inset: -25% -25% -25% 15%;
+}
+.aurora-band-1 { animation: aurora-drift-1 26s ease-in-out infinite; }
+.aurora-band-2 { animation: aurora-drift-2 34s ease-in-out infinite; opacity: 0.6; }
+.aurora-band-3 { animation: aurora-drift-3 42s ease-in-out infinite; opacity: 0.5; }
+@keyframes aurora-drift-1 {
+  0%, 100% { transform: translateX(-6%) rotate(-8deg) scaleY(1); }
+  33% { transform: translateX(5%) rotate(-3deg) scaleY(1.18); }
+  66% { transform: translateX(-2%) rotate(-11deg) scaleY(0.9); }
+}
+@keyframes aurora-drift-2 {
+  0%, 100% { transform: translateX(4%) rotate(6deg) scaleY(1.05); }
+  30% { transform: translateX(-6%) rotate(10deg) scaleY(0.88); }
+  65% { transform: translateX(3%) rotate(2deg) scaleY(1.2); }
+}
+@keyframes aurora-drift-3 {
+  0%, 100% { transform: translateX(0%) rotate(-2deg) scaleY(1.1); }
+  40% { transform: translateX(7%) rotate(-7deg) scaleY(0.92); }
+  75% { transform: translateX(-5%) rotate(3deg) scaleY(1.15); }
+}
+/* Soft glow rising from the horizon */
+.aurora-glow {
+  position: absolute;
+  inset: 0;
+  transition: background 2s ease;
+  animation: aurora-glow-pulse 18s ease-in-out infinite;
+}
+@keyframes aurora-glow-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
 </style>

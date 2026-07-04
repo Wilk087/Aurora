@@ -9,7 +9,7 @@ import { reactive } from 'vue'
 import { pluginBus } from './eventBus'
 
 export type ImmersiveStyleId = 'default' | 'modern' | 'artwork'
-export type ImmersiveAnimStyleId = 'lava-lamp' | 'sonar-ripple' | 'cinematic-grain'
+export type ImmersiveAnimStyleId = 'lava-lamp' | 'sonar-ripple' | 'cinematic-grain' | 'aurora-flow'
 
 export interface ImmersiveSettings {
   style: ImmersiveStyleId

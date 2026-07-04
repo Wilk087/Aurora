@@ -132,9 +132,11 @@ onMounted(async () => {
     showSetupWizard.value = true
   }
 
-  // Restore last open tab
+  // Restore last open tab; Home is the default starting screen
   if (settings.lastTab && settings.lastTab !== '/') {
     router.replace(settings.lastTab)
+  } else {
+    router.replace('/home')
   }
 
   await library.loadLibrary()

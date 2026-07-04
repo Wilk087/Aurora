@@ -8,6 +8,7 @@ export interface LyricLine {
   text: string
   words?: LyricWord[] // present if enhanced LRC format
   translation?: string // optional translated line (e.g. from Netease tlyric)
+  pronunciation?: string // optional romanized line (e.g. romaji)
 }
 
 function parseTime(min: string, sec: string, frac?: string): number {
@@ -117,29 +118,43 @@ export function findCurrentWord(words: LyricWord[], currentTime: number): number
 }
 
 /**
- * Merge a translation LRC string into an existing lyrics array.
- * Matches lines by timestamp (within 500ms tolerance) and attaches the
- * translation text to the closest matching original line.
+ * Merge a secondary LRC string (translation or pronunciation) into an existing
+ * lyrics array. Matches lines by timestamp (within 500ms tolerance) and
+ * attaches the text to the closest matching original line under `field`.
  */
-export function mergeTranslations(lyrics: LyricLine[], translationLrc: string): LyricLine[] {
-  const tranLines = parseLRC(translationLrc)
-  if (tranLines.length === 0) return lyrics
+function mergeLrcField(
+  lyrics: LyricLine[],
+  secondaryLrc: string,
+  field: 'translation' | 'pronunciation',
+): LyricLine[] {
+  const secondaryLines = parseLRC(secondaryLrc)
+  if (secondaryLines.length === 0) return lyrics
 
   // Build map keyed by rounded timestamp (10ms precision)
-  const tranMap = new Map<number, string>()
-  for (const tl of tranLines) {
-    if (tl.text) tranMap.set(Math.round(tl.time * 100), tl.text)
+  const map = new Map<number, string>()
+  for (const sl of secondaryLines) {
+    if (sl.text) map.set(Math.round(sl.time * 100), sl.text)
   }
 
   return lyrics.map(line => {
     const key = Math.round(line.time * 100)
     // Exact match first
-    if (tranMap.has(key)) return { ...line, translation: tranMap.get(key) }
+    if (map.has(key)) return { ...line, [field]: map.get(key) }
     // Fuzzy match within ±500ms (50 units at 10ms resolution)
     for (let delta = 1; delta <= 50; delta++) {
-      if (tranMap.has(key + delta)) return { ...line, translation: tranMap.get(key + delta) }
-      if (tranMap.has(key - delta)) return { ...line, translation: tranMap.get(key - delta) }
+      if (map.has(key + delta)) return { ...line, [field]: map.get(key + delta) }
+      if (map.has(key - delta)) return { ...line, [field]: map.get(key - delta) }
     }
     return line
   })
+}
+
+/** Merge a translation LRC string into an existing lyrics array. */
+export function mergeTranslations(lyrics: LyricLine[], translationLrc: string): LyricLine[] {
+  return mergeLrcField(lyrics, translationLrc, 'translation')
+}
+
+/** Merge a pronunciation (e.g. romaji) LRC string into an existing lyrics array. */
+export function mergePronunciations(lyrics: LyricLine[], pronunciationLrc: string): LyricLine[] {
+  return mergeLrcField(lyrics, pronunciationLrc, 'pronunciation')
 }

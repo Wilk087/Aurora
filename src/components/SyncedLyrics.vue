@@ -85,9 +85,14 @@
           <span class="text-sm tracking-widest">···</span>
           <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" /></svg>
         </span>
+        <!-- Pronunciation line (romaji) -->
+        <p
+          v-if="line.pronunciation && line.pronunciation.toLowerCase().trim() !== line.text.toLowerCase().trim()"
+          class="sl-translation-line mt-0.5 text-base font-normal italic"
+        >{{ line.pronunciation }}</p>
         <!-- Translation line -->
         <p
-          v-if="line.translation && line.translation.toLowerCase().trim() !== line.text.toLowerCase().trim()"
+          v-if="player.showLyricsTranslation && line.translation && line.translation.toLowerCase().trim() !== line.text.toLowerCase().trim()"
           class="sl-translation-line mt-0.5 text-base font-normal"
         >{{ line.translation }}</p>
         <!-- Selection indicator -->
@@ -135,13 +140,58 @@
       @close="showCard = false"
     />
 
+    <!-- Lyrics toolbar (edit / translate / toggle translation) -->
+    <Transition name="slide-up">
+      <div
+        v-if="lyrics.length > 0 && selectedLines.size === 0 && player.currentTrack?.source !== 'subsonic'"
+        class="sl-toolbar absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 px-1.5 py-1.5 rounded-full bg-black/75 backdrop-blur-xl border border-white/10 shadow-xl"
+      >
+        <button
+          @click="openLyricsEditor"
+          class="w-7 h-7 flex items-center justify-center rounded-full text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+          title="Edit lyrics (re-sync timestamps)"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" />
+          </svg>
+        </button>
+        <button
+          @click="showTranslationEditor = true"
+          class="flex items-center gap-1.5 px-2.5 h-7 rounded-full text-xs font-medium text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+          title="Write your own translation"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 21l5.25-11.25L21 21m-9-3h7.5M3 5.621a48.474 48.474 0 016-.371m0 0c1.12 0 2.233.038 3.334.114M9 5.25V3m3.334 2.364C11.176 10.658 7.69 15.08 3 17.502m9.334-12.138c.896.061 1.785.147 2.666.257m-4.589 8.495a18.023 18.023 0 01-3.827-5.802" />
+          </svg>
+          Translate
+        </button>
+        <button
+          @click="player.setShowLyricsTranslation(!player.showLyricsTranslation)"
+          class="flex items-center gap-1.5 px-2.5 h-7 rounded-full text-xs font-medium transition-colors"
+          :class="player.showLyricsTranslation ? 'bg-accent/25 text-accent' : 'text-white/50 hover:text-white hover:bg-white/10'"
+          title="Show / hide translations"
+        >
+          Translated
+        </button>
+      </div>
+    </Transition>
+
     <!-- LRC Syncer modal -->
     <LrcSyncer
       :visible="showSyncer"
-      :plain-lyrics="plainLyricsText"
+      :plain-lyrics="syncerSource"
       :track-path="player.currentTrack?.path || ''"
       @close="showSyncer = false"
       @saved="onSyncSaved"
+    />
+
+    <!-- Own-translation editor -->
+    <LyricsTranslationEditor
+      :visible="showTranslationEditor"
+      :lyrics="lyrics"
+      :track-path="player.currentTrack?.path || ''"
+      @close="showTranslationEditor = false"
+      @saved="onTranslationSaved"
     />
   </div>
 </template>
@@ -149,9 +199,10 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { usePlayerStore } from '@/stores/player'
-import { parseLRC, mergeTranslations, findCurrentLine, findCurrentWord, type LyricLine } from '@/utils/lrcParser'
+import { parseLRC, mergeTranslations, mergePronunciations, findCurrentLine, findCurrentWord, type LyricLine } from '@/utils/lrcParser'
 import LyricsCard from '@/components/LyricsCard.vue'
 import LrcSyncer from '@/components/LrcSyncer.vue'
+import LyricsTranslationEditor from '@/components/LyricsTranslationEditor.vue'
 
 const player = usePlayerStore()
 
@@ -191,6 +242,7 @@ watch(
         let parsed = parseLRC(local.lrc)
         if (parsed.length > 0) {
           if (local.translation) parsed = mergeTranslations(parsed, local.translation)
+          if (local.pronunciation) parsed = mergePronunciations(parsed, local.pronunciation)
           lyrics.value = parsed
           return
         }
@@ -213,6 +265,7 @@ watch(
         let parsed = parseLRC(online.lrc)
         if (parsed.length > 0) {
           if (online.translation) parsed = mergeTranslations(parsed, online.translation)
+          if (online.pronunciation) parsed = mergePronunciations(parsed, online.pronunciation)
           lyrics.value = parsed
         } else {
           plainLyricsText.value = online.lrc
@@ -301,6 +354,25 @@ function onSyncSaved(lrcContent: string) {
   lyrics.value = parseLRC(lrcContent)
 }
 
+// ── Own-translation editor ───────────────────────────────────────────
+const showTranslationEditor = ref(false)
+
+/** Apply a freshly saved user translation to the displayed lyrics */
+function onTranslationSaved(translationLrc: string) {
+  const stripped = lyrics.value.map(l => ({ ...l, translation: undefined }))
+  lyrics.value = mergeTranslations(stripped, translationLrc)
+}
+
+// ── Lyrics editor (re-sync existing lyrics through the LRC syncer) ────
+/** Text fed to the syncer: unsynced lyrics as-is, or the synced lines' text */
+const syncerSource = computed(() =>
+  plainLyricsText.value || lyrics.value.map(l => l.text).filter(t => t.trim()).join('\n'),
+)
+
+function openLyricsEditor() {
+  showSyncer.value = true
+}
+
 // Clear selection when track changes
 watch(() => player.currentTrack?.path, () => {
   selectedLines.value = new Set()
@@ -346,6 +418,17 @@ watch(() => player.currentTrack?.path, () => {
 }
 .sl-translation-line {
   /* inherits color from parent .sl-lyric-line state classes */
+}
+
+/* Toolbar fades in when hovering the lyrics area */
+.sl-toolbar {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.lyrics-container:hover .sl-toolbar {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .slide-up-enter-active,

@@ -2,7 +2,12 @@
   <div class="p-6" ref="viewRoot">
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold">Playlists</h1>
+      <div>
+        <h1 class="text-2xl font-bold">Playlists</h1>
+        <p v-if="library.searchQuery" class="text-sm text-white/40 mt-1">
+          {{ visiblePlaylists.length }} playlist{{ visiblePlaylists.length !== 1 ? 's' : '' }} matching "{{ library.searchQuery }}"
+        </p>
+      </div>
       <div class="flex items-center gap-2">
         <!-- Sort dropdown -->
         <div class="relative" ref="sortBtnRef">
@@ -74,9 +79,21 @@
       </div>
     </div>
 
+    <!-- No search results -->
+    <div
+      v-if="library.searchQuery && playlistStore.sortedPlaylists.length > 0 && visiblePlaylists.length === 0"
+      class="flex flex-col items-center justify-center h-64 text-white/30"
+    >
+      <svg class="w-16 h-16 mb-4 text-white/[0.06]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+      </svg>
+      <p class="text-lg font-medium mb-1">No playlists found</p>
+      <p class="text-sm">No playlists match "{{ library.searchQuery }}"</p>
+    </div>
+
     <!-- Empty state -->
     <div
-      v-if="playlistStore.sortedPlaylists.length === 0"
+      v-else-if="playlistStore.sortedPlaylists.length === 0"
       class="flex flex-col items-center justify-center h-64 text-white/30"
     >
       <svg class="w-16 h-16 mb-4" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
@@ -109,7 +126,7 @@
     <!-- Playlists grid -->
     <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
       <div
-        v-for="playlist in playlistStore.sortedPlaylists"
+        v-for="playlist in visiblePlaylists"
         :key="playlist.id"
         class="group relative"
       >
@@ -251,6 +268,7 @@ import { useScrollMemory } from '@/composables/useScrollMemory'
 import { menuPosition } from '@/utils/menuPosition'
 import { usePlaylistStore, type PlaylistSortOrder } from '@/stores/playlist'
 import { usePlayerStore } from '@/stores/player'
+import { useLibraryStore } from '@/stores/library'
 import { useToast } from '@/composables/useToast'
 import PlaylistCover from '@/components/PlaylistCover.vue'
 import SmartPlaylistDialog from '@/components/SmartPlaylistDialog.vue'
@@ -258,9 +276,25 @@ import EditPlaylistDialog from '@/components/EditPlaylistDialog.vue'
 
 const playlistStore = usePlaylistStore()
 const player = usePlayerStore()
+const library = useLibraryStore()
 const router = useRouter()
 const toast = useToast()
 const viewRoot = ref<HTMLElement | null>(null)
+
+/** Strip diacritics for lenient matching, same as the library store search */
+function normalizeStr(str: string): string {
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
+/** Playlists filtered by the global search query (consistent with Albums view) */
+const visiblePlaylists = computed(() => {
+  if (!library.searchQuery) return playlistStore.sortedPlaylists
+  const q = normalizeStr(library.searchQuery)
+  return playlistStore.sortedPlaylists.filter(p =>
+    normalizeStr(p.name).includes(q) ||
+    (p.description && normalizeStr(p.description).includes(q)),
+  )
+})
 
 useScrollMemory(() => viewRoot.value?.closest('main'))
 
@@ -282,6 +316,7 @@ const sortOptions: { label: string; value: PlaylistSortOrder }[] = [
   { label: 'Recently Created', value: 'created' },
   { label: 'Name (A–Z)', value: 'name' },
   { label: 'Song Count', value: 'tracks' },
+  { label: 'Custom (drag in sidebar)', value: 'custom' },
 ]
 const sortLabel = computed(() => sortOptions.find(o => o.value === playlistStore.playlistSortOrder)?.label || 'Sort')
 const sortMenuStyle = ref<Record<string, string>>({})
@@ -294,7 +329,7 @@ function toggleSortMenu() {
   showSortMenu.value = !showSortMenu.value
 }
 function setSort(order: PlaylistSortOrder) {
-  playlistStore.playlistSortOrder = order
+  playlistStore.setSortOrder(order)
   showSortMenu.value = false
 }
 
