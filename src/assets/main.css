@@ -100,6 +100,16 @@
     background: var(--bg-solid);
   }
 
+  /* ── View headers ─────────────────────────────────────────────── */
+  /* Transparent by default — views scroll in their own container    */
+  /* below the header, so it blends into the app chrome with no      */
+  /* painted layer. Themes can override via --aurora-view-header-*.  */
+  .view-header {
+    background: var(--aurora-view-header-bg, transparent);
+    backdrop-filter: var(--aurora-view-header-blur, none);
+    -webkit-backdrop-filter: var(--aurora-view-header-blur, none);
+  }
+
   /* ── Window drag ──────────────────────────────────────────────── */
   .drag-region {
     -webkit-app-region: drag;

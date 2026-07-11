@@ -1,14 +1,16 @@
 <template>
-  <div class="p-6" ref="viewRoot">
+  <div class="h-full flex flex-col" ref="viewRoot">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h1 class="text-2xl font-bold">Playlists</h1>
-        <p v-if="library.searchQuery" class="text-sm text-white/40 mt-1">
-          {{ visiblePlaylists.length }} playlist{{ visiblePlaylists.length !== 1 ? 's' : '' }} matching "{{ library.searchQuery }}"
+    <div class="shrink-0 view-header flex items-center justify-between px-6 py-3 border-b border-white/[0.06]">
+      <div class="flex items-baseline gap-2.5 min-w-0">
+        <h1 class="text-xl font-bold">Playlists</h1>
+        <p class="text-xs text-white/40 truncate">
+          {{ filteredPlaylists.length }} playlist{{ filteredPlaylists.length !== 1 ? 's' : '' }}<span v-if="library.searchQuery"> matching "{{ library.searchQuery }}"</span>
         </p>
       </div>
       <div class="flex items-center gap-2">
+        <!-- Tag filter dropdown -->
+        <TagFilterDropdown v-if="tagsStore.visibleTags.length > 0" v-model="activeTags" :tags="tagsStore.visibleTags" />
         <!-- Sort dropdown -->
         <div class="relative" ref="sortBtnRef">
           <button
@@ -79,102 +81,106 @@
       </div>
     </div>
 
-    <!-- No search results -->
-    <div
-      v-if="library.searchQuery && playlistStore.sortedPlaylists.length > 0 && visiblePlaylists.length === 0"
-      class="flex flex-col items-center justify-center h-64 text-white/30"
-    >
-      <svg class="w-16 h-16 mb-4 text-white/[0.06]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-        <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
-      </svg>
-      <p class="text-lg font-medium mb-1">No playlists found</p>
-      <p class="text-sm">No playlists match "{{ library.searchQuery }}"</p>
-    </div>
-
-    <!-- Empty state -->
-    <div
-      v-else-if="playlistStore.sortedPlaylists.length === 0"
-      class="flex flex-col items-center justify-center h-64 text-white/30"
-    >
-      <svg class="w-16 h-16 mb-4" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z" />
-      </svg>
-      <p class="text-lg font-medium mb-1">No playlists yet</p>
-      <p class="text-sm mb-6">Organize your music or let rules do it automatically</p>
-      <div class="flex items-center gap-3">
-        <button
-          @click="showCreateDialog = true"
-          class="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent/20 text-accent hover:bg-accent/30 transition-colors text-sm font-medium"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
-          New Playlist
-        </button>
-        <button
-          @click="showSmartDialog = true"
-          class="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.06] text-white/60 hover:text-white hover:bg-white/[0.1] transition-colors text-sm font-medium"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-          </svg>
-          Smart Playlist
-        </button>
-      </div>
-    </div>
-
-    <!-- Playlists grid -->
-    <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+    <div class="flex-1 min-h-0 overflow-y-auto p-6" ref="scrollEl">
+      <!-- No search or filter results -->
       <div
-        v-for="playlist in visiblePlaylists"
-        :key="playlist.id"
-        class="group relative"
+        v-if="(library.searchQuery || activeTags.length > 0) && playlistStore.sortedPlaylists.length > 0 && filteredPlaylists.length === 0"
+        class="flex flex-col items-center justify-center h-64 text-white/30"
       >
-        <router-link
-          :to="`/playlist/${playlist.id}`"
-          class="block rounded-xl overflow-hidden bg-white/[0.04] hover:bg-white/[0.08] transition-all"
-          @contextmenu.prevent="openContextMenu(playlist, $event)"
+        <svg class="w-16 h-16 mb-4 text-white/[0.06]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+        </svg>
+        <p class="text-lg font-medium mb-1">No playlists found</p>
+        <p v-if="library.searchQuery" class="text-sm">No playlists match "{{ library.searchQuery }}"</p>
+        <p v-else class="text-sm">No playlists have songs with the selected tags</p>
+        <button v-if="activeTags.length" @click="activeTags = []" class="mt-2 text-sm text-accent hover:underline">Clear filter</button>
+      </div>
+
+      <!-- Empty state -->
+      <div
+        v-else-if="playlistStore.sortedPlaylists.length === 0"
+        class="flex flex-col items-center justify-center h-64 text-white/30"
+      >
+        <svg class="w-16 h-16 mb-4" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z" />
+        </svg>
+        <p class="text-lg font-medium mb-1">No playlists yet</p>
+        <p class="text-sm mb-6">Organize your music or let rules do it automatically</p>
+        <div class="flex items-center gap-3">
+          <button
+            @click="showCreateDialog = true"
+            class="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent/20 text-accent hover:bg-accent/30 transition-colors text-sm font-medium"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            New Playlist
+          </button>
+          <button
+            @click="showSmartDialog = true"
+            class="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/[0.06] text-white/60 hover:text-white hover:bg-white/[0.1] transition-colors text-sm font-medium"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+            </svg>
+            Smart Playlist
+          </button>
+        </div>
+      </div>
+
+      <!-- Playlists grid -->
+      <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        <div
+          v-for="playlist in filteredPlaylists"
+          :key="playlist.id"
+          class="group relative"
         >
-          <!-- Cover collage -->
-          <div class="aspect-square relative overflow-hidden bg-white/[0.06]">
-            <PlaylistCover :playlist-id="playlist.id" />
-            <!-- Smart playlist badge -->
-            <div
-              v-if="playlist.smart"
-              class="absolute top-2 left-2 px-1.5 py-0.5 rounded-md bg-accent/80 backdrop-blur-sm text-[10px] font-semibold text-white"
-            >
-              Smart
-            </div>
-            <!-- Play overlay -->
-            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-              <button
-                @click.prevent.stop="playPlaylist(playlist.id)"
-                class="w-12 h-12 rounded-full bg-accent flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
+          <router-link
+            :to="`/playlist/${playlist.id}`"
+            class="block rounded-xl overflow-hidden bg-white/[0.04] hover:bg-white/[0.08] transition-all"
+            @contextmenu.prevent="openContextMenu(playlist, $event)"
+          >
+            <!-- Cover collage -->
+            <div class="aspect-square relative overflow-hidden bg-white/[0.06]">
+              <PlaylistCover :playlist-id="playlist.id" />
+              <!-- Smart playlist badge -->
+              <div
+                v-if="playlist.smart"
+                class="absolute top-2 left-2 px-1.5 py-0.5 rounded-md bg-accent/80 backdrop-blur-sm text-[10px] font-semibold text-white"
               >
-                <svg class="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              </button>
+                Smart
+              </div>
+              <!-- Play overlay -->
+              <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <button
+                  @click.prevent.stop="playPlaylist(playlist.id)"
+                  class="w-12 h-12 rounded-full bg-accent flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
+                >
+                  <svg class="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div class="p-3">
-            <p class="text-sm font-medium truncate">{{ playlist.name }}</p>
-            <p class="text-xs text-white/40">{{ getTrackCount(playlist) }} {{ getTrackCount(playlist) === 1 ? 'song' : 'songs' }}</p>
-          </div>
-        </router-link>
+            <div class="p-3">
+              <p class="text-sm font-medium truncate">{{ playlist.name }}</p>
+              <p class="text-xs text-white/40">{{ getTrackCount(playlist) }} {{ getTrackCount(playlist) === 1 ? 'song' : 'songs' }}</p>
+            </div>
+          </router-link>
 
-        <!-- Context menu button -->
-        <button
-          @click.stop="openContextMenu(playlist, $event)"
-          class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 text-white/70 hover:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-            <circle cx="12" cy="6" r="1.5" />
-            <circle cx="12" cy="12" r="1.5" />
-            <circle cx="12" cy="18" r="1.5" />
-          </svg>
-        </button>
+          <!-- Context menu button -->
+          <button
+            @click.stop="openContextMenu(playlist, $event)"
+            class="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 text-white/70 hover:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <circle cx="12" cy="6" r="1.5" />
+              <circle cx="12" cy="12" r="1.5" />
+              <circle cx="12" cy="18" r="1.5" />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -269,17 +275,22 @@ import { menuPosition } from '@/utils/menuPosition'
 import { usePlaylistStore, type PlaylistSortOrder } from '@/stores/playlist'
 import { usePlayerStore } from '@/stores/player'
 import { useLibraryStore } from '@/stores/library'
+import { useTagsStore } from '@/stores/tags'
 import { useToast } from '@/composables/useToast'
 import PlaylistCover from '@/components/PlaylistCover.vue'
 import SmartPlaylistDialog from '@/components/SmartPlaylistDialog.vue'
 import EditPlaylistDialog from '@/components/EditPlaylistDialog.vue'
+import TagFilterDropdown from '@/components/TagFilterDropdown.vue'
 
 const playlistStore = usePlaylistStore()
 const player = usePlayerStore()
 const library = useLibraryStore()
+const tagsStore = useTagsStore()
 const router = useRouter()
 const toast = useToast()
 const viewRoot = ref<HTMLElement | null>(null)
+const scrollEl = ref<HTMLElement | null>(null)
+const activeTags = ref<string[]>([])
 
 /** Strip diacritics for lenient matching, same as the library store search */
 function normalizeStr(str: string): string {
@@ -296,7 +307,19 @@ const visiblePlaylists = computed(() => {
   )
 })
 
-useScrollMemory(() => viewRoot.value?.closest('main'))
+/** Playlists containing at least one track matching an active tag (track or album tags) */
+const filteredPlaylists = computed(() => {
+  if (activeTags.value.length === 0) return visiblePlaylists.value
+  return visiblePlaylists.value.filter(p =>
+    playlistStore.getPlaylistTracks(p.id).some(track => {
+      const trackTagList = tagsStore.getTrackTags(track.id)
+      const albumTagList = tagsStore.getAlbumTags(`${track.album}---${track.albumArtist || track.artist}`)
+      return activeTags.value.some(tag => trackTagList.includes(tag) || albumTagList.includes(tag))
+    }),
+  )
+})
+
+useScrollMemory(() => scrollEl.value)
 
 const showCreateDialog = ref(false)
 const showSmartDialog = ref(false)

@@ -18,6 +18,7 @@
         v-if="showSortMenu"
         class="fixed z-[100] w-80 py-1.5 rounded-xl menu-panel shadow-2xl"
         :style="sortMenuStyle"
+        @click.stop
       >
         <p class="px-3.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/30">Sort</p>
         <button

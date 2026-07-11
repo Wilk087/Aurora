@@ -1,10 +1,10 @@
 <template>
-  <div class="songs-view p-6 h-full flex flex-col overflow-hidden">
+  <div class="songs-view h-full flex flex-col overflow-hidden">
     <!-- Header -->
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h1 class="text-3xl font-bold text-white mb-1">Songs</h1>
-        <p class="text-sm text-white/40">{{ filteredTracksByTag.length }} songs<span v-if="library.searchQuery"> matching "{{ library.searchQuery }}"</span></p>
+    <div class="shrink-0 z-30 view-header flex items-center justify-between px-6 py-3 border-b border-white/[0.06]">
+      <div class="flex items-baseline gap-2.5 min-w-0">
+        <h1 class="text-xl font-bold text-white">Songs</h1>
+        <p class="text-xs text-white/40 truncate">{{ filteredTracksByTag.length }} songs<span v-if="library.searchQuery"> matching "{{ library.searchQuery }}"</span></p>
       </div>
 
       <div class="flex items-center gap-2">
@@ -57,111 +57,113 @@
       </div>
     </div>
 
-    <!-- No search results -->
-    <EmptyState
-      v-if="library.searchQuery && filteredTracksByTag.length === 0"
-      title="No songs found"
-      :description="`No songs match &quot;${library.searchQuery}&quot;`"
-    >
-      <template #icon>
-        <svg class="w-16 h-16 text-white/[0.06]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-          <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
-        </svg>
-      </template>
-    </EmptyState>
-
-    <!-- Empty state -->
-    <EmptyState
-      v-if="library.tracks.length === 0 && !library.isScanning && !library.searchQuery"
-      title="No music yet"
-      description="Add a folder to start building your library"
-      large
-    >
-      <template #icon>
-        <svg class="w-20 h-20 text-white/[0.06]" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
-        </svg>
-      </template>
-      <button
-        @click="library.addFolder()"
-        class="px-6 py-2.5 bg-accent hover:bg-accent-hover rounded-full text-sm font-medium text-white transition-colors accent-glow"
+    <div class="flex-1 min-h-0 flex flex-col px-6 pb-6 pt-4">
+      <!-- No search results -->
+      <EmptyState
+        v-if="library.searchQuery && filteredTracksByTag.length === 0"
+        title="No songs found"
+        :description="`No songs match &quot;${library.searchQuery}&quot;`"
       >
-        Add Music Folder
-      </button>
-    </EmptyState>
-
-    <!-- Scanning indicator -->
-    <div
-      v-if="library.isScanning"
-      class="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.05]"
-    >
-      <div class="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
-      <span class="text-sm text-white/60">
-        Scanning... {{ library.scanProgress.current }}/{{ library.scanProgress.total }} files
-      </span>
-    </div>
-
-    <!-- Song list -->
-    <div v-if="filteredTracksByTag.length > 0" class="flex flex-col flex-1 min-h-0">
-      <!-- Column headers -->
-      <div class="flex items-center gap-3 px-4 py-2 mb-1 border-b border-white/[0.06] shrink-0">
-        <div class="w-8 text-center text-[10px] text-white/30 font-medium">#</div>
-        <div class="w-10" />
-        <div class="flex-1 text-[10px] text-white/30 font-medium uppercase tracking-wider">
-          Title
-        </div>
-        <div
-          class="w-48 hidden lg:block text-[10px] text-white/30 font-medium uppercase tracking-wider"
-        >
-          Album
-        </div>
-        <div class="w-14 text-right">
-          <svg
-            class="w-3.5 h-3.5 text-white/30 inline"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            viewBox="0 0 24 24"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <path d="M12 6v6l4 2" />
+        <template #icon>
+          <svg class="w-16 h-16 text-white/[0.06]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
           </svg>
-        </div>
-        <div class="w-7" />
+        </template>
+      </EmptyState>
+
+      <!-- Empty state -->
+      <EmptyState
+        v-if="library.tracks.length === 0 && !library.isScanning && !library.searchQuery"
+        title="No music yet"
+        description="Add a folder to start building your library"
+        large
+      >
+        <template #icon>
+          <svg class="w-20 h-20 text-white/[0.06]" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+          </svg>
+        </template>
+        <button
+          @click="library.addFolder()"
+          class="px-6 py-2.5 bg-accent hover:bg-accent-hover rounded-full text-sm font-medium text-white transition-colors accent-glow"
+        >
+          Add Music Folder
+        </button>
+      </EmptyState>
+
+      <!-- Scanning indicator -->
+      <div
+        v-if="library.isScanning"
+        class="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.05]"
+      >
+        <div class="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+        <span class="text-sm text-white/60">
+          Scanning... {{ library.scanProgress.current }}/{{ library.scanProgress.total }} files
+        </span>
       </div>
 
-      <!-- Virtual scrolled tracks -->
-      <VirtualScroller
-        ref="virtualScrollerRef"
-        :items="filteredTracksByTag"
-        :item-height="56"
-        key-field="id"
-        container-height="100%"
-        class="flex-1 min-h-0"
-      >
-        <template #default="{ item: track, index: i }">
-          <SongRow
-            :track="track"
-            :index="i"
-            :selected="selection.isSelected(track.id)"
-            :selectable="selection.hasSelection.value"
-            :selected-tracks="selection.selectedItems.value"
-            @play="selection.hasSelection.value ? selection.handleSelect(i, $event ?? { ctrlKey: true, metaKey: false, shiftKey: false }) : playTrack(i)"
-            @select="selection.handleSelect(i, $event)"
-          />
-        </template>
-      </VirtualScroller>
-    </div>
+      <!-- Song list -->
+      <div v-if="filteredTracksByTag.length > 0" class="flex flex-col flex-1 min-h-0">
+        <!-- Column headers -->
+        <div class="flex items-center gap-3 px-4 py-2 mb-1 border-b border-white/[0.06] shrink-0">
+          <div class="w-8 text-center text-[10px] text-white/30 font-medium">#</div>
+          <div class="w-10" />
+          <div class="flex-1 text-[10px] text-white/30 font-medium uppercase tracking-wider">
+            Title
+          </div>
+          <div
+            class="w-48 hidden lg:block text-[10px] text-white/30 font-medium uppercase tracking-wider"
+          >
+            Album
+          </div>
+          <div class="w-14 text-right">
+            <svg
+              class="w-3.5 h-3.5 text-white/30 inline"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              viewBox="0 0 24 24"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 6v6l4 2" />
+            </svg>
+          </div>
+          <div class="w-7" />
+        </div>
 
-    <!-- Selection action bar -->
-    <SelectionBar
-      :count="selection.selectedCount.value"
-      :track-ids="selection.selectedItems.value.map(t => t.id)"
-      @play-next="onPlayNextSelected"
-      @add-to-queue="onAddToQueueSelected"
-      @select-all="selection.selectAll()"
-      @clear="selection.clearSelection()"
-    />
+        <!-- Virtual scrolled tracks -->
+        <VirtualScroller
+          ref="virtualScrollerRef"
+          :items="filteredTracksByTag"
+          :item-height="56"
+          key-field="id"
+          container-height="100%"
+          class="flex-1 min-h-0"
+        >
+          <template #default="{ item: track, index: i }">
+            <SongRow
+              :track="track"
+              :index="i"
+              :selected="selection.isSelected(track.id)"
+              :selectable="selection.hasSelection.value"
+              :selected-tracks="selection.selectedItems.value"
+              @play="selection.hasSelection.value ? selection.handleSelect(i, $event ?? { ctrlKey: true, metaKey: false, shiftKey: false }) : playTrack(i)"
+              @select="selection.handleSelect(i, $event)"
+            />
+          </template>
+        </VirtualScroller>
+      </div>
+
+      <!-- Selection action bar -->
+      <SelectionBar
+        :count="selection.selectedCount.value"
+        :track-ids="selection.selectedItems.value.map(t => t.id)"
+        @play-next="onPlayNextSelected"
+        @add-to-queue="onAddToQueueSelected"
+        @select-all="selection.selectAll()"
+        @clear="selection.clearSelection()"
+      />
+    </div>
   </div>
 </template>
 

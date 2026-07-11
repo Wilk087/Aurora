@@ -51,10 +51,24 @@ async function initDiscordRPC(clientId?: string) {
     })
 
     await rpcClient.login()
+    rpcReady = true
   } catch (err) {
     logger.info('Discord RPC not available (Discord not running?):', (err as Error).message)
     rpcReady = false
   }
+}
+
+// Reconnect if Discord was started (or restarted) after Aurora. Throttled so a
+// missing Discord doesn't get hammered with connection attempts on every track.
+let rpcLastConnectAttempt = 0
+
+async function ensureDiscordRPC(): Promise<boolean> {
+  if (rpcClient && rpcReady) return true
+  const now = Date.now()
+  if (now - rpcLastConnectAttempt < 15000) return false
+  rpcLastConnectAttempt = now
+  await initDiscordRPC()
+  return rpcReady
 }
 
 // ── Album art URL lookup (for Discord RPC) ────────────────────────────────
@@ -190,7 +204,11 @@ async function updateDiscordPresence(data: {
   showTimestamps: boolean
   songLink: boolean
 } | null) {
-  if (!rpcClient || !rpcReady) return
+  if (!rpcClient || !rpcReady) {
+    // Only bother reconnecting when there's something to show
+    if (!data || !data.isPlaying) return
+    if (!(await ensureDiscordRPC())) return
+  }
 
   const gen = ++presenceGeneration
 
