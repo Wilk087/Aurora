@@ -31,6 +31,8 @@
                 { label: 'Enhanced LRC', description: 'Word-level timestamps for karaoke-style highlighting.' },
                 { label: 'Instrumental breaks', description: 'Mark sections without vocals using the Tab key.' },
                 { label: 'Undo', description: 'Remove the last stamp with Ctrl+Z if you mis-timed it.' },
+                { label: 'Edit timestamps', description: 'Double-click a stamped time to type an exact value.' },
+                { label: 'Shift everything', description: 'Offset the whole sync earlier or later by a custom amount.' },
               ]"
               :hotkeys="[
                 { keys: ['Space'], description: 'Stamp current line / word' },
@@ -152,6 +154,34 @@
           </div>
         </div>
 
+        <!-- Global offset: shift the whole sync earlier/later -->
+        <div v-if="hasAnyStamp" class="flex items-center justify-center gap-2 px-6 pb-2">
+          <span class="text-xs text-white/40">Shift all timestamps</span>
+          <button
+            @click="applyOffset(-1)"
+            class="px-2.5 py-1 rounded-lg text-xs font-mono font-medium bg-white/[0.08] hover:bg-white/[0.12] text-white/60 hover:text-white/80 transition-all"
+            title="Shift everything earlier"
+          >
+            −
+          </button>
+          <input
+            v-model="offsetValue"
+            type="number"
+            step="0.1"
+            min="0"
+            class="w-16 text-center text-xs font-mono px-1.5 py-1 rounded-lg bg-white/[0.06] border border-white/[0.08] text-white/70 outline-none focus:border-accent/40 transition-colors"
+            title="Offset amount in seconds"
+          />
+          <span class="text-xs text-white/40">s</span>
+          <button
+            @click="applyOffset(1)"
+            class="px-2.5 py-1 rounded-lg text-xs font-mono font-medium bg-white/[0.08] hover:bg-white/[0.12] text-white/60 hover:text-white/80 transition-all"
+            title="Shift everything later"
+          >
+            +
+          </button>
+        </div>
+
         <!-- Lyrics lines -->
         <div
           ref="scrollContainer"
@@ -170,11 +200,23 @@
               @click="stampLine(i)"
             >
               <div class="flex items-center gap-3">
+                <input
+                  v-if="editingLine === i"
+                  :ref="el => { if (el) editInputRef = el as HTMLInputElement }"
+                  v-model="editValue"
+                  class="text-[10px] font-mono w-[64px] text-center px-1.5 py-0.5 rounded bg-accent/20 text-accent border border-accent/50 outline-none"
+                  placeholder="mm:ss.xx"
+                  @click.stop
+                  @keydown.enter.stop.prevent="commitEditLine"
+                  @blur="commitEditLine"
+                />
                 <span
+                  v-else
                   class="text-[10px] font-mono min-w-[52px] text-center px-1.5 py-0.5 rounded"
                   :class="line.time !== null ? 'bg-accent/20 text-accent hover:bg-accent/35' : 'bg-white/5 text-white/20'"
-                  :title="line.time !== null ? 'Jump to this timestamp' : ''"
+                  :title="line.time !== null ? 'Click to jump · double-click to type a new time' : ''"
                   @click.stop="line.time !== null ? player.seek(line.time) : stampLine(i)"
+                  @dblclick.stop="startEditLine(i)"
                 >
                   {{ line.time !== null ? formatTime(line.time) : '--:--' }}
                 </span>
@@ -215,11 +257,23 @@
               :class="[getElrcLineClass(li), li === playingElrcLineIndex ? 'lrc-live' : '']"
             >
               <div class="flex items-start gap-3">
+                <input
+                  v-if="editingElrcLine === li"
+                  :ref="el => { if (el) editInputRef = el as HTMLInputElement }"
+                  v-model="editValue"
+                  class="text-[10px] font-mono w-[64px] text-center px-1.5 py-0.5 rounded mt-0.5 shrink-0 bg-accent/20 text-accent border border-accent/50 outline-none"
+                  placeholder="mm:ss.xx"
+                  @click.stop
+                  @keydown.enter.stop.prevent="commitEditElrcLine"
+                  @blur="commitEditElrcLine"
+                />
                 <span
+                  v-else
                   class="text-[10px] font-mono min-w-[52px] text-center px-1.5 py-0.5 rounded mt-0.5 shrink-0"
                   :class="line.time !== null ? 'bg-accent/20 text-accent cursor-pointer hover:bg-accent/35' : 'bg-white/5 text-white/20'"
-                  :title="line.time !== null ? 'Jump to this timestamp' : ''"
+                  :title="line.time !== null ? 'Click to jump · double-click to type a new time (shifts the whole line)' : ''"
                   @click.stop="line.time !== null && player.seek(line.time)"
+                  @dblclick.stop="startEditElrcLine(li)"
                 >
                   {{ line.time !== null ? formatTime(line.time) : '--:--' }}
                 </span>
@@ -283,6 +337,7 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { useToast } from '@/composables/useToast'
 import TutorialPopup from '@/components/TutorialPopup.vue'
+import type { LyricLine } from '@/utils/lrcParser'
 
 // ── Standard LRC types ────────────────────────────────────────────────
 interface SyncLine {
@@ -306,6 +361,8 @@ const props = defineProps<{
   visible: boolean
   plainLyrics: string
   trackPath: string
+  /** Already-synced lyrics — when provided, the syncer starts from these timestamps */
+  existingLyrics?: LyricLine[] | null
 }>()
 
 const emit = defineEmits<{
@@ -415,37 +472,174 @@ function nudgeLine(index: number, delta: number) {
   line.time = Math.min(max, Math.max(0, line.time + delta))
 }
 
+// ── Typed timestamp editing (double-click a stamp to type its value) ──
+const editingLine = ref<number | null>(null)      // standard mode line index
+const editingElrcLine = ref<number | null>(null)  // ELRC mode line index
+const editValue = ref('')
+const editInputRef = ref<HTMLInputElement | null>(null)
+
+/** Accepts "mm:ss.xx", "mm:ss" or plain seconds ("83.5") */
+function parseTimeInput(str: string): number | null {
+  const s = str.trim()
+  const m = s.match(/^(\d+):(\d{1,2}(?:[.,]\d{1,3})?)$/)
+  if (m) {
+    const sec = parseFloat(m[2].replace(',', '.'))
+    if (sec >= 60) return null
+    return parseInt(m[1]) * 60 + sec
+  }
+  if (/^\d+([.,]\d+)?$/.test(s)) return parseFloat(s.replace(',', '.'))
+  return null
+}
+
+function clampTime(t: number): number {
+  const max = duration.value > 0 ? duration.value : Infinity
+  return Math.min(max, Math.max(0, t))
+}
+
+function startEditLine(index: number) {
+  const line = lines.value[index]
+  if (!line || line.time === null) return
+  editingElrcLine.value = null
+  editingLine.value = index
+  editValue.value = formatTime(line.time)
+  nextTick(() => { editInputRef.value?.focus(); editInputRef.value?.select() })
+}
+
+function commitEditLine() {
+  const idx = editingLine.value
+  if (idx === null) return
+  editingLine.value = null
+  const t = parseTimeInput(editValue.value)
+  const line = lines.value[idx]
+  if (t !== null && line) line.time = clampTime(t)
+}
+
+function startEditElrcLine(li: number) {
+  const line = elrcLines.value[li]
+  if (!line || line.time === null) return
+  editingLine.value = null
+  editingElrcLine.value = li
+  editValue.value = formatTime(line.time)
+  nextTick(() => { editInputRef.value?.focus(); editInputRef.value?.select() })
+}
+
+/** Editing an ELRC line's timestamp shifts the whole line (words keep their relative timing) */
+function commitEditElrcLine() {
+  const li = editingElrcLine.value
+  if (li === null) return
+  editingElrcLine.value = null
+  const line = elrcLines.value[li]
+  const t = parseTimeInput(editValue.value)
+  if (t === null || !line || line.time === null) return
+  const delta = clampTime(t) - line.time
+  line.time += delta
+  for (const w of line.words) {
+    if (w.time !== null) w.time = clampTime(w.time + delta)
+  }
+}
+
+function cancelEdit() {
+  editingLine.value = null
+  editingElrcLine.value = null
+}
+
+// ── Global offset (shift every stamped timestamp by ± a custom amount) ──
+const offsetValue = ref('0.5')
+const hasAnyStamp = computed(() =>
+  elrcMode.value ? stampedElrcWords.value > 0 : stampedCount.value > 0,
+)
+
+function applyOffset(direction: 1 | -1) {
+  const amount = Math.abs(parseFloat(offsetValue.value.replace(',', '.')))
+  if (!amount || isNaN(amount)) return
+  const delta = amount * direction
+  if (elrcMode.value) {
+    for (const line of elrcLines.value) {
+      if (line.time !== null) line.time = clampTime(line.time + delta)
+      for (const w of line.words) {
+        if (w.time !== null) w.time = clampTime(w.time + delta)
+      }
+    }
+  } else {
+    for (const line of lines.value) {
+      if (line.time !== null) line.time = clampTime(line.time + delta)
+    }
+  }
+}
+
 // Parse plain lyrics when visible/lyrics change
 watch(
-  () => [props.visible, props.plainLyrics],
+  () => [props.visible, props.plainLyrics, props.existingLyrics],
   () => {
-    if (props.visible && props.plainLyrics) initLines()
+    if (props.visible && (props.plainLyrics || props.existingLyrics?.length)) initLines()
   },
   { immediate: true },
 )
 
 function initLines() {
   lineElRefs.value = {}
+  const existing = props.existingLyrics && props.existingLyrics.length > 0 ? props.existingLyrics : null
   if (elrcMode.value) {
-    elrcLines.value = props.plainLyrics
-      .split('\n')
-      .map(l => l.trim())
-      .filter(l => l.length > 0)
-      .map(l => ({
-        words: l.split(/\s+/).filter(w => w.length > 0).map(w => ({ text: w, time: null })),
-        time: null,
-        isInstrumental: false,
-      }))
+    if (existing) {
+      elrcLines.value = existing.map(l => {
+        if (!l.text.trim()) return { words: [], time: l.time, isInstrumental: true }
+        if (l.words && l.words.length > 0) {
+          return {
+            words: l.words.map(w => ({ text: w.text, time: w.time as number | null })),
+            time: l.time as number | null,
+            isInstrumental: false,
+          }
+        }
+        // Line-synced only — words still need stamping
+        return {
+          words: l.text.split(/\s+/).filter(w => w.length > 0).map(w => ({ text: w, time: null as number | null })),
+          time: null,
+          isInstrumental: false,
+        }
+      })
+    } else {
+      elrcLines.value = props.plainLyrics
+        .split('\n')
+        .map(l => l.trim())
+        .filter(l => l.length > 0)
+        .map(l => ({
+          words: l.split(/\s+/).filter(w => w.length > 0).map(w => ({ text: w, time: null })),
+          time: null,
+          isInstrumental: false,
+        }))
+    }
     elrcCurrentLine.value = 0
     elrcCurrentWord.value = 0
+    advanceElrcCursor()
   } else {
-    lines.value = props.plainLyrics
-      .split('\n')
-      .map(text => text.trim())
-      .filter(text => text.length > 0)
-      .map(text => ({ text, time: null }))
-    currentStampIndex.value = 0
+    if (existing) {
+      lines.value = existing.map(l => ({ text: l.text, time: l.time as number | null }))
+    } else {
+      lines.value = props.plainLyrics
+        .split('\n')
+        .map(text => text.trim())
+        .filter(text => text.length > 0)
+        .map(text => ({ text, time: null }))
+    }
+    // Start at the first unstamped line (all stamped → stays at 0, nothing highlighted)
+    const firstUnstamped = lines.value.findIndex(l => l.time === null)
+    currentStampIndex.value = firstUnstamped >= 0 ? firstUnstamped : 0
   }
+}
+
+/** Move the ELRC cursor to the first unstamped word/instrumental (past the end when fully stamped) */
+function advanceElrcCursor() {
+  for (let li = 0; li < elrcLines.value.length; li++) {
+    const l = elrcLines.value[li]
+    if (l.isInstrumental) {
+      if (l.time === null) { elrcCurrentLine.value = li; elrcCurrentWord.value = 0; return }
+      continue
+    }
+    const wi = l.words.findIndex(w => w.time === null)
+    if (wi >= 0) { elrcCurrentLine.value = li; elrcCurrentWord.value = wi; return }
+  }
+  elrcCurrentLine.value = elrcLines.value.length
+  elrcCurrentWord.value = 0
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────
@@ -665,6 +859,11 @@ function togglePlayback() { player.togglePlay() }
 
 function onKeyDown(e: KeyboardEvent) {
   if (!props.visible) return
+  // Don't hijack keys while a timestamp (or the offset field) is being typed
+  if ((e.target as HTMLElement)?.tagName === 'INPUT') {
+    if (e.code === 'Escape') { e.preventDefault(); e.stopPropagation(); cancelEdit() }
+    return
+  }
   if (e.code === 'Space') {
     e.preventDefault(); e.stopPropagation()
     if (elrcMode.value) stampElrcNext(); else stampNext()

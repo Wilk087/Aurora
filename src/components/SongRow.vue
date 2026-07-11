@@ -201,6 +201,16 @@
           Show in File Explorer
         </button>
         <button
+          v-if="isLocalTrack"
+          @click.stop="openMetadataEditor"
+          class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5"
+        >
+          <svg class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+          </svg>
+          Edit Metadata
+        </button>
+        <button
           @click.stop="openTagDialog"
           class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5"
         >
@@ -283,6 +293,15 @@
         </template>
       </div>
     </Teleport>
+
+    <!-- Metadata editor -->
+    <MetadataEditorDialog
+      :show="showMetadataEditor"
+      :tracks="[track]"
+      mode="song"
+      @close="showMetadataEditor = false"
+      @saved="showMetadataEditor = false"
+    />
 
     <!-- Tag Dialog -->
     <TagDialog
@@ -432,6 +451,7 @@ import PlaylistSubmenu from '@/components/PlaylistSubmenu.vue'
 import { pluginContextMenuItems } from '@/plugins/api'
 import type { PluginContextMenuItem } from '@/types/plugin'
 import TagDialog from '@/components/TagDialog.vue'
+import MetadataEditorDialog from '@/components/MetadataEditorDialog.vue'
 
 const props = defineProps<{
   track: Track
@@ -462,6 +482,12 @@ const plusBtnRef = ref<HTMLElement>()
 // Context menu state
 const showCtx = ref(false)
 const showTagDialog = ref(false)
+const showMetadataEditor = ref(false)
+
+/** Metadata editing only works for local files (not subsonic/plugin streams) */
+const isLocalTrack = computed(() =>
+  (!props.track.source || props.track.source === 'local') && !props.track.path.includes('://'),
+)
 const ctxPos = ref<Record<string, string>>({})
 const openPluginSubmenu = ref<number | null>(null)
 const ctxStyle = computed(() => ({
@@ -525,6 +551,12 @@ function goToAlbum() {
 function showInExplorer() {
   showCtx.value = false
   window.api.showInExplorer(props.track.path)
+}
+
+function openMetadataEditor() {
+  showCtx.value = false
+  // Same delayed open as the TagDialog — lets the closing click finish first
+  setTimeout(() => { showMetadataEditor.value = true }, 80)
 }
 
 function openTagDialog() {

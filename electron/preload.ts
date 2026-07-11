@@ -93,6 +93,10 @@ contextBridge.exposeInMainWorld('api', {
   // Credits / extended metadata
   getTrackCredits: (trackPath: string) => ipcRenderer.invoke('track:get-credits', trackPath),
 
+  // Metadata editing (writes tags into the audio file via ffmpeg)
+  writeTags: (trackPath: string, tags: Record<string, string | undefined>) =>
+    ipcRenderer.invoke('track:write-tags', trackPath, tags),
+
   // Waveform generation
   generateWaveform: (trackPath: string): Promise<number[]> => ipcRenderer.invoke('track:generate-waveform', trackPath),
   generateWaveformSubsonic: (songId: string): Promise<number[]> => ipcRenderer.invoke('track:generate-waveform-subsonic', songId),

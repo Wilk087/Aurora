@@ -315,6 +315,15 @@ export const useLibraryStore = defineStore('library', () => {
     return albums.value.find((a) => a.id === id)
   }
 
+  /** Replace local tracks in place after a metadata edit (matched by id) */
+  function updateLocalTracks(updated: Track[]) {
+    const byId = new Map(updated.map(t => [t.id, t]))
+    localTracks.value = localTracks.value.map(t => {
+      const next = byId.get(t.id)
+      return next ? markRaw({ ...t, ...next }) : t
+    })
+  }
+
   /** Merge Subsonic tracks from server into the library */
   function mergeSubsonicTracks(rawTracks: Track[]) {
     subsonicTracks.value = rawTracks.map((t: Track) => markRaw({ ...t, source: 'subsonic' as const }))
@@ -463,6 +472,7 @@ export const useLibraryStore = defineStore('library', () => {
     setSeparateSoundtracks,
     setIncludeSinglesInAlbums,
     setSoundtrackTags,
+    updateLocalTracks,
     mergeSubsonicTracks,
     clearSubsonicTracks,
     addPluginTracks,

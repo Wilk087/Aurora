@@ -76,6 +76,12 @@
           </svg>
           Show in File Explorer
         </button>
+        <button v-if="isLocalAlbum" @click.stop="openMetadataEditor" class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5">
+          <svg class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+          </svg>
+          Edit Metadata
+        </button>
         <button @click.stop="openTagDialog" class="ctx-item w-full px-3.5 py-2 text-left text-sm transition-colors flex items-center gap-2.5">
           <svg class="w-4 h-4 shrink-0 opacity-50" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z" />
@@ -171,6 +177,15 @@
       </div>
     </Teleport>
 
+    <!-- ── Album metadata editor ── -->
+    <MetadataEditorDialog
+      :show="showMetadataEditor"
+      :tracks="album.tracks"
+      mode="album"
+      @close="showMetadataEditor = false"
+      @saved="showMetadataEditor = false"
+    />
+
     <!-- ── Tag Dialog (own Teleport, independent of ctx menu) ── -->
     <Teleport to="body">
       <TagDialog
@@ -192,6 +207,7 @@ import { menuPosition, subMenuPosition } from '@/utils/menuPosition'
 import { usePlayerStore } from '@/stores/player'
 import ArtistLinks from '@/components/ArtistLinks.vue'
 import TagDialog from '@/components/TagDialog.vue'
+import MetadataEditorDialog from '@/components/MetadataEditorDialog.vue'
 import PlaylistSubmenu from '@/components/PlaylistSubmenu.vue'
 import type { Album } from '@/stores/library'
 import { pluginAlbumContextMenuItems } from '@/plugins/api'
@@ -233,7 +249,7 @@ const ctxStyle = computed(() => ({
 function openCtx(e: MouseEvent) {
   showPlaylistSub.value = false
   openPluginSubmenu.value = null
-  ctxPos.value = menuPosition(e.clientX, e.clientY, 200, 320)
+  ctxPos.value = menuPosition(e.clientX, e.clientY, 200, 360)
   showCtx.value = true
 }
 
@@ -244,6 +260,18 @@ function goToYear() { if (props.album.year) router.push(`/year/${props.album.yea
 function openInExplorer() {
   showCtx.value = false
   if (props.album.tracks.length > 0) window.api.showInExplorer(props.album.tracks[0].path)
+}
+
+// ── Album metadata editor (local files only) ──────────────────────────────
+const showMetadataEditor = ref(false)
+const isLocalAlbum = computed(() =>
+  props.album.tracks.every(t => (!t.source || t.source === 'local') && !t.path.includes('://')),
+)
+
+function openMetadataEditor() {
+  showCtx.value = false
+  // Same 80ms gap as the TagDialog — see openTagDialog below
+  setTimeout(() => { showMetadataEditor.value = true }, 80)
 }
 
 // ── Tag Dialog ────────────────────────────────────────────────────────────

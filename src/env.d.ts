@@ -190,6 +190,20 @@ interface Window {
     removeScanProgressListener: () => void
     // Credits
     getTrackCredits: (trackPath: string) => Promise<TrackCredits>
+    // Metadata editing — returns the re-parsed, updated track
+    writeTags: (trackPath: string, tags: {
+      title?: string
+      artist?: string
+      albumArtist?: string
+      album?: string
+      year?: string
+      trackNumber?: string
+      disc?: string
+      genre?: string
+      composer?: string
+      comment?: string
+      coverPath?: string
+    }) => Promise<Track>
     // Waveform
     generateWaveform: (trackPath: string) => Promise<number[]>
     generateWaveformSubsonic: (songId: string) => Promise<number[]>

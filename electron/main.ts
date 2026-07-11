@@ -3659,9 +3659,14 @@ app.whenReady().then(async () => {
     album?: string
     year?: string
     trackNumber?: string
+    disc?: string
     genre?: string
+    composer?: string
+    comment?: string
     /** Base64-encoded JPEG image data for cover art */
     coverData?: string
+    /** Path to an image file to embed as cover art (takes precedence over coverData) */
+    coverPath?: string
   }) => {
     const { promisify } = await import('util')
     const { rename, unlink, writeFile } = await import('fs/promises')
@@ -3675,10 +3680,15 @@ app.whenReady().then(async () => {
 
     const args: string[] = ['-y', '-i', trackPath]
 
-    if (tags.coverData) {
-      await writeFile(coverTmpPath, Buffer.from(tags.coverData, 'base64'))
-      args.push('-i', coverTmpPath)
-      args.push('-map', '0', '-map', '1', '-c', 'copy', '-disposition:v:0', 'attached_pic')
+    const coverInput = tags.coverPath || (tags.coverData ? coverTmpPath : null)
+    if (coverInput) {
+      if (!tags.coverPath && tags.coverData) {
+        await writeFile(coverTmpPath, Buffer.from(tags.coverData, 'base64'))
+      }
+      args.push('-i', coverInput)
+      // Map audio from input 0 and the new image from input 1, dropping any
+      // existing attached picture so covers get replaced instead of stacked
+      args.push('-map', '0:a', '-map', '1', '-c', 'copy', '-disposition:v:0', 'attached_pic')
     } else {
       args.push('-map', '0', '-c', 'copy')
     }
@@ -3689,7 +3699,10 @@ app.whenReady().then(async () => {
     if (tags.album !== undefined)       args.push('-metadata', `album=${tags.album}`)
     if (tags.year !== undefined)        args.push('-metadata', `date=${tags.year}`)
     if (tags.trackNumber !== undefined) args.push('-metadata', `track=${tags.trackNumber}`)
+    if (tags.disc !== undefined)        args.push('-metadata', `disc=${tags.disc}`)
     if (tags.genre !== undefined)       args.push('-metadata', `genre=${tags.genre}`)
+    if (tags.composer !== undefined)    args.push('-metadata', `composer=${tags.composer}`)
+    if (tags.comment !== undefined)     args.push('-metadata', `comment=${tags.comment}`)
 
     if (ext === '.mp3') args.push('-id3v2_version', '3')
     // M4A/MP4: force 'mov' muxer — the default 'ipod' profile rejects FLAC audio
@@ -3700,13 +3713,35 @@ app.whenReady().then(async () => {
     try {
       await execFileAsync('ffmpeg', args)
       await rename(tmpPath, trackPath)
-      return { ok: true }
     } catch (err: any) {
       await unlink(tmpPath).catch(() => {})
       throw new Error(`ffmpeg tag write failed: ${err.message}`)
     } finally {
-      if (tags.coverData) await unlink(coverTmpPath).catch(() => {})
+      if (tags.coverData && !tags.coverPath) await unlink(coverTmpPath).catch(() => {})
     }
+
+    // Cover changed → drop the album's cached cover so parseTrack re-extracts it.
+    // The cache filename is keyed on the album name as stored in the file.
+    if (coverInput) {
+      try {
+        const mm = await import('music-metadata')
+        const md = await mm.parseFile(trackPath)
+        const albumId = generateId(md.common.album || trackPath)
+        await unlink(join(coverCachePath, `${albumId}.jpg`)).catch(() => {})
+        await unlink(join(coverCachePath, `${albumId}.png`)).catch(() => {})
+      } catch {}
+    }
+
+    // Refresh the library cache entry so the change survives without a rescan
+    const updated = await parseTrack(trackPath)
+    if (cache.trackMap.has(trackPath)) {
+      cache.trackMap.set(trackPath, { ...cache.trackMap.get(trackPath), ...updated })
+      cache.tracks = Array.from(cache.trackMap.values())
+      rebuildIndexes()
+      scheduleFlush()
+      return cache.trackMap.get(trackPath)
+    }
+    return updated
   })
 
   // Passthrough IPC for plugins (full trust — plugins can invoke any IPC channel)

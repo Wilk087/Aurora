@@ -178,6 +178,7 @@
     <LrcSyncer
       :visible="showSyncer"
       :plain-lyrics="syncerSource"
+      :existing-lyrics="lyrics.length > 0 ? lyrics : null"
       :track-path="player.currentTrack?.path || ''"
       @close="showSyncer = false"
       @saved="onSyncSaved"

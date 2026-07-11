@@ -56,6 +56,16 @@
               <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
             </svg>
           </button>
+          <button
+            v-if="isLocalAlbum"
+            @click="showMetadataEditor = true"
+            class="w-10 h-10 bg-white/[0.08] hover:bg-white/[0.12] rounded-full flex items-center justify-center text-white/50 hover:text-white/80 transition-all"
+            title="Edit album metadata"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" />
+            </svg>
+          </button>
           <!-- Plugin slot — data-album-id is kept in sync with the viewed album -->
           <div id="aurora-album-detail-slot" :data-album-id="album.id" />
         </div>
@@ -75,6 +85,15 @@
         @select="selection.handleSelect(i, $event)"
       />
     </div>
+
+    <!-- Album metadata editor -->
+    <MetadataEditorDialog
+      :show="showMetadataEditor"
+      :tracks="album.tracks"
+      mode="album"
+      @close="showMetadataEditor = false"
+      @saved="onMetadataSaved"
+    />
 
     <!-- Selection action bar -->
     <SelectionBar
@@ -100,6 +119,7 @@ import { usePlayerStore } from '@/stores/player'
 import { useSelection } from '@/composables/useSelection'
 import SongRow from '@/components/SongRow.vue'
 import SelectionBar from '@/components/SelectionBar.vue'
+import MetadataEditorDialog from '@/components/MetadataEditorDialog.vue'
 import Hls from 'hls.js'
 
 const route = useRoute()
@@ -113,6 +133,23 @@ const selection = useSelection(() => album.value?.tracks ?? [])
 const coverUrl = computed(() =>
   album.value?.coverArt ? window.api.getMediaUrl(album.value.coverArt) : '',
 )
+
+// ── Album metadata editing (local files only) ────────────────────────────
+const showMetadataEditor = ref(false)
+const isLocalAlbum = computed(() =>
+  (album.value?.tracks ?? []).every(t => (!t.source || t.source === 'local') && !t.path.includes('://')),
+)
+
+/** Renaming the album (or its artist) changes the derived album id — follow it */
+function onMetadataSaved(updated: Track[]) {
+  showMetadataEditor.value = false
+  const first = updated[0]
+  if (!first) return
+  const newAlbum = library.albums.find(a => a.tracks.some(t => t.id === first.id))
+  if (newAlbum && newAlbum.id !== route.params.id) {
+    router.replace(`/album/${newAlbum.id}`)
+  }
+}
 
 // ── Animated cover (HLS stream) ─────────────────────────────────────────
 const animatedVideoEl = ref<HTMLVideoElement | null>(null)
