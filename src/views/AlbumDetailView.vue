@@ -26,9 +26,14 @@
         <div class="flex items-center gap-3 text-sm text-white/40">
           <span v-if="album.year" class="cursor-pointer hover:text-accent transition-colors" @click="goToYear">{{ album.year }}</span>
           <span v-if="album.year">&bull;</span>
-          <span>{{ album.tracks.length }} songs</span>
+          <span v-if="missingTracks.length">{{ album.tracks.length }}/{{ album.tracks.length + missingTracks.length }} songs</span>
+          <span v-else>{{ album.tracks.length }} songs</span>
           <span>&bull;</span>
           <span>{{ totalDuration }}</span>
+          <template v-if="missingTracks.length">
+            <span>&bull;</span>
+            <span>{{ missingTracks.length }} missing</span>
+          </template>
         </div>
 
         <div class="flex items-center gap-3 mt-5 flex-wrap">
@@ -72,18 +77,67 @@
       </div>
     </div>
 
-    <!-- Track list -->
+    <!-- Track list (missing tracks interleaved when enabled — cosmetic only) -->
     <div class="space-y-0.5">
-      <SongRow
-        v-for="(track, i) in album.tracks"
-        :key="track.id"
-        :track="track"
-        :index="i"
-        :selected="selection.isSelected(track.id)"
-        :selectable="selection.hasSelection.value"
-        @play="selection.hasSelection.value ? selection.handleSelect(i, $event ?? { ctrlKey: true, metaKey: false, shiftKey: false }) : player.playAll(album.tracks, i)"
-        @select="selection.handleSelect(i, $event)"
-      />
+      <template
+        v-for="row in displayRows"
+        :key="row.kind === 'disc' ? `disc-${row.disc}` : row.kind === 'local' ? row.track.id : `missing-${row.key}`"
+      >
+        <!-- Disc separator (multi-disc albums only) -->
+        <div v-if="row.kind === 'disc'" class="flex items-center gap-2 px-4 pt-4 pb-1.5 select-none">
+          <svg class="w-3.5 h-3.5 text-white/25" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9" />
+            <circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none" />
+          </svg>
+          <span class="text-xs font-semibold uppercase tracking-wider text-white/25">Disc {{ row.disc }}</span>
+          <div class="flex-1 border-t border-white/[0.06]" />
+        </div>
+        <SongRow
+          v-else-if="row.kind === 'local'"
+          :track="row.track"
+          :index="row.index"
+          :display-number="row.num"
+          :selected="selection.isSelected(row.track.id)"
+          :selectable="selection.hasSelection.value"
+          @play="selection.hasSelection.value ? selection.handleSelect(row.index, $event ?? { ctrlKey: true, metaKey: false, shiftKey: false }) : player.playAll(album.tracks, row.index)"
+          @select="selection.handleSelect(row.index, $event)"
+        />
+        <div
+          v-else
+          class="group flex items-center gap-3 px-4 rounded-lg relative select-none"
+          style="height: 56px;"
+          title="Not in your library"
+        >
+          <div class="w-8 text-center shrink-0">
+            <span class="text-xs text-white/15">{{ row.num || '·' }}</span>
+          </div>
+          <div class="w-10 h-10 rounded-md bg-white/[0.03] border border-dashed border-white/10 shrink-0 flex items-center justify-center">
+            <svg class="w-4 h-4 text-white/10" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
+            </svg>
+          </div>
+          <div class="flex-1 min-w-0 flex items-center gap-2">
+            <p class="text-sm font-medium truncate text-white/25">{{ row.entry.title }}</p>
+            <span class="px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider rounded bg-white/[0.06] text-white/25 shrink-0">missing</span>
+          </div>
+          <div class="w-48 hidden lg:block" />
+          <div class="w-14 text-right shrink-0">
+            <span class="text-xs text-white/15 tabular-nums">{{ row.entry.duration ? formatTime(row.entry.duration) : '' }}</span>
+          </div>
+          <div class="w-7 shrink-0" />
+          <div class="w-7 shrink-0">
+            <button
+              @click.stop="hideMissing(row.key)"
+              class="w-7 h-7 rounded-full text-white/20 hover:text-white/60 hover:bg-white/[0.06] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+              title="Hide this missing track (wrong match or unwanted)"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </template>
     </div>
 
     <!-- Album metadata editor -->
@@ -117,6 +171,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useLibraryStore } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { useSelection } from '@/composables/useSelection'
+import { formatTime } from '@/utils/formatTime'
+import { matchTracklist, type MissingEntry } from '@/utils/missingTracks'
 import SongRow from '@/components/SongRow.vue'
 import SelectionBar from '@/components/SelectionBar.vue'
 import MetadataEditorDialog from '@/components/MetadataEditorDialog.vue'
@@ -149,6 +205,88 @@ function onMetadataSaved(updated: Track[]) {
   if (newAlbum && newAlbum.id !== route.params.id) {
     router.replace(`/album/${newAlbum.id}`)
   }
+}
+
+// ── Missing tracks (optional, cosmetic) ─────────────────────────────────
+// Compares the album against its official tracklist (iTunes lookup, cached
+// in the main process) and greys out tracks not present in the library.
+const canonicalTracks = ref<CanonicalTrack[] | null>(null)
+
+watch(
+  [() => album.value?.id, () => player.showMissingTracks],
+  async () => {
+    canonicalTracks.value = null
+    const a = album.value
+    if (!a || !player.showMissingTracks) return
+    try {
+      const list = await window.api.getAlbumTracklist(a.name || '', a.artist || '')
+      if (album.value?.id === a.id) canonicalTracks.value = list
+    } catch {}
+  },
+  { immediate: true },
+)
+
+const tracklistAnalysis = computed(() => {
+  const a = album.value
+  if (!a || !canonicalTracks.value) return null
+  return matchTracklist(a.tracks, canonicalTracks.value, new Set(player.hiddenMissingTracks[a.id] ?? []))
+})
+
+const missingTracks = computed(() => tracklistAnalysis.value?.missing ?? [])
+
+type DisplayRow =
+  | { kind: 'disc'; disc: number }
+  | { kind: 'local'; track: Track; index: number; num?: number }
+  | { kind: 'missing'; entry: CanonicalTrack; key: string; num: number }
+
+/** Track rows with missing ones inserted at their canonical position, plus
+ *  cosmetic "Disc N" separators for multi-disc albums. Matched tracks are
+ *  numbered by the canonical tracklist; otherwise by their file tags. */
+const displayRows = computed<DisplayRow[]>(() => {
+  const a = album.value
+  if (!a) return []
+  const analysis = tracklistAnalysis.value
+  const localCanon = analysis?.localCanon
+  const byAnchor = new Map<number, MissingEntry[]>()
+  for (const m of analysis?.missing ?? []) {
+    byAnchor.set(m.anchor, [...(byAnchor.get(m.anchor) ?? []), m])
+  }
+
+  const discOfLocal = (t: Track) => localCanon?.get(t.id)?.disc || t.disc || 1
+  const multiDisc = new Set([
+    ...a.tracks.map(discOfLocal),
+    ...(analysis?.missing ?? []).map(m => m.entry.disc || 1),
+  ]).size > 1
+
+  const rows: DisplayRow[] = []
+  const seenDiscs = new Set<number>()
+  const pushWithDisc = (disc: number, row: DisplayRow) => {
+    if (multiDisc && !seenDiscs.has(disc)) {
+      seenDiscs.add(disc)
+      rows.push({ kind: 'disc', disc })
+    }
+    rows.push(row)
+  }
+  const pushMissing = (m: MissingEntry) =>
+    pushWithDisc(m.entry.disc || 1, { kind: 'missing', entry: m.entry, key: m.key, num: m.entry.track })
+
+  for (const m of byAnchor.get(-1) ?? []) pushMissing(m)
+  a.tracks.forEach((t, i) => {
+    const canonEntry = localCanon?.get(t.id)
+    pushWithDisc(discOfLocal(t), {
+      kind: 'local',
+      track: t,
+      index: i,
+      // canonical number > file tag number > list index (SongRow fallback)
+      num: canonEntry?.track || (analysis || multiDisc ? t.track || undefined : undefined),
+    })
+    for (const m of byAnchor.get(i) ?? []) pushMissing(m)
+  })
+  return rows
+})
+
+function hideMissing(key: string) {
+  if (album.value) player.hideMissingTrack(album.value.id, key)
 }
 
 // ── Animated cover (HLS stream) ─────────────────────────────────────────

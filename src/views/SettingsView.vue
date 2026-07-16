@@ -209,6 +209,42 @@
       </div>
     </section>
 
+    <!-- ── Missing Tracks ─────────────────────────────────────────── -->
+    <section v-show="showSection('general', 'Missing Tracks')" class="mb-8">
+      <h2 class="text-lg font-semibold text-white mb-4">Missing Tracks</h2>
+      <div class="space-y-4">
+        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">Show Missing Album Tracks</p>
+            <p class="text-xs text-white/30 mt-0.5">Compare albums against their official tracklist (via the iTunes catalog) and grey out songs your library is missing — purely cosmetic</p>
+          </div>
+          <button
+            @click="player.setShowMissingTracks(!player.showMissingTracks)"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="player.showMissingTracks ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
+              :class="player.showMissingTracks ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
+        <div v-if="player.showMissingTracks" class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">Hidden Missing Tracks</p>
+            <p class="text-xs text-white/30 mt-0.5">{{ hiddenMissingCount }} track{{ hiddenMissingCount === 1 ? '' : 's' }} hidden from album pages (via the × button on a missing row)</p>
+          </div>
+          <button
+            @click="resetHiddenMissing"
+            :disabled="hiddenMissingCount === 0"
+            class="px-3 py-1.5 text-xs font-medium rounded-lg bg-white/[0.08] hover:bg-white/[0.12] text-white/60 hover:text-white/80 transition-all disabled:opacity-40"
+          >
+            Unhide All
+          </button>
+        </div>
+      </div>
+    </section>
+
     <!-- ── Discord Rich Presence ──────────────────────────────────── -->
     <section v-show="showSection('integrations', 'Discord Rich Presence')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Discord Rich Presence</h2>
@@ -1138,6 +1174,20 @@
           </button>
         </div>
 
+        <div class="flex items-center justify-between">
+          <div>
+            <span class="text-sm text-white/70">Album Tracklists</span>
+            <p class="text-xs text-white/30">Official tracklists fetched for the missing tracks feature</p>
+          </div>
+          <button
+            @click="clearCache('tracklists')"
+            :disabled="cacheClearing.tracklists"
+            class="px-3 py-1.5 text-xs font-medium rounded-lg bg-white/[0.08] hover:bg-white/[0.12] text-white/60 hover:text-white/80 transition-all disabled:opacity-40"
+          >
+            {{ cacheClearing.tracklists ? 'Clearing...' : 'Clear' }}
+          </button>
+        </div>
+
         <div class="border-t border-white/[0.06] pt-3">
           <button
             @click="clearAllCaches"
@@ -1828,6 +1878,7 @@ const sectionKeywords: Record<string, string[]> = {
   'Music Folders': ['folder', 'scan', 'rescan', 'add folder', 'music library'],
   'Library': ['songs', 'albums', 'artists', 'stats', 'count'],
   'Album Display': ['soundtrack', 'singles', 'tags', 'auto-tag', 'display', 'covers'],
+  'Missing Tracks': ['missing', 'incomplete', 'tracklist', 'greyed', 'grayed', 'itunes', 'complete album'],
   'Discord Rich Presence': ['discord', 'rpc', 'activity', 'presence', 'status'],
   'Search': ['search lyrics', 'lyrics search'],
   'Audio Output': ['audio', 'output', 'device', 'speaker', 'sound', 'sink'],
@@ -1857,6 +1908,7 @@ function showSection(tabId: string, heading: string): boolean {
 
 const sectionTabMap: Record<string, string> = {
   'Music Folders': 'general', 'Library': 'general', 'Album Display': 'general',
+  'Missing Tracks': 'general',
   'Discord Rich Presence': 'integrations', 'Search': 'general', 'Audio Output': 'general',
   'Playback': 'general', 'Appearance': 'appearance', 'Animated Covers': 'appearance',
   'Behavior': 'general', 'Scrobbling': 'integrations', 'Navidrome / Subsonic': 'integrations',
@@ -2436,6 +2488,16 @@ async function clearAnimatedCoverCache() {
   }
 }
 
+// ── Missing tracks ────────────────────────
+const hiddenMissingCount = computed(() =>
+  Object.values(player.hiddenMissingTracks).reduce((n, list) => n + list.length, 0),
+)
+
+function resetHiddenMissing() {
+  player.resetHiddenMissingTracks()
+  toast.success('All hidden missing tracks restored')
+}
+
 // ── Behavior ──────────────────────────────
 function toggleTray() {
   player.setTrayEnabled(!player.trayEnabled)
@@ -2657,6 +2719,7 @@ const cacheClearing = ref<Record<string, boolean>>({
   artist: false,
   waveform: false,
   animated: false,
+  tracklists: false,
 })
 
 const cacheLabels: Record<string, string> = {
@@ -2664,6 +2727,7 @@ const cacheLabels: Record<string, string> = {
   covers: 'Cover art',
   artist: 'Artist info',
   waveform: 'Waveform',
+  tracklists: 'Album tracklists',
 }
 
 async function clearCache(target: string) {
@@ -2682,7 +2746,7 @@ async function clearCache(target: string) {
 }
 
 async function clearAllCaches() {
-  const targets = ['library', 'covers', 'artist', 'waveform']
+  const targets = ['library', 'covers', 'artist', 'waveform', 'tracklists']
   for (const t of targets) cacheClearing.value[t] = true
   cacheClearing.value.animated = true
   try {

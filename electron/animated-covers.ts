@@ -92,7 +92,7 @@ function isNegativelyCached(key: string): boolean {
 }
 
 // ── HTTPS helpers ───────────────────────────────────────────────────────────
-function fetchText(url: string, headers: Record<string, string> = {}): Promise<string> {
+export function fetchText(url: string, headers: Record<string, string> = {}): Promise<string> {
   return new Promise((resolve, reject) => {
     const ua = `AuroraPlayer/${app.getVersion()}`
     const parsed = new URL(url)
@@ -239,7 +239,7 @@ async function getAppleMusicToken(): Promise<string> {
 }
 
 // ── Normalise strings for lenient comparison ────────────────────────────────
-function normalizeStr(s: string): string {
+export function normalizeStr(s: string): string {
   return s
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // strip diacritics (é→e, ü→u, …)
     .toLowerCase()

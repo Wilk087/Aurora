@@ -37,7 +37,7 @@
         </div>
       </div>
       <template v-else>
-        <span class="text-xs text-white/30 group-hover:hidden">{{ index + 1 }}</span>
+        <span class="text-xs text-white/30 group-hover:hidden">{{ displayNumber ?? index + 1 }}</span>
         <svg class="w-4 h-4 text-white/70 hidden group-hover:block mx-auto" fill="currentColor" viewBox="0 0 24 24">
           <path d="M8 5v14l11-7z" />
         </svg>
@@ -460,6 +460,8 @@ const props = defineProps<{
   selectable?: boolean
   /** All currently selected tracks — passed by parent views for multi-track plugin actions */
   selectedTracks?: Track[]
+  /** Overrides the displayed row number (used when missing-track rows are interleaved) */
+  displayNumber?: number
 }>()
 
 defineEmits(['play', 'select'])

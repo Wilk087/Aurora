@@ -16,6 +16,7 @@ import {
 } from './subsonic'
 import { startRemoteServer, stopRemoteServer, registerRemoteIPC, isRemoteEnabled } from './remote'
 import { registerAnimatedCoverIPC, getAlbumArtworkUrl, getArtistArtworkUrl } from './animated-covers'
+import { registerAlbumTracklistIPC, clearTracklistCache } from './album-tracklist'
 import { logger, installGlobalLogHandlers, initLogger, getLogPath } from './logger'
 import { getAppPaths } from './paths'
 
@@ -1880,6 +1881,9 @@ app.whenReady().then(async () => {
   // ── Animated covers ────────────────────────────────────────────────────
   registerAnimatedCoverIPC()
 
+  // ── Album tracklists (missing tracks feature) ──────────────────────────
+  registerAlbumTracklistIPC()
+
   // ── Remote control server ──────────────────────────────────────────────
   registerRemoteIPC(() => app.getPath('userData'))
   if (isRemoteEnabled(app.getPath('userData'))) {
@@ -3154,6 +3158,13 @@ app.whenReady().then(async () => {
         if (existsSync(waveformCachePath)) await rm(waveformCachePath)
         results.waveform = true
       } catch { results.waveform = false }
+    }
+
+    if (targets.includes('tracklists')) {
+      try {
+        clearTracklistCache()
+        results.tracklists = true
+      } catch { results.tracklists = false }
     }
 
     return results

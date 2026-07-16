@@ -101,6 +101,14 @@ interface TrackMetaSnapshot {
   album: string
 }
 
+/** One entry of an album's official tracklist (missing tracks feature) */
+interface CanonicalTrack {
+  title: string
+  track: number
+  disc: number
+  duration: number
+}
+
 interface Playlist {
   id: string
   name: string
@@ -280,6 +288,9 @@ interface Window {
     getAnimatedCover: (album: string, artist: string) => Promise<string | null>
     getAnimatedCoverCacheStats: () => Promise<{ count: number }>
     clearAnimatedCoverCache: () => Promise<{ ok: boolean }>
+    // Album tracklists (missing tracks feature)
+    getAlbumTracklist: (album: string, artist: string) => Promise<CanonicalTrack[] | null>
+    getAlbumTracklistsCached: (albums: { id: string; album: string; artist: string }[]) => Promise<Record<string, CanonicalTrack[] | null>>
     // Logging
     getLogPath: () => Promise<string>
     log: (level: 'info' | 'warn' | 'error' | 'debug', message: string) => void

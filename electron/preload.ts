@@ -251,6 +251,12 @@ contextBridge.exposeInMainWorld('api', {
   clearAnimatedCoverCache: (): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('animated-cover:clear-cache'),
 
+  // Album tracklists (missing tracks feature)
+  getAlbumTracklist: (album: string, artist: string): Promise<{ title: string; track: number; disc: number; duration: number }[] | null> =>
+    ipcRenderer.invoke('album-tracklist:get', album, artist),
+  getAlbumTracklistsCached: (albums: { id: string; album: string; artist: string }[]): Promise<Record<string, { title: string; track: number; disc: number; duration: number }[] | null>> =>
+    ipcRenderer.invoke('album-tracklist:get-cached', albums),
+
   // Logging
   getLogPath: (): Promise<string> => ipcRenderer.invoke('logger:get-path'),
   log: (level: 'info' | 'warn' | 'error' | 'debug', message: string) =>

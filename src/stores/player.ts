@@ -338,6 +338,11 @@ export const usePlayerStore = defineStore('player', () => {
   const animatedCoversEnabled = ref(true)
   const pauseAnimatedOnBlur = ref(false)
 
+  // ── Missing tracks (album pages) ───────────────────────────────────────
+  const showMissingTracks = ref(false)
+  // albumId → normalized titles the user chose to hide (wrong match / unwanted)
+  const hiddenMissingTracks = ref<Record<string, string[]>>({})
+
   async function generateWaveform(trackPath: string) {
     if (waveformCache.has(trackPath)) {
       waveformData.value = waveformCache.get(trackPath)!
@@ -640,6 +645,8 @@ export const usePlayerStore = defineStore('player', () => {
     if (typeof s.waveformEnabled === 'boolean') waveformEnabled.value = s.waveformEnabled
     if (typeof s.animatedCoversEnabled === 'boolean') animatedCoversEnabled.value = s.animatedCoversEnabled
     if (typeof s.pauseAnimatedOnBlur === 'boolean') pauseAnimatedOnBlur.value = s.pauseAnimatedOnBlur
+    if (typeof s.showMissingTracks === 'boolean') showMissingTracks.value = s.showMissingTracks
+    if (s.hiddenMissingTracks && typeof s.hiddenMissingTracks === 'object') hiddenMissingTracks.value = s.hiddenMissingTracks
     if (typeof s.adaptiveAccent === 'boolean') adaptiveAccent.value = s.adaptiveAccent
     if (typeof s.iosSliders === 'boolean') iosSliders.value = s.iosSliders
     if (s.trayEnabled === false) trayEnabled.value = false
@@ -1442,6 +1449,24 @@ export const usePlayerStore = defineStore('player', () => {
     window.api.mergeSettings({ pauseAnimatedOnBlur: enabled })
   }
 
+  function setShowMissingTracks(enabled: boolean) {
+    showMissingTracks.value = enabled
+    window.api.mergeSettings({ showMissingTracks: enabled })
+  }
+
+  function hideMissingTrack(albumId: string, normTitle: string) {
+    const list = hiddenMissingTracks.value[albumId] ?? []
+    if (!list.includes(normTitle)) {
+      hiddenMissingTracks.value = { ...hiddenMissingTracks.value, [albumId]: [...list, normTitle] }
+      window.api.mergeSettings({ hiddenMissingTracks: hiddenMissingTracks.value })
+    }
+  }
+
+  function resetHiddenMissingTracks() {
+    hiddenMissingTracks.value = {}
+    window.api.mergeSettings({ hiddenMissingTracks: {} })
+  }
+
   function setAdaptiveAccent(enabled: boolean) {
     adaptiveAccent.value = enabled
     window.api.mergeSettings({ adaptiveAccent: enabled })
@@ -1691,6 +1716,12 @@ export const usePlayerStore = defineStore('player', () => {
     setAnimatedCoversEnabled,
     pauseAnimatedOnBlur,
     setPauseAnimatedOnBlur,
+    // Missing tracks
+    showMissingTracks,
+    setShowMissingTracks,
+    hiddenMissingTracks,
+    hideMissingTrack,
+    resetHiddenMissingTracks,
     // Adaptive accent
     adaptiveAccent,
     currentAccentColor,

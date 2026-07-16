@@ -3,7 +3,10 @@
     <div class="shrink-0 view-header flex items-center justify-between px-6 py-3 border-b border-white/[0.06]">
       <div class="flex items-baseline gap-2.5 min-w-0">
         <h1 class="text-xl font-bold text-white">Albums</h1>
-        <p class="text-xs text-white/40 truncate">{{ filteredAlbumsByTag.length }} albums<span v-if="library.searchQuery"> matching "{{ library.searchQuery }}"</span></p>
+        <p class="text-xs text-white/40 truncate">
+          {{ filteredAlbumsByTag.length }} albums<span v-if="library.searchQuery"> matching "{{ library.searchQuery }}"</span><span v-if="missingOnly"> with missing tracks</span>
+          <span v-if="missingScan.active" class="text-white/25"> &bull; checking {{ missingScan.done }}/{{ missingScan.total }}…</span>
+        </p>
       </div>
 
       <div class="flex items-center gap-2">
@@ -24,10 +27,23 @@
           :options="albumSortOptions"
           :model-value="library.albumSortOrder"
           :label="`View: ${albumSortLabels[library.albumSortOrder]}`"
-          :active-tags="activeAlbumTags.length || undefined"
+          :active-tags="(activeAlbumTags.length + (missingOnly ? 1 : 0)) || undefined"
           @update:model-value="selectSort"
         >
           <template #filter>
+            <template v-if="player.showMissingTracks">
+              <div class="border-t border-white/[0.06] my-1" />
+              <button
+                @click="toggleMissingOnly"
+                class="w-full px-3.5 py-2 text-left text-xs transition-colors flex items-center justify-between"
+                :class="missingOnly ? 'text-accent bg-white/[0.08]' : 'text-white/60 hover:text-white hover:bg-white/[0.06]'"
+              >
+                <span>Missing Tracks Only</span>
+                <svg v-if="missingOnly" class="w-3.5 h-3.5 text-accent shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" />
+                </svg>
+              </button>
+            </template>
             <div class="border-t border-white/[0.06] my-1" />
             <div class="px-3.5 py-1">
               <div class="flex items-center justify-between mb-1.5">
@@ -90,6 +106,21 @@
         </button>
       </EmptyState>
 
+      <!-- Missing-tracks filter active, nothing found -->
+      <EmptyState
+        v-if="missingOnly && filteredAlbumsByTag.length === 0 && !library.searchQuery"
+        :title="missingScan.active ? 'Checking your albums…' : 'No missing tracks found'"
+        :description="missingScan.active
+          ? `Comparing albums against their official tracklists (${missingScan.done}/${missingScan.total} checked)`
+          : 'None of your checked albums are missing tracks'"
+      >
+        <template #icon>
+          <svg class="w-16 h-16 text-white/[0.06]" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </template>
+      </EmptyState>
+
       <!-- Loading skeleton -->
       <LoadingSkeleton v-if="!library.libraryReady" :count="24" />
 
@@ -104,6 +135,9 @@
             @click="$router.push(`/album/${album.id}`)"
             @play="player.playAll(album.tracks)"
           />
+          <p v-if="missingOnly && missingCounts[album.id]" class="mt-1 px-0.5 text-[10px] text-white/40">
+            {{ missingCounts[album.id] }} track{{ missingCounts[album.id] === 1 ? '' : 's' }} missing
+          </p>
           <div v-if="getAlbumTags(album).length > 0" class="mt-1 px-0.5 relative">
             <button
               @click.stop="openAlbumTagMenu(album.id, $event)"
@@ -138,12 +172,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useScrollMemory } from '@/composables/useScrollMemory'
 import { useLibraryStore, type AlbumSortOrder } from '@/stores/library'
 import { usePlayerStore } from '@/stores/player'
 import { useTagsStore } from '@/stores/tags'
 import { useTagFilter } from '@/composables/useTagFilter'
+import { countMissing } from '@/utils/missingTracks'
 import AlbumCard from '@/components/AlbumCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import SortDropdownMenu from '@/components/SortDropdownMenu.vue'
@@ -157,12 +192,81 @@ const openTagMenuAlbum = ref<string | null>(null)
 const tagMenuStyle = ref<Record<string, string>>({})
 
 const filteredAlbumsByTag = computed(() => {
-  if (activeAlbumTags.value.length === 0) return library.filteredAlbums
-  return library.filteredAlbums.filter((album) => {
-    const key = `${album.name}---${album.artist}`
-    const albumTags = tagsStore.getAlbumTags(key)
-    return activeAlbumTags.value.some(tag => albumTags.includes(tag))
-  })
+  let list = library.filteredAlbums
+  if (activeAlbumTags.value.length > 0) {
+    list = list.filter((album) => {
+      const key = `${album.name}---${album.artist}`
+      const albumTags = tagsStore.getAlbumTags(key)
+      return activeAlbumTags.value.some(tag => albumTags.includes(tag))
+    })
+  }
+  if (missingOnly.value) {
+    list = list.filter(album => (missingCounts.value[album.id] ?? 0) > 0)
+  }
+  return list
+})
+
+// ── Missing tracks filter (opt-in feature) ─────────────────────────────
+// Cached tracklists load instantly; albums never looked up before are
+// fetched in a slow background pass (the iTunes API rate-limits hard).
+const missingOnly = ref(false)
+const tracklists = ref<Record<string, CanonicalTrack[]>>({})
+const missingScan = ref({ active: false, done: 0, total: 0 })
+let missingScanToken = 0
+
+const missingCounts = computed<Record<string, number>>(() => {
+  if (!missingOnly.value) return {}
+  const out: Record<string, number> = {}
+  for (const album of library.albums) {
+    const canon = tracklists.value[album.id]
+    if (!canon) continue
+    out[album.id] = countMissing(album.tracks, canon, new Set(player.hiddenMissingTracks[album.id] ?? []))
+  }
+  return out
+})
+
+async function startMissingScan() {
+  const token = ++missingScanToken
+  const albums = library.albums
+  const cached = await window.api.getAlbumTracklistsCached(
+    albums.map(a => ({ id: a.id, album: a.name, artist: a.artist })),
+  )
+  if (token !== missingScanToken) return
+  const map = { ...tracklists.value }
+  for (const [id, canon] of Object.entries(cached)) {
+    if (canon) map[id] = canon
+  }
+  tracklists.value = map
+  // Fetch albums the cache knows nothing about (absent = never looked up)
+  const todo = albums.filter(a => !(a.id in cached) && !map[a.id])
+  missingScan.value = { active: todo.length > 0, done: 0, total: todo.length }
+  for (const a of todo) {
+    if (token !== missingScanToken) return
+    try {
+      const canon = await window.api.getAlbumTracklist(a.name, a.artist)
+      if (token !== missingScanToken) return
+      if (canon) tracklists.value = { ...tracklists.value, [a.id]: canon }
+    } catch {}
+    missingScan.value = { ...missingScan.value, done: missingScan.value.done + 1 }
+    // Throttle: an album costs up to 3 iTunes calls; ~20 calls/min are tolerated
+    await new Promise(r => setTimeout(r, 6000))
+  }
+  if (token === missingScanToken) missingScan.value.active = false
+}
+
+function toggleMissingOnly() {
+  missingOnly.value = !missingOnly.value
+  if (missingOnly.value) {
+    startMissingScan()
+  } else {
+    missingScanToken++
+    missingScan.value.active = false
+  }
+}
+
+// Feature switched off in settings → drop the filter
+watch(() => player.showMissingTracks, (on) => {
+  if (!on && missingOnly.value) toggleMissingOnly()
 })
 
 function getAlbumTags(album: { name: string; artist: string }): string[] {
@@ -213,7 +317,10 @@ function onClickOutside(e: MouseEvent) {
 }
 
 onMounted(() => document.addEventListener('click', onClickOutside))
-onUnmounted(() => document.removeEventListener('click', onClickOutside))
+onUnmounted(() => {
+  document.removeEventListener('click', onClickOutside)
+  missingScanToken++ // stop a running missing-tracks scan
+})
 
 function rescan() {
   library.rescanAll()
