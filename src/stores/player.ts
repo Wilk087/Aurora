@@ -328,6 +328,8 @@ export const usePlayerStore = defineStore('player', () => {
   const showLyricsTranslation = ref(true)
   // 'system' resolves to the OS display language in the main process
   const lyricsTranslationLang = ref('system')
+  // Independent of translation language — romanizes the original line (e.g. Japanese → rōmaji)
+  const lyricsShowRomaji = ref(false)
 
   // ── Waveform data ──────────────────────────────────────────────────────
   const waveformData = ref<number[]>([])
@@ -642,6 +644,15 @@ export const usePlayerStore = defineStore('player', () => {
     if (s.lyricsOffset !== undefined) lyricsOffset.value = s.lyricsOffset
     if (typeof s.showLyricsTranslation === 'boolean') showLyricsTranslation.value = s.showLyricsTranslation
     if (typeof s.lyricsTranslationLang === 'string') lyricsTranslationLang.value = s.lyricsTranslationLang
+    if (typeof s.lyricsShowRomaji === 'boolean') {
+      lyricsShowRomaji.value = s.lyricsShowRomaji
+    } else if (s.lyricsTranslationLang === 'romaji') {
+      // Migrate the old combined "romaji" translation-language option to the
+      // new independent toggle so it doesn't collide with a real translation.
+      lyricsShowRomaji.value = true
+      lyricsTranslationLang.value = 'system'
+      window.api.mergeSettings({ lyricsShowRomaji: true, lyricsTranslationLang: 'system' })
+    }
     if (typeof s.waveformEnabled === 'boolean') waveformEnabled.value = s.waveformEnabled
     if (typeof s.animatedCoversEnabled === 'boolean') animatedCoversEnabled.value = s.animatedCoversEnabled
     if (typeof s.pauseAnimatedOnBlur === 'boolean') pauseAnimatedOnBlur.value = s.pauseAnimatedOnBlur
@@ -1419,6 +1430,11 @@ export const usePlayerStore = defineStore('player', () => {
     window.api.mergeSettings({ lyricsTranslationLang: lang })
   }
 
+  function setLyricsShowRomaji(enabled: boolean) {
+    lyricsShowRomaji.value = enabled
+    window.api.mergeSettings({ lyricsShowRomaji: enabled })
+  }
+
   function setWaveformEnabled(enabled: boolean) {
     waveformEnabled.value = enabled
     window.api.mergeSettings({ waveformEnabled: enabled })
@@ -1706,6 +1722,8 @@ export const usePlayerStore = defineStore('player', () => {
     setShowLyricsTranslation,
     lyricsTranslationLang,
     setLyricsTranslationLang,
+    lyricsShowRomaji,
+    setLyricsShowRomaji,
     // Waveform
     waveformData,
     waveformEnabled,

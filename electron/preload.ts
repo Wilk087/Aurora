@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('api', {
   getLyrics: (trackPath: string) => ipcRenderer.invoke('lyrics:get', trackPath),
   fetchOnlineLyrics: (trackInfo: { path: string; title: string; artist: string; album: string; duration: number }) =>
     ipcRenderer.invoke('lyrics:fetch-online', trackInfo),
+  translateLyrics: (payload: { lrc: string; translation?: string }) =>
+    ipcRenderer.invoke('lyrics:translate', payload),
 
   // Window controls
   minimize: () => ipcRenderer.send('window:minimize'),

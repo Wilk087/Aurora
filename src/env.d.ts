@@ -147,8 +147,9 @@ interface Window {
     getFolders: () => Promise<string[]>
     removeFolder: (path: string) => Promise<{ folders: string[]; tracks: Track[] }>
     openFolderDialog: () => Promise<string | null>
-    getLyrics: (trackPath: string) => Promise<{ lrc: string; translation?: string; pronunciation?: string } | null>
-    fetchOnlineLyrics: (trackInfo: { path: string; title: string; artist: string; album: string; duration: number }) => Promise<{ lrc: string; translation?: string; pronunciation?: string } | null>
+    getLyrics: (trackPath: string) => Promise<{ lrc: string; translation?: string } | null>
+    fetchOnlineLyrics: (trackInfo: { path: string; title: string; artist: string; album: string; duration: number }) => Promise<{ lrc: string; translation?: string } | null>
+    translateLyrics: (payload: { lrc: string; translation?: string }) => Promise<{ translation?: string; pronunciation?: string } | null>
     minimize: () => void
     maximize: () => void
     close: () => void

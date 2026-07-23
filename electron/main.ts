@@ -1315,23 +1315,27 @@ async function translateLrc(lrcContent: string, targetLang: string): Promise<str
 }
 
 /**
- * Apply the user's language preference to a lyrics result.
- * - 'auto': pass through the source-provided translation (e.g. Netease tlyric)
- * - 'romaji': romanize the original into `pronunciation` AND translate into
- *   the system language (a hand-written translation still wins)
+ * Apply the user's language/romaji preferences to a lyrics result.
+ * - translationLang 'auto': pass through the source-provided translation (e.g. Netease tlyric)
  * - anything else: translate the original into that language
+ * - showRomaji: independently romanize the original into `pronunciation`,
+ *   regardless of the translation language
  * A user-authored translation (tagged [by:user]) always wins as the translation.
+ * Translation and romanization are fetched concurrently since they're independent.
  */
 async function applyLyricsLanguage(
   result: { lrc: string; translation?: string },
-  targetLang: string,
+  opts: { translationLang: string; showRomaji: boolean },
 ): Promise<{ lrc: string; translation?: string; pronunciation?: string }> {
-  if (targetLang === 'auto') return result
   const userTranslation = result.translation?.includes('[by:user]') ? result.translation : undefined
-  const romaji = targetLang === 'romaji'
-  const pronunciation = romaji ? (await translateLrc(result.lrc, 'romaji')) ?? undefined : undefined
-  const translationLang = romaji ? systemDisplayLang() : targetLang
-  const translation = userTranslation ?? (await translateLrc(result.lrc, translationLang)) ?? undefined
+  const needsTranslation = opts.translationLang !== 'auto' && !userTranslation
+
+  const [pronunciation, translated] = await Promise.all([
+    opts.showRomaji ? translateLrc(result.lrc, 'romaji').then(r => r ?? undefined) : Promise.resolve(undefined),
+    needsTranslation ? translateLrc(result.lrc, opts.translationLang).then(r => r ?? undefined) : Promise.resolve(undefined),
+  ])
+
+  const translation = userTranslation ?? (opts.translationLang === 'auto' ? result.translation : translated)
   return { lrc: result.lrc, translation, pronunciation }
 }
 
@@ -2011,12 +2015,14 @@ app.whenReady().then(async () => {
   })
 
   // ── IPC: Lyrics ──
+  // `lyrics:get` / `lyrics:fetch-online` return as soon as the LRC itself is available
+  // (plus any source-provided translation, which is free — no network round-trip).
+  // Google-Translate-derived translation/romaji are fetched separately via
+  // `lyrics:translate` so the renderer can show synced lyrics immediately and
+  // patch in translations once they resolve, instead of blocking on both.
   ipcMain.handle('lyrics:get', async (_, trackPath: string) => {
     if (trackPath.startsWith('subsonic://')) return null
-    const local = await findLocalLyrics(trackPath)
-    if (!local) return null
-    const settings = await loadSettings()
-    return await applyLyricsLanguage(local, resolveLyricsTargetLang(settings))
+    return await findLocalLyrics(trackPath)
   })
 
   ipcMain.handle('lyrics:fetch-online', async (_, trackInfo: { path: string; title: string; artist: string; album: string; duration: number }) => {
@@ -2030,10 +2036,15 @@ app.whenReady().then(async () => {
         await saveLyricsFile(trackInfo.path, '[instrumental]')
       }
     }
-    if (!result) return null
-    // Apply language preference: translate original → target lang, or pass tlyric through
+    return result
+  })
+
+  ipcMain.handle('lyrics:translate', async (_, payload: { lrc: string; translation?: string }) => {
     const settings = await loadSettings()
-    return await applyLyricsLanguage(result, resolveLyricsTargetLang(settings))
+    return await applyLyricsLanguage(payload, {
+      translationLang: resolveLyricsTargetLang(settings),
+      showRomaji: !!settings.lyricsShowRomaji,
+    })
   })
 
   // ── IPC: App paths (for Settings display) ──

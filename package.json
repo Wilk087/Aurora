@@ -187,6 +187,7 @@
     "bufferutil": "^4.1.0",
     "dbus-next": "^0.10.2",
     "express": "^5.2.1",
+    "gifenc": "^1.0.3",
     "hls.js": "^1.6.16",
     "music-metadata": "^11.13.0",
     "pinia": "^2.3.0",

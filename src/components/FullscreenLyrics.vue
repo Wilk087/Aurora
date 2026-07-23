@@ -86,7 +86,7 @@
         </p>
         <!-- Pronunciation line (romaji) -->
         <p
-          v-if="line.pronunciation && line.pronunciation.toLowerCase().trim() !== line.text.toLowerCase().trim()"
+          v-if="player.lyricsShowRomaji && line.pronunciation && line.pronunciation.toLowerCase().trim() !== line.text.toLowerCase().trim()"
           class="fs-translation-line text-xl font-semibold mt-1 italic"
         >{{ line.pronunciation }}</p>
         <!-- Translation line -->
@@ -171,6 +171,14 @@
         >
           Translated
         </button>
+        <button
+          @click="player.setLyricsShowRomaji(!player.lyricsShowRomaji)"
+          class="flex items-center gap-1.5 px-3 h-8 rounded-full text-sm font-medium transition-colors"
+          :class="player.lyricsShowRomaji ? 'bg-accent/25 text-accent' : 'text-white/50 hover:text-white hover:bg-white/10'"
+          title="Show / hide romaji"
+        >
+          Romaji
+        </button>
       </div>
     </Transition>
 
@@ -217,6 +225,21 @@ const showSyncer = ref(false)
 
 const plainLyricsLines = computed(() => plainLyricsText.value.split('\n').map(l => l.trim()))
 
+// Guards against a slow translate response landing after the user has already
+// moved on to a different track.
+let lyricsRequestId = 0
+
+/** Kick off the (network-bound) translation/romaji fetch and patch it in once it resolves. */
+function loadTranslation(requestId: number, base: { lrc: string; translation?: string }) {
+  window.api.translateLyrics(base).then((extra) => {
+    if (requestId !== lyricsRequestId || !extra) return
+    let updated = lyrics.value
+    if (extra.translation) updated = mergeTranslations(updated, extra.translation)
+    if (extra.pronunciation) updated = mergePronunciations(updated, extra.pronunciation)
+    lyrics.value = updated
+  }).catch(() => {})
+}
+
 // Load lyrics when track changes
 watch(
   () => player.currentTrack?.path,
@@ -227,45 +250,40 @@ watch(
     lineRefs.value = {}
     searchingOnline.value = false
 
+    const requestId = ++lyricsRequestId
+
     if (!path) return
     const track = player.currentTrack
     if (!track) return
 
     loading.value = true
     try {
-      const local = await window.api.getLyrics(path)
-      if (local) {
-        if (local.lrc === '[instrumental]') return
-        let parsed = parseLRC(local.lrc)
-        if (parsed.length > 0) {
-          if (local.translation) parsed = mergeTranslations(parsed, local.translation)
-          if (local.pronunciation) parsed = mergePronunciations(parsed, local.pronunciation)
-          lyrics.value = parsed
-          return
-        }
-        plainLyricsText.value = local.lrc
+      let base = await window.api.getLyrics(path)
+
+      if (!base) {
+        loading.value = false
+        searchingOnline.value = true
+        base = await window.api.fetchOnlineLyrics({
+          path: track.path,
+          title: track.title,
+          artist: track.artist,
+          album: track.album,
+          duration: track.duration,
+        })
+      }
+
+      if (requestId !== lyricsRequestId) return // track changed while awaiting
+      if (!base) return
+      if (base.lrc === '[instrumental]') return
+
+      const parsed = parseLRC(base.lrc)
+      if (parsed.length === 0) {
+        plainLyricsText.value = base.lrc
         return
       }
 
-      loading.value = false
-      searchingOnline.value = true
-      const online = await window.api.fetchOnlineLyrics({
-        path: track.path,
-        title: track.title,
-        artist: track.artist,
-        album: track.album,
-        duration: track.duration,
-      })
-      if (online) {
-        let parsed = parseLRC(online.lrc)
-        if (parsed.length > 0) {
-          if (online.translation) parsed = mergeTranslations(parsed, online.translation)
-          if (online.pronunciation) parsed = mergePronunciations(parsed, online.pronunciation)
-          lyrics.value = parsed
-        } else {
-          plainLyricsText.value = online.lrc
-        }
-      }
+      lyrics.value = parsed
+      loadTranslation(requestId, base)
     } catch (err) {
       console.error('Error loading lyrics:', err)
     } finally {

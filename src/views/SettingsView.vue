@@ -595,10 +595,28 @@
           </button>
         </div>
 
+        <!-- Show romaji -->
+        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">Show Romaji</p>
+            <p class="text-xs text-white/30 mt-0.5">Romanize the original line (e.g. Japanese → rōmaji), shown above the translation</p>
+          </div>
+          <button
+            @click="player.setLyricsShowRomaji(!player.lyricsShowRomaji)"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="player.lyricsShowRomaji ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
+              :class="player.lyricsShowRomaji ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
+
         <!-- Translation language -->
         <div class="px-4 py-3 rounded-xl bg-white/[0.05]">
           <p class="text-sm text-white/80">Translation Language</p>
-          <p class="text-xs text-white/30 mt-0.5 mb-2">Lyrics are translated from the original. Romaji romanizes the original text instead (e.g. Japanese → rōmaji).</p>
+          <p class="text-xs text-white/30 mt-0.5 mb-2">Lyrics are translated from the original into this language.</p>
           <div class="relative" ref="langDropdownRef">
             <button
               @click.stop="showLangDropdown = !showLangDropdown"
@@ -2144,7 +2162,6 @@ function themeSwatchColor(c: string | undefined): string {
 const translationLangOptions: { value: string; label: string }[] = [
   { value: 'system', label: `System language${systemLangName ? ` (${systemLangName})` : ''}` },
   { value: 'auto', label: 'Auto (from source)' },
-  { value: 'romaji', label: 'Romaji (romanize original)' },
   { value: 'en', label: 'English' },
   { value: 'es', label: 'Spanish' },
   { value: 'fr', label: 'French' },
