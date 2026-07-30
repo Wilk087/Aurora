@@ -64,8 +64,10 @@
         class="fs-lyric-line py-3 cursor-pointer relative"
         :class="[
           i === currentLineIndex ? 'is-active' : (Math.abs(i - currentLineIndex) === 1 ? 'is-near' : (Math.abs(i - currentLineIndex) === 2 ? 'is-far' : 'is-hidden')),
-          selectedLines.has(i) ? 'ring-1 ring-accent/40 rounded-lg !bg-accent/10' : ''
+          selectedLines.has(i) ? 'ring-1 ring-accent/40 rounded-lg !bg-accent/10' : '',
+          ...singerClasses(line, singerDisplay)
         ]"
+        :style="singerStyle(line, singerDisplay)"
       >
         <p class="text-[2.5rem] font-extrabold leading-snug">
           <!-- Enhanced LRC: word-by-word highlight for the active line -->
@@ -74,7 +76,7 @@
               v-for="(word, wi) in line.words"
               :key="wi"
               class="transition-colors duration-200"
-              :class="wi <= currentWordIndex ? 'text-white' : 'text-white/20'"
+              :class="wi <= currentWordIndex ? 'fs-word-on' : 'fs-word-off'"
             >{{ wi < line.words.length - 1 ? word.text + ' ' : word.text }}</span>
           </template>
           <template v-else-if="line.text">{{ line.text }}</template>
@@ -179,6 +181,16 @@
         >
           Romaji
         </button>
+        <button
+          @click="showSingerEditor = true"
+          class="w-8 h-8 flex items-center justify-center rounded-full transition-colors"
+          :class="hasSingers ? 'bg-accent/25 text-accent' : 'text-white/50 hover:text-white hover:bg-white/10'"
+          title="Assign singers (duet view)"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+          </svg>
+        </button>
       </div>
     </Transition>
 
@@ -200,16 +212,27 @@
       @close="showTranslationEditor = false"
       @saved="onTranslationSaved"
     />
+
+    <!-- Per-singer assignment editor -->
+    <LyricsSingerEditor
+      :visible="showSingerEditor"
+      :lyrics="lyrics"
+      :track-path="player.currentTrack?.path || ''"
+      @close="showSingerEditor = false"
+      @saved="onSingersSaved"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, inject } from 'vue'
 import { usePlayerStore } from '@/stores/player'
-import { parseLRC, mergeTranslations, mergePronunciations, findCurrentLine, findCurrentWord, type LyricLine } from '@/utils/lrcParser'
+import { parseLRC, mergeTranslations, mergePronunciations, mergeSingers, findCurrentLine, findCurrentWord, type LyricLine } from '@/utils/lrcParser'
+import { singerStyle, singerClasses } from '@/utils/lyricSingers'
 import LyricsCard from '@/components/LyricsCard.vue'
 import LrcSyncer from '@/components/LrcSyncer.vue'
 import LyricsTranslationEditor from '@/components/LyricsTranslationEditor.vue'
+import LyricsSingerEditor from '@/components/LyricsSingerEditor.vue'
 
 const player = usePlayerStore()
 const isLightBackground = inject('isLightBackground', computed(() => false))
@@ -276,11 +299,14 @@ watch(
       if (!base) return
       if (base.lrc === '[instrumental]') return
 
-      const parsed = parseLRC(base.lrc)
+      let parsed = parseLRC(base.lrc)
       if (parsed.length === 0) {
         plainLyricsText.value = base.lrc
         return
       }
+
+      // Singer assignments come from a local sidecar — no network, apply right away
+      if (base.singers) parsed = mergeSingers(parsed, base.singers)
 
       lyrics.value = parsed
       loadTranslation(requestId, base)
@@ -376,6 +402,22 @@ function onTranslationSaved(translationLrc: string) {
   lyrics.value = mergeTranslations(stripped, translationLrc)
 }
 
+// ── Per-singer editor ────────────────────────────────────────────────
+const showSingerEditor = ref(false)
+const hasSingers = computed(() => lyrics.value.some(l => l.singer || l.background))
+
+const singerDisplay = computed(() => ({
+  enabled: player.lyricsPerSinger,
+  colorsEnabled: player.lyricsSingerColorsEnabled,
+  colors: player.lyricsSingerColors,
+}))
+
+/** Apply freshly saved singer assignments (empty content clears them) */
+function onSingersSaved(singersLrc: string) {
+  const stripped = lyrics.value.map(l => ({ ...l, singer: undefined, background: undefined }))
+  lyrics.value = mergeSingers(stripped, singersLrc)
+}
+
 // ── Lyrics editor (re-sync existing lyrics through the LRC syncer) ────
 /** Text fed to the syncer: unsynced lyrics as-is, or the synced lines' text */
 const syncerSource = computed(() =>
@@ -450,6 +492,32 @@ watch(() => player.currentTrack?.path, () => {
 
 .fs-translation-line {
   /* inherits color and transform from parent .fs-lyric-line state classes */
+}
+
+/* ── Per-singer (duet) display ───────────────────────────────────────
+   Alignment comes from an inline style and is always the primary cue.
+   Colour is opt-in; background vocals render smaller and quieter, the way
+   Apple Music treats ttm:role="x-bg" lines. */
+.fs-word-on {
+  color: white;
+}
+.fs-word-off {
+  color: rgba(255, 255, 255, 0.2);
+}
+.fs-lyric-line.is-singer-colored.is-active {
+  color: var(--singer-color);
+  text-shadow: 0 0 40px var(--singer-glow);
+}
+.fs-lyric-line.is-singer-colored.is-active .fs-word-on {
+  color: var(--singer-color);
+}
+/* Overrides the inner <p>'s text-[2.5rem] Tailwind class */
+.fs-lyric-line.is-bg-vocal p {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+.fs-lyric-line.is-bg-vocal {
+  opacity: 0.72;
 }
 
 .fs-slide-up-enter-active,

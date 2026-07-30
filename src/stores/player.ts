@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { pluginBus } from '@/plugins/eventBus'
+import { DEFAULT_SINGER_COLORS, SINGER_ORDER, type SingerId } from '@/utils/lyricSingers'
 
 // Lazy accessor for library store to avoid circular dependency
 // Must not use require() — Vite doesn't resolve @/ aliases in require() calls
@@ -330,6 +331,12 @@ export const usePlayerStore = defineStore('player', () => {
   const lyricsTranslationLang = ref('system')
   // Independent of translation language — romanizes the original line (e.g. Japanese → rōmaji)
   const lyricsShowRomaji = ref(false)
+  // Duet display: align each line by its singer. Inert on tracks with no
+  // singer markings, so it's safe to leave on.
+  const lyricsPerSinger = ref(true)
+  // Colour-coding is opt-in: Apple Music's Duet View uses position alone.
+  const lyricsSingerColorsEnabled = ref(false)
+  const lyricsSingerColors = ref<Record<SingerId, string>>({ ...DEFAULT_SINGER_COLORS })
 
   // ── Waveform data ──────────────────────────────────────────────────────
   const waveformData = ref<number[]>([])
@@ -644,6 +651,18 @@ export const usePlayerStore = defineStore('player', () => {
     if (s.lyricsOffset !== undefined) lyricsOffset.value = s.lyricsOffset
     if (typeof s.showLyricsTranslation === 'boolean') showLyricsTranslation.value = s.showLyricsTranslation
     if (typeof s.lyricsTranslationLang === 'string') lyricsTranslationLang.value = s.lyricsTranslationLang
+    if (typeof s.lyricsPerSinger === 'boolean') lyricsPerSinger.value = s.lyricsPerSinger
+    if (typeof s.lyricsSingerColorsEnabled === 'boolean') lyricsSingerColorsEnabled.value = s.lyricsSingerColorsEnabled
+    if (s.lyricsSingerColors && typeof s.lyricsSingerColors === 'object') {
+      // Only adopt keys we know, so a stale/hand-edited settings file can't
+      // inject junk into the colour map
+      const restored = { ...DEFAULT_SINGER_COLORS }
+      for (const id of SINGER_ORDER) {
+        const value = s.lyricsSingerColors[id]
+        if (typeof value === 'string' && /^#[0-9a-f]{3,8}$/i.test(value)) restored[id] = value
+      }
+      lyricsSingerColors.value = restored
+    }
     if (typeof s.lyricsShowRomaji === 'boolean') {
       lyricsShowRomaji.value = s.lyricsShowRomaji
     } else if (s.lyricsTranslationLang === 'romaji') {
@@ -1435,6 +1454,26 @@ export const usePlayerStore = defineStore('player', () => {
     window.api.mergeSettings({ lyricsShowRomaji: enabled })
   }
 
+  function setLyricsPerSinger(enabled: boolean) {
+    lyricsPerSinger.value = enabled
+    window.api.mergeSettings({ lyricsPerSinger: enabled })
+  }
+
+  function setLyricsSingerColorsEnabled(enabled: boolean) {
+    lyricsSingerColorsEnabled.value = enabled
+    window.api.mergeSettings({ lyricsSingerColorsEnabled: enabled })
+  }
+
+  function setLyricsSingerColor(singer: SingerId, color: string) {
+    lyricsSingerColors.value = { ...lyricsSingerColors.value, [singer]: color }
+    window.api.mergeSettings({ lyricsSingerColors: { ...lyricsSingerColors.value } })
+  }
+
+  function resetLyricsSingerColors() {
+    lyricsSingerColors.value = { ...DEFAULT_SINGER_COLORS }
+    window.api.mergeSettings({ lyricsSingerColors: { ...DEFAULT_SINGER_COLORS } })
+  }
+
   function setWaveformEnabled(enabled: boolean) {
     waveformEnabled.value = enabled
     window.api.mergeSettings({ waveformEnabled: enabled })
@@ -1724,6 +1763,13 @@ export const usePlayerStore = defineStore('player', () => {
     setLyricsTranslationLang,
     lyricsShowRomaji,
     setLyricsShowRomaji,
+    lyricsPerSinger,
+    setLyricsPerSinger,
+    lyricsSingerColorsEnabled,
+    setLyricsSingerColorsEnabled,
+    lyricsSingerColors,
+    setLyricsSingerColor,
+    resetLyricsSingerColors,
     // Waveform
     waveformData,
     waveformEnabled,

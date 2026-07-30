@@ -406,27 +406,6 @@
       </div>
     </section>
 
-    <!-- ── Search ────────────────────────────────────────────────── -->
-    <section v-show="showSection('general', 'Search')" class="mb-8">
-      <h2 class="text-lg font-semibold text-white mb-4">Search</h2>
-      <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
-        <div>
-          <p class="text-sm text-white/80">Search in Lyrics</p>
-          <p class="text-xs text-white/30 mt-0.5">Include downloaded .lrc lyrics files when searching your library</p>
-        </div>
-        <button
-          @click="library.setSearchLyricsEnabled(!library.searchLyricsEnabled)"
-          class="relative w-11 h-6 rounded-full transition-colors duration-200"
-          :class="library.searchLyricsEnabled ? 'bg-accent' : 'bg-white/15'"
-        >
-          <div
-            class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
-            :class="library.searchLyricsEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'"
-          />
-        </button>
-      </div>
-    </section>
-
     <!-- ── Audio Output ───────────────────────────────────────────── -->
     <section v-show="showSection('general', 'Audio Output')" class="mb-8">
       <h2 class="text-lg font-semibold text-white mb-4">Audio Output</h2>
@@ -576,7 +555,13 @@
             <span class="text-xs text-white/60 tabular-nums w-8">{{ player.crossfadeDuration }}s</span>
           </div>
         </div>
+      </div>
+    </section>
 
+    <!-- ── Lyrics ────────────────────────────────────────────────── -->
+    <section v-show="showSection('general', 'Lyrics')" class="mb-8">
+      <h2 class="text-lg font-semibold text-white mb-4">Lyrics</h2>
+      <div class="space-y-4">
         <!-- Lyrics translation -->
         <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
           <div>
@@ -591,24 +576,6 @@
             <div
               class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
               :class="player.showLyricsTranslation ? 'translate-x-[22px]' : 'translate-x-0.5'"
-            />
-          </button>
-        </div>
-
-        <!-- Show romaji -->
-        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
-          <div>
-            <p class="text-sm text-white/80">Show Romaji</p>
-            <p class="text-xs text-white/30 mt-0.5">Romanize the original line (e.g. Japanese → rōmaji), shown above the translation</p>
-          </div>
-          <button
-            @click="player.setLyricsShowRomaji(!player.lyricsShowRomaji)"
-            class="relative w-11 h-6 rounded-full transition-colors duration-200"
-            :class="player.lyricsShowRomaji ? 'bg-accent' : 'bg-white/15'"
-          >
-            <div
-              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
-              :class="player.lyricsShowRomaji ? 'translate-x-[22px]' : 'translate-x-0.5'"
             />
           </button>
         </div>
@@ -654,6 +621,85 @@
           </div>
         </div>
 
+        <!-- Show romaji -->
+        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">Show Romaji</p>
+            <p class="text-xs text-white/30 mt-0.5">Romanize the original line (e.g. Japanese → rōmaji), shown above the translation</p>
+          </div>
+          <button
+            @click="player.setLyricsShowRomaji(!player.lyricsShowRomaji)"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="player.lyricsShowRomaji ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
+              :class="player.lyricsShowRomaji ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
+
+        <!-- Per-singer lyrics -->
+        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">Per-Singer Lyrics</p>
+            <p class="text-xs text-white/30 mt-0.5">Align and colour each line by singer for duets — assign singers from the lyrics toolbar</p>
+          </div>
+          <button
+            @click="player.setLyricsPerSinger(!player.lyricsPerSinger)"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="player.lyricsPerSinger ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
+              :class="player.lyricsPerSinger ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
+
+        <!-- Singer colour-coding -->
+        <div v-if="player.lyricsPerSinger" class="px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-sm text-white/80">Colour-Code Singers</p>
+              <p class="text-xs text-white/30 mt-0.5">Off by default — Apple Music separates singers by position alone</p>
+            </div>
+            <button
+              @click="player.setLyricsSingerColorsEnabled(!player.lyricsSingerColorsEnabled)"
+              class="relative w-11 h-6 rounded-full transition-colors duration-200 shrink-0"
+              :class="player.lyricsSingerColorsEnabled ? 'bg-accent' : 'bg-white/15'"
+            >
+              <div
+                class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
+                :class="player.lyricsSingerColorsEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'"
+              />
+            </button>
+          </div>
+
+          <div v-if="player.lyricsSingerColorsEnabled" class="mt-3 pt-3 border-t border-white/[0.06] flex items-center gap-4 flex-wrap">
+            <label
+              v-for="id in SINGER_ORDER"
+              :key="id"
+              class="flex items-center gap-2 cursor-pointer"
+              :title="`Pick a colour for ${SINGER_LABELS[id]}`"
+            >
+              <input
+                type="color"
+                :value="player.lyricsSingerColors[id]"
+                @input="player.setLyricsSingerColor(id, ($event.target as HTMLInputElement).value)"
+                class="singer-color-input"
+              />
+              <span class="text-xs text-white/50">{{ SINGER_LABELS[id] }}</span>
+            </label>
+            <button
+              @click="player.resetLyricsSingerColors()"
+              class="ml-auto px-3 py-1.5 rounded-lg text-xs font-medium bg-white/[0.08] hover:bg-white/[0.12] text-white/60 hover:text-white/80 transition-all"
+            >
+              Reset colours
+            </button>
+          </div>
+        </div>
+
         <!-- Lyrics offset -->
         <div class="px-4 py-3 rounded-xl bg-white/[0.05]">
           <div class="flex items-center justify-between mb-2">
@@ -677,6 +723,24 @@
             <button @click="adjustLyricsOffset(0.5)" class="w-8 h-8 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] text-white/60 flex items-center justify-center transition-colors text-sm font-bold">+</button>
             <button @click="resetLyricsOffset" class="text-xs text-white/30 hover:text-white/60 transition-colors">Reset</button>
           </div>
+        </div>
+
+        <!-- Search in lyrics -->
+        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">Search in Lyrics</p>
+            <p class="text-xs text-white/30 mt-0.5">Include downloaded .lrc lyrics files when searching your library</p>
+          </div>
+          <button
+            @click="library.setSearchLyricsEnabled(!library.searchLyricsEnabled)"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200"
+            :class="library.searchLyricsEnabled ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
+              :class="library.searchLyricsEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
         </div>
       </div>
     </section>
@@ -1802,6 +1866,7 @@ import { useRegistryStore } from '@/stores/registry'
 import { useSyncStore } from '@/stores/sync'
 import { useToast } from '@/composables/useToast'
 import { getPluginSettingsSchema, notifyPluginSettingChanged } from '@/plugins'
+import { SINGER_ORDER, SINGER_LABELS } from '@/utils/lyricSingers'
 import type { PluginSettingField } from '@/types/plugin'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import HubPanel from '@/components/HubPanel.vue'
@@ -1898,9 +1963,9 @@ const sectionKeywords: Record<string, string[]> = {
   'Album Display': ['soundtrack', 'singles', 'tags', 'auto-tag', 'display', 'covers'],
   'Missing Tracks': ['missing', 'incomplete', 'tracklist', 'greyed', 'grayed', 'itunes', 'complete album'],
   'Discord Rich Presence': ['discord', 'rpc', 'activity', 'presence', 'status'],
-  'Search': ['search lyrics', 'lyrics search'],
   'Audio Output': ['audio', 'output', 'device', 'speaker', 'sound', 'sink'],
-  'Playback': ['playback', 'queue', 'shuffle', 'crossfade', 'player', 'volume', 'gapless', 'lyrics', 'translation', 'translate', 'language'],
+  'Playback': ['playback', 'queue', 'shuffle', 'crossfade', 'player', 'volume', 'gapless', 'normalization'],
+  'Lyrics': ['lyrics', 'lrc', 'translation', 'translate', 'language', 'romaji', 'romanize', 'singer', 'singers', 'duet', 'per-singer', 'background vocals', 'offset', 'timing', 'sync', 'search lyrics', 'lyrics search'],
   'Appearance': ['theme', 'color', 'accent', 'font', 'ui', 'dark', 'window', 'opacity', 'blur'],
   'Animated Covers': ['animation', 'cover', 'album art', 'animated'],
   'Behavior': ['behavior', 'window', 'minimize', 'tray', 'startup', 'close'],
@@ -1927,8 +1992,8 @@ function showSection(tabId: string, heading: string): boolean {
 const sectionTabMap: Record<string, string> = {
   'Music Folders': 'general', 'Library': 'general', 'Album Display': 'general',
   'Missing Tracks': 'general',
-  'Discord Rich Presence': 'integrations', 'Search': 'general', 'Audio Output': 'general',
-  'Playback': 'general', 'Appearance': 'appearance', 'Animated Covers': 'appearance',
+  'Discord Rich Presence': 'integrations', 'Audio Output': 'general',
+  'Playback': 'general', 'Lyrics': 'general', 'Appearance': 'appearance', 'Animated Covers': 'appearance',
   'Behavior': 'general', 'Scrobbling': 'integrations', 'Navidrome / Subsonic': 'integrations',
   'Remote Control': 'integrations', 'Cache': 'system', 'Sync Folder': 'sync',
   'Export / Import': 'system', 'Troubleshooting': 'system', 'Themes': 'appearance',
@@ -2793,4 +2858,24 @@ async function openLogFile() {
 .dropdown-leave-active { transition: all 0.1s ease-in; }
 .dropdown-enter-from, .dropdown-leave-to { opacity: 0; transform: translateY(-4px); }
 .dropdown-enter-to, .dropdown-leave-from { opacity: 1; transform: translateY(0); }
+
+/* Native colour picker, restyled as a small round swatch */
+.singer-color-input {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 0.15);
+  border-radius: 9999px;
+  background: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.singer-color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.singer-color-input::-webkit-color-swatch {
+  border: none;
+  border-radius: 9999px;
+}
 </style>

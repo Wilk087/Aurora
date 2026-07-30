@@ -1,3 +1,11 @@
+import {
+  SINGER_PREFIX_RE,
+  parseSingerToken,
+  formatSingerToken,
+  type SingerId,
+  type SingerMark,
+} from './lyricSingers'
+
 export interface LyricWord {
   time: number // seconds (when this word starts)
   text: string
@@ -9,6 +17,8 @@ export interface LyricLine {
   words?: LyricWord[] // present if enhanced LRC format
   translation?: string // optional translated line (e.g. from Netease tlyric)
   pronunciation?: string // optional romanized line (e.g. romaji)
+  singer?: SingerId // optional vocalist, for per-singer (duet) display
+  background?: boolean // background vocal (Apple's ttm:role="x-bg" equivalent)
 }
 
 function parseTime(min: string, sec: string, frac?: string): number {
@@ -46,7 +56,20 @@ export function parseLRC(lrcContent: string): LyricLine[] {
 
     if (timestamps.length === 0) continue
 
-    const afterTimestamps = line.substring(lastIndex)
+    let afterTimestamps = line.substring(lastIndex)
+
+    // A speaker prefix ("v2: ", "F: ", "v2+bg: ", …) marks who sings the line.
+    // Strip it before word parsing so it never shows up as lyric text. Only
+    // recognised tags are stripped, so a line like "So: …" stays intact.
+    let mark: SingerMark = {}
+    const prefixMatch = afterTimestamps.match(SINGER_PREFIX_RE)
+    if (prefixMatch) {
+      const parsed = parseSingerToken(prefixMatch[1])
+      if (parsed) {
+        mark = parsed
+        afterTimestamps = afterTimestamps.slice(prefixMatch[0].length)
+      }
+    }
 
     // Parse word-level timestamps if present
     const wordMatches: Array<{ time: number; index: number; length: number }> = []
@@ -85,7 +108,7 @@ export function parseLRC(lrcContent: string): LyricLine[] {
     }
 
     for (const time of timestamps) {
-      lyrics.push({ time, text, words })
+      lyrics.push({ time, text, words, singer: mark.singer, background: mark.background })
     }
   }
 
@@ -117,6 +140,26 @@ export function findCurrentWord(words: LyricWord[], currentTime: number): number
   return -1
 }
 
+/** Index a secondary LRC string by rounded timestamp (10ms precision) */
+function buildTimeMap(secondaryLrc: string): Map<number, string> {
+  const map = new Map<number, string>()
+  for (const line of parseLRC(secondaryLrc)) {
+    if (line.text) map.set(Math.round(line.time * 100), line.text)
+  }
+  return map
+}
+
+/** Exact timestamp match, else the nearest entry within ±500ms */
+function lookupNear(map: Map<number, string>, time: number): string | undefined {
+  const key = Math.round(time * 100)
+  if (map.has(key)) return map.get(key)
+  for (let delta = 1; delta <= 50; delta++) {
+    if (map.has(key + delta)) return map.get(key + delta)
+    if (map.has(key - delta)) return map.get(key - delta)
+  }
+  return undefined
+}
+
 /**
  * Merge a secondary LRC string (translation or pronunciation) into an existing
  * lyrics array. Matches lines by timestamp (within 500ms tolerance) and
@@ -127,25 +170,12 @@ function mergeLrcField(
   secondaryLrc: string,
   field: 'translation' | 'pronunciation',
 ): LyricLine[] {
-  const secondaryLines = parseLRC(secondaryLrc)
-  if (secondaryLines.length === 0) return lyrics
-
-  // Build map keyed by rounded timestamp (10ms precision)
-  const map = new Map<number, string>()
-  for (const sl of secondaryLines) {
-    if (sl.text) map.set(Math.round(sl.time * 100), sl.text)
-  }
+  const map = buildTimeMap(secondaryLrc)
+  if (map.size === 0) return lyrics
 
   return lyrics.map(line => {
-    const key = Math.round(line.time * 100)
-    // Exact match first
-    if (map.has(key)) return { ...line, [field]: map.get(key) }
-    // Fuzzy match within ±500ms (50 units at 10ms resolution)
-    for (let delta = 1; delta <= 50; delta++) {
-      if (map.has(key + delta)) return { ...line, [field]: map.get(key + delta) }
-      if (map.has(key - delta)) return { ...line, [field]: map.get(key - delta) }
-    }
-    return line
+    const value = lookupNear(map, line.time)
+    return value === undefined ? line : { ...line, [field]: value }
   })
 }
 
@@ -157,4 +187,37 @@ export function mergeTranslations(lyrics: LyricLine[], translationLrc: string): 
 /** Merge a pronunciation (e.g. romaji) LRC string into an existing lyrics array. */
 export function mergePronunciations(lyrics: LyricLine[], pronunciationLrc: string): LyricLine[] {
   return mergeLrcField(lyrics, pronunciationLrc, 'pronunciation')
+}
+
+/**
+ * Merge a singers sidecar (`[mm:ss.xx]v2`, `[mm:ss.xx]v2+bg`, …) into an
+ * existing lyrics array. Unrecognised markings are ignored.
+ */
+export function mergeSingers(lyrics: LyricLine[], singersLrc: string): LyricLine[] {
+  const map = buildTimeMap(singersLrc)
+  if (map.size === 0) return lyrics
+
+  return lyrics.map(line => {
+    const mark = parseSingerToken(lookupNear(map, line.time))
+    return mark ? { ...line, singer: mark.singer, background: mark.background } : line
+  })
+}
+
+function formatLrcTime(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = Math.floor(seconds % 60)
+  const cs = Math.floor((seconds % 1) * 100)
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  return `${pad(m)}:${pad(s)}.${pad(cs)}`
+}
+
+/** Serialize per-line vocal markings into a `.singers.lrc` sidecar. */
+export function serializeSingers(
+  lines: Array<{ time: number; singer?: SingerId; background?: boolean }>,
+): string {
+  return lines
+    .map(line => ({ time: line.time, token: formatSingerToken(line) }))
+    .filter(entry => entry.token)
+    .map(entry => `[${formatLrcTime(entry.time)}]${entry.token}`)
+    .join('\n')
 }

@@ -860,11 +860,12 @@ async function parseTrack(filePath: string): Promise<any> {
 }
 
 // ── Lyrics ─────────────────────────────────────────────────────────────────
-async function findLocalLyrics(audioPath: string): Promise<{ lrc: string; translation?: string } | null> {
+async function findLocalLyrics(audioPath: string): Promise<{ lrc: string; translation?: string; singers?: string } | null> {
   const dir = dirname(audioPath)
   const name = basename(audioPath, extname(audioPath))
   const lrcPath = join(dir, `${name}.lrc`)
   const tranPath = join(dir, `${name}.translation.lrc`)
+  const singersPath = join(dir, `${name}.singers.lrc`)
 
   try {
     if (existsSync(lrcPath)) {
@@ -873,7 +874,11 @@ async function findLocalLyrics(audioPath: string): Promise<{ lrc: string; transl
       try {
         if (existsSync(tranPath)) translation = await readFile(tranPath, 'utf-8')
       } catch {}
-      return { lrc, translation }
+      let singers: string | undefined
+      try {
+        if (existsSync(singersPath)) singers = await readFile(singersPath, 'utf-8')
+      } catch {}
+      return { lrc, translation, singers }
     }
   } catch {}
 
@@ -1347,6 +1352,17 @@ async function saveTranslationFile(audioPath: string, translationContent: string
     await writeFile(tranPath, translationContent, 'utf-8')
   } catch (err) {
     logger.error('Failed to save .translation.lrc file:', err)
+  }
+}
+
+async function saveSingersFile(audioPath: string, singersContent: string): Promise<void> {
+  const dir = dirname(audioPath)
+  const name = basename(audioPath, extname(audioPath))
+  const singersPath = join(dir, `${name}.singers.lrc`)
+  try {
+    await writeFile(singersPath, singersContent, 'utf-8')
+  } catch (err) {
+    logger.error('Failed to save .singers.lrc file:', err)
   }
 }
 
@@ -3069,6 +3085,12 @@ app.whenReady().then(async () => {
   ipcMain.handle('lyrics:save-translation', async (_, trackPath: string, translationContent: string) => {
     if (trackPath.startsWith('subsonic://')) return
     await saveTranslationFile(trackPath, translationContent)
+  })
+
+  // ── IPC: Save per-singer assignments (.singers.lrc next to the track) ──
+  ipcMain.handle('lyrics:save-singers', async (_, trackPath: string, singersContent: string) => {
+    if (trackPath.startsWith('subsonic://')) return
+    await saveSingersFile(trackPath, singersContent)
   })
 
   ipcMain.handle('lyrics:search', async (_, query: string, tracks: { id: string; path: string }[]) => {

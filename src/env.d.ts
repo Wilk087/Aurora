@@ -147,7 +147,7 @@ interface Window {
     getFolders: () => Promise<string[]>
     removeFolder: (path: string) => Promise<{ folders: string[]; tracks: Track[] }>
     openFolderDialog: () => Promise<string | null>
-    getLyrics: (trackPath: string) => Promise<{ lrc: string; translation?: string } | null>
+    getLyrics: (trackPath: string) => Promise<{ lrc: string; translation?: string; singers?: string } | null>
     fetchOnlineLyrics: (trackInfo: { path: string; title: string; artist: string; album: string; duration: number }) => Promise<{ lrc: string; translation?: string } | null>
     translateLyrics: (payload: { lrc: string; translation?: string }) => Promise<{ translation?: string; pronunciation?: string } | null>
     minimize: () => void
@@ -280,6 +280,7 @@ interface Window {
     // LRC save / search
     saveLyrics: (trackPath: string, lrcContent: string) => Promise<void>
     saveLyricsTranslation: (trackPath: string, translationContent: string) => Promise<void>
+    saveLyricsSingers: (trackPath: string, singersContent: string) => Promise<void>
     searchLyrics: (query: string, tracks: { id: string; path: string }[]) => Promise<string[]>
     // App version & update checking
     getAppVersion: () => Promise<string>
