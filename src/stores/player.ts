@@ -1134,7 +1134,6 @@ export const usePlayerStore = defineStore('player', () => {
     const nextTrack = cfNextTrack
     const nextIdx = cfNextIndex
     const savedSrc = audioNext.src
-    const savedPos = audioNext.currentTime
     // Keep next audible, silence main while we reload it
     if (audioCtx && mainFadeGain && nextFadeGain) {
       const now = audioCtx.currentTime
@@ -1153,12 +1152,45 @@ export const usePlayerStore = defineStore('player', () => {
     // Load next track into main audio element (audioNext covers audio during this gap)
     audio.src = savedSrc
     audio.load()
+    // Wait until the element is actually seekable. `canplay` alone isn't enough
+    // on a cold file, and seeking a not-ready element is silently dropped —
+    // which would restart the track from 0 right after the listener heard it
+    // fade in. audioNext stays audible for the whole wait, so waiting is safe.
     await new Promise<void>(resolve => {
-      audio.addEventListener('canplay', () => resolve(), { once: true })
-      audio.addEventListener('error', () => resolve(), { once: true })
-      setTimeout(resolve, 2000)
+      if (audio.readyState >= 2) { resolve(); return }
+      const done = () => {
+        clearTimeout(timer)
+        audio.removeEventListener('canplay', done)
+        audio.removeEventListener('loadeddata', done)
+        audio.removeEventListener('error', done)
+        resolve()
+      }
+      const timer = setTimeout(done, 4000)
+      audio.addEventListener('canplay', done)
+      audio.addEventListener('loadeddata', done)
+      audio.addEventListener('error', done)
     })
-    audio.currentTime = Math.min(savedPos, audio.duration || Infinity)
+    // The user may have skipped during the reload above. cancelCrossfade()
+    // already restored the gains and the caller is loading its own track, so
+    // don't fight it by finishing this hand-off.
+    if (!isCrossfading) return
+    // Read the hand-off position *now*, not before the reload: a cold load can
+    // take hundreds of ms, and seeking to a stale position replays audio the
+    // listener just heard.
+    const handoffPos = Math.min(audioNext.currentTime, audio.duration || Infinity)
+    if (audio.readyState >= 2 && Number.isFinite(handoffPos) && handoffPos > 0) {
+      // Confirm the seek landed before handing the gains over
+      await new Promise<void>(resolve => {
+        const done = () => {
+          clearTimeout(timer)
+          audio.removeEventListener('seeked', done)
+          resolve()
+        }
+        const timer = setTimeout(done, 1000)
+        audio.addEventListener('seeked', done)
+        audio.currentTime = handoffPos
+      })
+    }
     await audio.play().catch(() => {})
     // Switch gains: bring main back up, silence next
     if (audioCtx && mainFadeGain && nextFadeGain) {
