@@ -338,6 +338,90 @@ export const usePlayerStore = defineStore('player', () => {
   const lyricsSingerColorsEnabled = ref(false)
   const lyricsSingerColors = ref<Record<SingerId, string>>({ ...DEFAULT_SINGER_COLORS })
 
+  // ── Session restore (queue + position across restarts) ──────────────────
+  const rememberQueue = ref(true)
+  const SESSION_SAVE_INTERVAL = 5000
+  let lastSessionSave = 0
+
+  /**
+   * Persist the queue and playhead so the next launch can pick up where this
+   * one left off. Throttled — it's driven by timeupdate, which fires ~4×/s.
+   */
+  function persistSession(force = false) {
+    if (!rememberQueue.value) return
+    const track = currentTrack.value
+    if (!track || queue.value.length === 0) return
+
+    const now = Date.now()
+    if (!force && now - lastSessionSave < SESSION_SAVE_INTERVAL) return
+    lastSessionSave = now
+
+    window.api.savePlaybackState({
+      trackIds: queue.value.map(t => t.id),
+      // Stored separately from the index so a queue that loses tracks (files
+      // moved, subsonic offline) still resumes the right song.
+      currentTrackId: track.id,
+      position: activeAudio().currentTime || 0,
+      savedAt: now,
+    }).catch(() => {})
+  }
+
+  function setRememberQueue(enabled: boolean) {
+    rememberQueue.value = enabled
+    window.api.mergeSettings({ rememberQueue: enabled })
+    if (enabled) persistSession(true)
+    else window.api.clearPlaybackState().catch(() => {})
+  }
+
+  /**
+   * Rebuild the last session's queue and cue the saved track at its saved
+   * position, left paused. Called once at startup after the library loads —
+   * tracks are resolved by id, so local, subsonic and plugin tracks all work
+   * as long as their source finished loading.
+   */
+  async function restoreSession() {
+    if (!rememberQueue.value) return
+    if (queue.value.length > 0) return // something already started playing
+
+    const saved = await window.api.loadPlaybackState().catch(() => null)
+    if (!saved?.trackIds?.length) return
+
+    const lib = getLibStore()
+    if (!lib) return
+    const byId = new Map<string, Track>(lib.tracks.map((t: Track) => [t.id, t]))
+    const restored = saved.trackIds.map(id => byId.get(id)).filter(Boolean) as Track[]
+    if (restored.length === 0) return
+
+    const idx = restored.findIndex(t => t.id === saved.currentTrackId)
+    if (idx < 0) return // the track we were on is gone — don't guess
+
+    queue.value = restored
+    currentIndex.value = idx
+    const track = restored[idx]
+    await loadTrack(track, { silent: true })
+
+    const position = Math.min(Math.max(saved.position || 0, 0), track.duration || Infinity)
+    if (position > 0) await seekWhenReady(activeAudio(), position)
+    currentTime.value = position
+  }
+
+  /** Seek an element that may still be loading (restore happens right after src is set) */
+  function seekWhenReady(el: HTMLAudioElement, position: number): Promise<void> {
+    return new Promise(resolve => {
+      const apply = () => {
+        clearTimeout(timer)
+        el.removeEventListener('loadedmetadata', apply)
+        el.removeEventListener('canplay', apply)
+        try { el.currentTime = position } catch { /* not seekable */ }
+        resolve()
+      }
+      const timer = setTimeout(apply, 4000)
+      if (el.readyState >= 1) { apply(); return }
+      el.addEventListener('loadedmetadata', apply)
+      el.addEventListener('canplay', apply)
+    })
+  }
+
   // ── Waveform data ──────────────────────────────────────────────────────
   const waveformData = ref<number[]>([])
   const waveformEnabled = ref(true)
@@ -487,6 +571,7 @@ export const usePlayerStore = defineStore('player', () => {
   // ── Audio event listeners ────────────────────────────────────────────────
   audio.addEventListener('timeupdate', () => {
     currentTime.value = audio.currentTime
+    persistSession()
     // Scrobble after listening to 50% or 4 minutes, whichever is first
     if (scrobblingEnabled && !scrobbleReported && currentTrack.value && duration.value > 30) {
       const threshold = Math.min(duration.value * 0.5, 240)
@@ -568,6 +653,7 @@ export const usePlayerStore = defineStore('player', () => {
   // ── audioStream event listeners (mirrors audio's, but reads from audioStream) ──
   audioStream.addEventListener('timeupdate', () => {
     currentTime.value = audioStream.currentTime
+    persistSession()
     if (scrobblingEnabled && !scrobbleReported && currentTrack.value && duration.value > 30) {
       const threshold = Math.min(duration.value * 0.5, 240)
       if (audioStream.currentTime >= threshold) {
@@ -651,6 +737,7 @@ export const usePlayerStore = defineStore('player', () => {
     if (s.lyricsOffset !== undefined) lyricsOffset.value = s.lyricsOffset
     if (typeof s.showLyricsTranslation === 'boolean') showLyricsTranslation.value = s.showLyricsTranslation
     if (typeof s.lyricsTranslationLang === 'string') lyricsTranslationLang.value = s.lyricsTranslationLang
+    if (typeof s.rememberQueue === 'boolean') rememberQueue.value = s.rememberQueue
     if (typeof s.lyricsPerSinger === 'boolean') lyricsPerSinger.value = s.lyricsPerSinger
     if (typeof s.lyricsSingerColorsEnabled === 'boolean') lyricsSingerColorsEnabled.value = s.lyricsSingerColorsEnabled
     if (s.lyricsSingerColors && typeof s.lyricsSingerColors === 'object') {
@@ -873,7 +960,8 @@ export const usePlayerStore = defineStore('player', () => {
   })
 
   // ── Internal helpers ─────────────────────────────────────────────────────
-  async function loadTrack(track: Track) {
+  /** `silent` skips the "now playing" scrobble — used when cueing a restored session */
+  async function loadTrack(track: Track, opts?: { silent?: boolean }) {
     cancelCrossfade()
     currentTrack.value = track
     duration.value = track.duration || 0
@@ -953,7 +1041,7 @@ export const usePlayerStore = defineStore('player', () => {
     }
 
     // Scrobble: update now playing
-    if (scrobblingEnabled) {
+    if (scrobblingEnabled && !opts?.silent) {
       window.api.updateNowPlaying({
         title: track.title,
         artist: track.artist,
@@ -1244,6 +1332,8 @@ export const usePlayerStore = defineStore('player', () => {
   function pause() {
     activeAudio().pause()
     if (isCrossfading) audioNext.pause()
+    // Save immediately — pausing then quitting is the common way to leave
+    persistSession(true)
   }
 
   function togglePlay() {
@@ -1795,6 +1885,9 @@ export const usePlayerStore = defineStore('player', () => {
     setLyricsTranslationLang,
     lyricsShowRomaji,
     setLyricsShowRomaji,
+    rememberQueue,
+    setRememberQueue,
+    restoreSession,
     lyricsPerSinger,
     setLyricsPerSinger,
     lyricsSingerColorsEnabled,

@@ -2071,6 +2071,35 @@ app.whenReady().then(async () => {
     state:  appPaths.state,
   }))
 
+  // ── IPC: Playback session (queue + position across restarts) ──
+  // Kept in the XDG state dir rather than settings.json — a queue can be
+  // thousands of track ids, and settings.json is rewritten on every merge.
+  const playbackStatePath = join(appPaths.state, 'playback-state.json')
+
+  ipcMain.handle('playback:save-state', async (_, state: unknown) => {
+    try {
+      await writeFile(playbackStatePath, JSON.stringify(state), 'utf-8')
+    } catch (err) {
+      logger.error('Failed to save playback state:', err)
+    }
+  })
+
+  ipcMain.handle('playback:load-state', async () => {
+    try {
+      if (!existsSync(playbackStatePath)) return null
+      return JSON.parse(await readFile(playbackStatePath, 'utf-8'))
+    } catch (err) {
+      logger.error('Failed to read playback state:', err)
+      return null
+    }
+  })
+
+  ipcMain.handle('playback:clear-state', async () => {
+    try {
+      if (existsSync(playbackStatePath)) await unlink(playbackStatePath)
+    } catch { /* nothing to clear */ }
+  })
+
   // ── IPC: Settings ──
   ipcMain.handle('settings:get', async () => await loadSettings())
   ipcMain.handle('settings:set', async (_, settings: any) => await saveSettings(settings))

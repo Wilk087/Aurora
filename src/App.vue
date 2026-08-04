@@ -140,6 +140,8 @@ onMounted(async () => {
   }
 
   await library.loadLibrary()
+  // Cue the last session's queue (paused) — needs the library resolved first
+  player.restoreSession().catch(() => {})
   await playlistStore.loadPlaylists()
   await favoritesStore.load()
   await tagsStore.load()

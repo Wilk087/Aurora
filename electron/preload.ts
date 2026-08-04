@@ -179,6 +179,12 @@ contextBridge.exposeInMainWorld('api', {
   saveLyrics: (trackPath: string, lrcContent: string) => ipcRenderer.invoke('lyrics:save', trackPath, lrcContent),
   saveLyricsTranslation: (trackPath: string, translationContent: string) => ipcRenderer.invoke('lyrics:save-translation', trackPath, translationContent),
   saveLyricsSingers: (trackPath: string, singersContent: string) => ipcRenderer.invoke('lyrics:save-singers', trackPath, singersContent),
+
+  // Playback session (queue + position across restarts)
+  savePlaybackState: (state: { trackIds: string[]; currentTrackId: string; position: number; savedAt: number }) =>
+    ipcRenderer.invoke('playback:save-state', state),
+  loadPlaybackState: () => ipcRenderer.invoke('playback:load-state'),
+  clearPlaybackState: () => ipcRenderer.invoke('playback:clear-state'),
   searchLyrics: (query: string, tracks: { id: string; path: string }[]) => ipcRenderer.invoke('lyrics:search', query, tracks),
 
   // App version & update checking

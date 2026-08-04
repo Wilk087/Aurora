@@ -526,6 +526,24 @@
           </button>
         </div>
 
+        <!-- Resume last session -->
+        <div class="flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.05]">
+          <div>
+            <p class="text-sm text-white/80">Resume Where You Left Off</p>
+            <p class="text-xs text-white/30 mt-0.5">Restore the queue and playback position on startup - cued up paused, not playing</p>
+          </div>
+          <button
+            @click="player.setRememberQueue(!player.rememberQueue)"
+            class="relative w-11 h-6 rounded-full transition-colors duration-200 shrink-0"
+            :class="player.rememberQueue ? 'bg-accent' : 'bg-white/15'"
+          >
+            <div
+              class="absolute top-0.5 w-5 h-5 rounded-full bg-control shadow transition-transform duration-200"
+              :class="player.rememberQueue ? 'translate-x-[22px]' : 'translate-x-0.5'"
+            />
+          </button>
+        </div>
+
         <!-- Crossfade -->
         <div class="px-4 py-3 rounded-xl bg-white/[0.05]">
           <div class="flex items-center justify-between mb-3">
@@ -1964,7 +1982,7 @@ const sectionKeywords: Record<string, string[]> = {
   'Missing Tracks': ['missing', 'incomplete', 'tracklist', 'greyed', 'grayed', 'itunes', 'complete album'],
   'Discord Rich Presence': ['discord', 'rpc', 'activity', 'presence', 'status'],
   'Audio Output': ['audio', 'output', 'device', 'speaker', 'sound', 'sink'],
-  'Playback': ['playback', 'queue', 'shuffle', 'crossfade', 'player', 'volume', 'gapless', 'normalization'],
+  'Playback': ['playback', 'queue', 'shuffle', 'crossfade', 'player', 'volume', 'gapless', 'normalization', 'resume', 'remember queue', 'restore session', 'continue'],
   'Lyrics': ['lyrics', 'lrc', 'translation', 'translate', 'language', 'romaji', 'romanize', 'singer', 'singers', 'duet', 'per-singer', 'background vocals', 'offset', 'timing', 'sync', 'search lyrics', 'lyrics search'],
   'Appearance': ['theme', 'color', 'accent', 'font', 'ui', 'dark', 'window', 'opacity', 'blur'],
   'Animated Covers': ['animation', 'cover', 'album art', 'animated'],

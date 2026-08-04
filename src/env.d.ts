@@ -281,6 +281,9 @@ interface Window {
     saveLyrics: (trackPath: string, lrcContent: string) => Promise<void>
     saveLyricsTranslation: (trackPath: string, translationContent: string) => Promise<void>
     saveLyricsSingers: (trackPath: string, singersContent: string) => Promise<void>
+    savePlaybackState: (state: { trackIds: string[]; currentTrackId: string; position: number; savedAt: number }) => Promise<void>
+    loadPlaybackState: () => Promise<{ trackIds: string[]; currentTrackId: string; position: number; savedAt: number } | null>
+    clearPlaybackState: () => Promise<void>
     searchLyrics: (query: string, tracks: { id: string; path: string }[]) => Promise<string[]>
     // App version & update checking
     getAppVersion: () => Promise<string>
