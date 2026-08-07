@@ -1470,7 +1470,7 @@ export const usePlayerStore = defineStore('player', () => {
     _disposePreloadCache()
   }
 
-  function removeFromQueue(index: number) {
+  async function removeFromQueue(index: number) {
     if (index < 0 || index >= queue.value.length) return
     if (index === currentIndex.value) {
       // Removing current track – play next if available
@@ -1479,7 +1479,7 @@ export const usePlayerStore = defineStore('player', () => {
         clearQueue()
       } else {
         if (currentIndex.value >= queue.value.length) currentIndex.value = 0
-        loadTrack(queue.value[currentIndex.value])
+        await loadTrack(queue.value[currentIndex.value])
         play()
       }
     } else {
@@ -1489,15 +1489,17 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
-  function playFromQueue(index: number) {
+  async function playFromQueue(index: number) {
     if (index < 0 || index >= queue.value.length) return
     currentIndex.value = index
-    loadTrack(queue.value[index])
+    // Must await: loadTrack sets audio.src asynchronously, and calling play()
+    // before that leaves the element to load the new source while paused.
+    await loadTrack(queue.value[index])
     play()
   }
 
   /** Insert a track right after the currently playing track */
-  function playNext(trackOrTracks: Track | Track[]) {
+  async function playNext(trackOrTracks: Track | Track[]) {
     const tracks = Array.isArray(trackOrTracks) ? trackOrTracks : [trackOrTracks]
     if (tracks.length === 0) return
 
@@ -1506,7 +1508,7 @@ export const usePlayerStore = defineStore('player', () => {
       queue.value = [...tracks]
       originalQueue.value = [...tracks]
       currentIndex.value = 0
-      loadTrack(tracks[0])
+      await loadTrack(tracks[0])
       play()
       return
     }
@@ -1517,7 +1519,7 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   /** Append a track or tracks to the end of the queue */
-  function playLater(trackOrTracks: Track | Track[]) {
+  async function playLater(trackOrTracks: Track | Track[]) {
     const tracks = Array.isArray(trackOrTracks) ? trackOrTracks : [trackOrTracks]
     if (tracks.length === 0) return
 
@@ -1525,7 +1527,7 @@ export const usePlayerStore = defineStore('player', () => {
       queue.value = [...tracks]
       originalQueue.value = [...tracks]
       currentIndex.value = 0
-      loadTrack(tracks[0])
+      await loadTrack(tracks[0])
       play()
       return
     }
