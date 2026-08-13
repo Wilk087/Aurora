@@ -29,12 +29,36 @@ if (!/^\d+\.\d+\.\d+$/.test(release)) {
   process.exit(1)
 }
 
+// The Arch source package runs on the system Electron, so it must depend on the
+// same major the app is built and tested against. Derive it from
+// devDependencies rather than letting someone remember to bump it by hand —
+// that is how the package ended up on electron28 while development moved to 33.
+const electronRange = pkg.devDependencies?.electron ?? ''
+const electronMajor = /(\d+)/.exec(electronRange)?.[1]
+
+if (!electronMajor) {
+  console.error(`could not read an Electron major from devDependencies.electron ("${electronRange}")`)
+  process.exit(1)
+}
+
 /** Files that carry a copy of the version, and how to find it. */
 const targets = [
   {
     file: 'PKGBUILD',
     pattern: /^pkgver=.*$/m,
     replacement: `pkgver=${release}`,
+  },
+  {
+    file: 'PKGBUILD',
+    label: `electron${electronMajor} dependency`,
+    pattern: /^depends=\('electron\d+'(.*)$/m,
+    replacement: (_m, rest) => `depends=('electron${electronMajor}'${rest}`,
+  },
+  {
+    file: 'PKGBUILD',
+    label: `electron${electronMajor} launcher`,
+    pattern: /^exec electron\d+ /m,
+    replacement: `exec electron${electronMajor} `,
   },
   {
     file: 'flake.nix',
@@ -45,19 +69,20 @@ const targets = [
 
 let drift = false
 
-for (const { file, pattern, replacement } of targets) {
+for (const { file, pattern, replacement, label } of targets) {
+  const what = label ?? `version ${release}`
   const path = resolve(root, file)
   const before = readFileSync(path, 'utf-8')
 
   if (!pattern.test(before)) {
-    console.error(`${file}: could not find a version line matching ${pattern}`)
+    console.error(`${file}: could not find a line matching ${pattern}`)
     process.exit(1)
   }
 
   const after = before.replace(pattern, replacement)
 
   if (before === after) {
-    console.log(`  ok       ${file} (${release})`)
+    console.log(`  ok       ${file} (${what})`)
     continue
   }
 
@@ -65,10 +90,10 @@ for (const { file, pattern, replacement } of targets) {
 
   if (check) {
     const currentLine = before.match(pattern)[0].trim()
-    console.error(`  DRIFT    ${file}: has "${currentLine}", expected ${release}`)
+    console.error(`  DRIFT    ${file}: has "${currentLine}", expected ${what}`)
   } else {
     writeFileSync(path, after)
-    console.log(`  updated  ${file} -> ${release}`)
+    console.log(`  updated  ${file} -> ${what}`)
   }
 }
 

@@ -2,6 +2,10 @@
   "compilerOptions": {
     "composite": true,
     "skipLibCheck": true,
+    // Electron 43 runs Node 24 in the main process.
+    "target": "ES2022",
+    // DOM is needed because preload.ts runs in the renderer and touches document.
+    "lib": ["ES2023", "DOM"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,

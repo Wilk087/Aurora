@@ -17,7 +17,7 @@ license=('GPL-3.0-or-later')
 # Must stay on the same Electron major the app is developed and tested against
 # (see devDependencies.electron in package.json). Bumping one without the other
 # ships Arch users a runtime nobody tested.
-depends=('electron33' 'gstreamer' 'gst-plugins-base' 'gst-plugins-good')
+depends=('electron43' 'gstreamer' 'gst-plugins-base' 'gst-plugins-good')
 makedepends=('npm' 'nodejs')
 provides=("${pkgname}=${pkgver}")
 conflicts=("${pkgname}-bin")
@@ -45,7 +45,7 @@ package() {
   install -dm755 "${pkgdir}/usr/bin"
   cat > "${pkgdir}/usr/bin/${pkgname}" << 'EOF'
 #!/bin/bash
-exec electron33 /usr/lib/aurora-player/dist-electron/main.js "$@"
+exec electron43 /usr/lib/aurora-player/dist-electron/main.js "$@"
 EOF
   chmod 755 "${pkgdir}/usr/bin/${pkgname}"
 

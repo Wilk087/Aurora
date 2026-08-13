@@ -220,8 +220,8 @@
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-vue": "^5.2.0",
     "autoprefixer": "^10.5.2",
-    "electron": "^33.4.11",
-    "electron-builder": "^25.1.0",
+    "electron": "^43.4.0",
+    "electron-builder": "^26.15.3",
     "postcss": "^8.5.16",
     "tailwindcss": "^3.4.0",
     "typescript": "^5.7.0",
@@ -232,7 +232,7 @@
     "vue-tsc": "^2.0.0"
   },
   "allowScripts": {
-    "electron@33.4.11": true,
+    "electron@43.4.0": true,
     "esbuild@0.25.12": true,
     "vue-demi@0.14.10": true,
     "usocket@0.3.0": true

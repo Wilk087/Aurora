@@ -212,8 +212,13 @@ sha256sum -c SHA256SUMS.txt --ignore-missing
 
 ### Requirements
 
-- Node.js 18 or later
+- Node.js 20 or later
 - npm
+
+Aurora is built against Electron 43 (Chromium 150, Node 24). The Arch source
+package depends on `electron43` from `extra`; `scripts/sync-version.mjs` keeps
+that in step with `devDependencies.electron`, so bumping Electron in one place
+updates the package too.
 
 ### Setup
 

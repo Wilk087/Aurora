@@ -1588,6 +1588,10 @@ async function createWindow() {
     minWidth: 900,
     minHeight: 600,
     frame: false,
+    // Electron 43 started rounding frameless window corners on Linux by
+    // default. Aurora draws its own corners in CSS, so let it keep doing that
+    // rather than having the compositor round them a second time.
+    roundedCorners: false,
     transparent: isTransparent,
     backgroundColor: isTransparent ? '#00000000' : '#0c0c0c',
     icon: app.isPackaged
@@ -1623,12 +1627,14 @@ async function createWindow() {
   // Prevent Ctrl+click / middle-click on router-links from opening a blank Electron window
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 
-  // Forward renderer console logs to the log file
-  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
-    const src = sourceId ? ` (${sourceId}:${line})` : ''
+  // Forward renderer console logs to the log file.
+  // Electron 35 moved these parameters onto the event object and changed `level`
+  // from a numeric code to a string.
+  mainWindow.webContents.on('console-message', ({ level, message, lineNumber, sourceId }) => {
+    const src = sourceId ? ` (${sourceId}:${lineNumber})` : ''
     const msg = `[renderer]${src} ${message}`
-    if (level === 3) logger.error(msg)
-    else if (level === 2) logger.warn(msg)
+    if (level === 'error') logger.error(msg)
+    else if (level === 'warning') logger.warn(msg)
     else logger.info(msg)
   })
 
@@ -1721,8 +1727,11 @@ if (!gotLock) {
 Menu.setApplicationMenu(null)
 
 // ── Linux display server detection (must run before app.whenReady) ─────────
-// Use ozone-platform-hint=auto so Electron 28 picks Wayland or X11 automatically.
-// We still log which session type was detected for debugging purposes.
+// Electron 38 made ozone-platform-hint=auto the default, so the switch below is
+// now belt-and-braces rather than load-bearing. Kept explicit so the behaviour
+// does not silently change again, and so this still works when the system
+// Electron (Arch source package) lags behind.
+// We log which session type was detected for debugging purposes.
 if (process.platform === 'linux') {
   // Force all GTK file-chooser dialogs to go through the XDG desktop portal
   // (xdg-desktop-portal-kde / -gnome) so the native KDE/GNOME picker is used
