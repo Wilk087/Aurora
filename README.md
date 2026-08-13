@@ -114,27 +114,69 @@ Aurora Player is a local music player for Linux and Windows, built with Electron
 
 ## Installation
 
+Every release publishes the same build to all of the channels below, so they are
+always on the same version.
+
+| Channel | Updates |
+|---|---|
+| AppImage | In-app, automatic |
+| Windows installer | In-app, automatic |
+| Windows portable | Manual download |
+| AUR (`aurora-player-bin`) | `pacman -Syu` |
+| deb / rpm / pacman file | Reinstall the new file |
+| Nix | `nix profile upgrade` |
+
+Aurora detects how it was installed. Package-managed installs are never modified
+in place; they get a notification pointing at the right command instead.
+
 ### Linux -- AppImage
 
 Download the latest `.AppImage` from the [Releases](https://github.com/Wilk087/Aurora/releases) page. Make it executable and run:
 
 ```
-chmod +x Aurora-Player-*.AppImage
-./Aurora-Player-*.AppImage
+chmod +x aurora-player-*.AppImage
+./aurora-player-*.AppImage
 ```
 
-### Linux -- Arch (pacman)
+This build updates itself. When a new release appears, Aurora offers to download
+and apply it without leaving the app.
 
-Download the `.pacman` package from [Releases](https://github.com/Wilk087/Aurora/releases) and install with:
+### Linux -- Arch (AUR)
+
+```
+paru -S aurora-player-bin
+```
+
+`aurora-player-bin` repackages the released AppImage, so there is no build step
+and it stays on the same Electron version as every other channel. It is updated
+automatically whenever a release is tagged.
+
+To build from source instead, use the `PKGBUILD` in this repository:
+
+```
+makepkg -si
+```
+
+Or install a downloaded `.pacman` file directly:
 
 ```
 sudo pacman -U aurora-player-*.pacman
 ```
 
-Or use the PKGBUILD included in the repository to build from source:
+### Linux -- Debian and Ubuntu
+
+Download the `.deb` from [Releases](https://github.com/Wilk087/Aurora/releases):
 
 ```
-makepkg -si
+sudo apt install ./aurora-player-*.deb
+```
+
+### Linux -- Fedora and openSUSE
+
+Download the `.rpm` from [Releases](https://github.com/Wilk087/Aurora/releases):
+
+```
+sudo dnf install ./aurora-player-*.rpm
 ```
 
 ### Linux -- Nix
@@ -154,7 +196,17 @@ nix run
 
 ### Windows
 
-Download the installer (`.exe`) or portable build from the [Releases](https://github.com/Wilk087/Aurora/releases) page.
+Download the installer (`.exe`) from the [Releases](https://github.com/Wilk087/Aurora/releases) page.
+The installer build updates itself in-app; the portable build does not, so you
+will need to download new versions manually.
+
+### Verifying a download
+
+Every release ships a `SHA256SUMS.txt`:
+
+```
+sha256sum -c SHA256SUMS.txt --ignore-missing
+```
 
 ## Development
 
@@ -192,13 +244,40 @@ npm run build
 Build distributable packages:
 
 ```
-npm run dist:pacman       # Arch Linux .pacman package
-npm run dist:appimage     # Linux AppImage
+npm run dist              # All Linux targets (AppImage, pacman, deb, rpm)
+npm run dist:appimage     # Linux AppImage only
+npm run dist:pacman       # Arch Linux .pacman only
+npm run dist:deb          # Debian .deb only
+npm run dist:rpm          # Fedora .rpm only
 npm run dist:win          # Windows installer + portable
-npm run dist:all          # All platforms at once
+npm run dist:all          # Linux and Windows at once
 ```
 
 Built packages are written to the `release/` directory.
+
+Building the `.rpm` target needs the `rpm` tools installed locally, and `.pacman`
+needs `bsdtar` (`libarchive-tools` on Debian and Ubuntu).
+
+### Releasing
+
+The version in `package.json` is the single source of truth. `npm version`
+propagates it to `PKGBUILD` and `flake.nix` automatically via
+`scripts/sync-version.mjs`:
+
+```
+npm version minor          # bumps package.json, PKGBUILD, flake.nix, commits, tags
+git push --follow-tags
+```
+
+Pushing the tag triggers `.github/workflows/release.yml`, which builds every
+target, publishes a GitHub release with checksums, and pushes the updated
+`aurora-player-bin` PKGBUILD to the AUR.
+
+To check for drift without changing anything:
+
+```
+npm run check-version
+```
 
 ## Documentation
 

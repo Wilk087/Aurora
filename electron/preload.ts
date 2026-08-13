@@ -189,7 +189,35 @@ contextBridge.exposeInMainWorld('api', {
 
   // App version & update checking
   getAppVersion: (): Promise<string> => ipcRenderer.invoke('app:get-version'),
-  checkForUpdate: (): Promise<{ currentVersion: string; latestVersion: string; url: string } | null> => ipcRenderer.invoke('app:check-update'),
+  checkForUpdate: (): Promise<{
+    currentVersion: string
+    latestVersion: string
+    url: string
+    source: string
+    /** 'auto' = the app can update itself, 'package-manager' = run `command`, 'manual' = download by hand */
+    method: 'auto' | 'manual' | 'package-manager'
+    command?: string
+  } | null> => ipcRenderer.invoke('app:check-update'),
+
+  /** Only valid when checkForUpdate() reported method === 'auto'. */
+  downloadUpdate: (): Promise<void> => ipcRenderer.invoke('app:download-update'),
+  installUpdate: (): Promise<void> => ipcRenderer.invoke('app:install-update'),
+  getInstallSource: (): Promise<string> => ipcRenderer.invoke('app:get-install-source'),
+
+  onUpdateProgress: (cb: (p: { percent: number; transferred: number; total: number }) => void) => {
+    ipcRenderer.on('update:download-progress', (_, p) => cb(p))
+  },
+  onUpdateDownloaded: (cb: (info: { version: string }) => void) => {
+    ipcRenderer.on('update:downloaded', (_, info) => cb(info))
+  },
+  onUpdateError: (cb: (info: { message: string }) => void) => {
+    ipcRenderer.on('update:error', (_, info) => cb(info))
+  },
+  removeUpdateListeners: () => {
+    ipcRenderer.removeAllListeners('update:download-progress')
+    ipcRenderer.removeAllListeners('update:downloaded')
+    ipcRenderer.removeAllListeners('update:error')
+  },
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('app:open-external', url),
 
   // Utility – build a localfile:// URL for local file playback (pass through http(s) URLs)

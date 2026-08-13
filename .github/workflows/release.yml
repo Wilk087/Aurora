@@ -1,0 +1,174 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g. v2.9.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  # ── Refuse to build a tag that disagrees with the files in the repo ────────
+  verify:
+    name: Verify version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - id: version
+        name: Check tag matches package.json
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          TAG_VERSION="${TAG#v}"
+          PKG_VERSION="$(node -p "require('./package.json').version.split('-')[0]")"
+
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag $TAG says $TAG_VERSION but package.json says $PKG_VERSION."
+            echo "::error::Run 'npm version <new>' so every file is bumped together."
+            exit 1
+          fi
+
+          echo "version=$PKG_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building $PKG_VERSION"
+
+      # PKGBUILD and flake.nix must already match package.json.
+      - name: Check version consistency
+        run: npm run check-version
+
+      - name: Test
+        run: npm test
+
+  # ── Build every install target ────────────────────────────────────────────
+  build:
+    name: Build ${{ matrix.name }}
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: Linux
+            # AppImage, pacman, deb, rpm all come from build.linux.target
+            args: --linux
+          - os: windows-latest
+            name: Windows
+            args: --win
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # electron-builder shells out to rpmbuild for the rpm target and to
+      # bsdtar for pacman; neither is on the runner by default.
+      - name: Install Linux packaging tools
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends rpm libarchive-tools
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and publish to draft release
+        run: npx electron-builder ${{ matrix.args }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.name }}
+          path: |
+            release/*.AppImage
+            release/*.pacman
+            release/*.deb
+            release/*.rpm
+            release/*.exe
+          if-no-files-found: error
+          retention-days: 7
+
+  # ── Checksums, then flip the draft release live ───────────────────────────
+  publish:
+    name: Publish release
+    needs: [verify, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Attach checksums and publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: v${{ needs.verify.outputs.version }}
+        run: |
+          gh release upload "$TAG" artifacts/SHA256SUMS.txt --clobber
+          # electron-builder left the release as a draft so that partial
+          # matrix output is never visible; make it live now that every
+          # target succeeded.
+          gh release edit "$TAG" --draft=false --latest
+
+  # ── Push the updated PKGBUILD to the AUR ──────────────────────────────────
+  aur:
+    name: Publish aurora-player-bin to AUR
+    needs: [verify, publish]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-Linux
+          path: artifacts
+
+      - name: Generate PKGBUILD from the released AppImage
+        run: |
+          APPIMAGE="$(ls artifacts/*.AppImage | head -1)"
+          echo "Using $APPIMAGE"
+          node scripts/gen-aur-pkgbuild.mjs "$APPIMAGE" aur/aurora-player-bin
+          cat aur/aurora-player-bin/PKGBUILD
+
+      # Runs makepkg in an Arch container, regenerates .SRCINFO, and pushes.
+      - name: Push to AUR
+        uses: KSXGitHub/github-actions-deploy-aur@v3.0.1
+        with:
+          pkgname: aurora-player-bin
+          pkgbuild: aur/aurora-player-bin/PKGBUILD
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: "Update to ${{ needs.verify.outputs.version }}"
+          ssh_keyscan_types: rsa,ecdsa,ed25519

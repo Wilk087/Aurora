@@ -14,12 +14,14 @@
       {
         packages.default = pkgs.buildNpmPackage rec {
           pname = "aurora-player";
-          version = "2.8.0";
+          version = "2.9.0";
 
           src = ./.;
 
-          VITE_APP_VERSION = version;
-          APP_VERSION = version;
+          # `version` above is kept in sync with package.json by
+          # scripts/sync-version.mjs. The app itself reads its version from
+          # package.json at build time (see __APP_VERSION__ in vite.config.ts),
+          # so there is nothing to pass through the environment here.
 
           npmDepsHash = "sha256-rOWXF0tMN21pucIF7U5qhTl5kJzFl2N1N+GYESBx1XE="; 
 
@@ -57,6 +59,10 @@
           ];
 
           installPhase = ''
+            # Drop build-only dependencies (electron, electron-builder, vite,
+            # typescript) so they don't end up in the installed closure.
+            npm prune --omit=dev --ignore-scripts
+
             mkdir -p $out/lib/aurora-player
             cp -r dist dist-electron node_modules package.json $out/lib/aurora-player/
 

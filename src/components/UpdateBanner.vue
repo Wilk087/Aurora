@@ -15,11 +15,40 @@
 
           <!-- Content -->
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-white">Update available</p>
-            <p class="text-xs text-white/50 mt-0.5">
-              Aurora Player <span class="text-white/70 font-medium">v{{ latestVersion }}</span> is available.
-              You're on v{{ currentVersion }}.
+            <p class="text-sm font-medium text-white">
+              {{ readyToInstall ? 'Update ready' : 'Update available' }}
             </p>
+            <p class="text-xs text-white/50 mt-0.5">
+              <template v-if="readyToInstall">
+                Aurora Player <span class="text-white/70 font-medium">v{{ latestVersion }}</span> is
+                downloaded. Restart to finish installing.
+              </template>
+              <template v-else>
+                Aurora Player <span class="text-white/70 font-medium">v{{ latestVersion }}</span> is available.
+                You're on v{{ currentVersion }}.
+              </template>
+            </p>
+
+            <!-- Package-managed installs update through their own package manager -->
+            <div v-if="method === 'package-manager' && command" class="mt-2">
+              <p class="text-xs text-white/40">Update through your package manager:</p>
+              <code class="block mt-1 px-2 py-1.5 rounded-lg bg-black/30 text-[11px] text-white/70 font-mono break-all">
+                {{ command }}
+              </code>
+            </div>
+
+            <!-- Download progress -->
+            <div v-if="downloading" class="mt-2">
+              <div class="h-1 rounded-full bg-white/10 overflow-hidden">
+                <div
+                  class="h-full bg-accent transition-[width] duration-200"
+                  :style="{ width: `${Math.round(progress)}%` }"
+                />
+              </div>
+              <p class="text-[11px] text-white/40 mt-1">Downloading… {{ Math.round(progress) }}%</p>
+            </div>
+
+            <p v-if="error" class="text-xs text-red-400/80 mt-2">{{ error }}</p>
           </div>
 
           <!-- Close -->
@@ -36,16 +65,46 @@
         <!-- Actions -->
         <div class="flex gap-2 mt-3 ml-12">
           <button
+            v-if="readyToInstall"
+            @click="restart"
+            class="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-white hover:brightness-110 transition-all"
+          >
+            Restart now
+          </button>
+          <button
+            v-else-if="method === 'auto'"
+            @click="download"
+            :disabled="downloading"
+            class="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-white hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-default"
+          >
+            {{ downloading ? 'Downloading…' : 'Update now' }}
+          </button>
+          <button
+            v-else-if="method === 'package-manager'"
+            @click="copyCommand"
+            class="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-white hover:brightness-110 transition-all"
+          >
+            {{ copied ? 'Copied' : 'Copy command' }}
+          </button>
+          <button
+            v-else
             @click="openRelease"
             class="px-3 py-1.5 text-xs font-medium rounded-lg bg-accent text-white hover:brightness-110 transition-all"
           >
-            View release
+            Download
+          </button>
+
+          <button
+            @click="openRelease"
+            class="px-3 py-1.5 text-xs font-medium rounded-lg bg-white/[0.06] text-white/60 hover:text-white/80 hover:bg-white/[0.1] transition-all"
+          >
+            Release notes
           </button>
           <button
             @click="dismiss"
             class="px-3 py-1.5 text-xs font-medium rounded-lg bg-white/[0.06] text-white/60 hover:text-white/80 hover:bg-white/[0.1] transition-all"
           >
-            Dismiss
+            Later
           </button>
         </div>
       </div>
@@ -54,12 +113,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 
 const visible = ref(false)
 const currentVersion = ref('')
 const latestVersion = ref('')
 const releaseUrl = ref('')
+
+/** How this install is expected to update. See electron/updater.ts. */
+const method = ref<'auto' | 'manual' | 'package-manager'>('manual')
+const command = ref<string | undefined>(undefined)
+
+const downloading = ref(false)
+const readyToInstall = ref(false)
+const progress = ref(0)
+const error = ref('')
+const copied = ref(false)
 
 async function dismiss() {
   visible.value = false
@@ -73,7 +142,35 @@ function openRelease() {
   if (releaseUrl.value) {
     window.api.openExternal(releaseUrl.value)
   }
-  dismiss()
+}
+
+async function download() {
+  error.value = ''
+  downloading.value = true
+  try {
+    await window.api.downloadUpdate()
+  } catch (err: any) {
+    // Leave the banner up so the user can still reach the release page.
+    downloading.value = false
+    error.value = err?.message ?? 'Download failed'
+  }
+}
+
+async function restart() {
+  try {
+    await window.api.installUpdate()
+  } catch (err: any) {
+    error.value = err?.message ?? 'Could not install the update'
+  }
+}
+
+async function copyCommand() {
+  if (!command.value) return
+  try {
+    await navigator.clipboard.writeText(command.value)
+    copied.value = true
+    setTimeout(() => { copied.value = false }, 2000)
+  } catch {}
 }
 
 onMounted(async () => {
@@ -91,8 +188,25 @@ onMounted(async () => {
     currentVersion.value = result.currentVersion
     latestVersion.value = result.latestVersion
     releaseUrl.value = result.url
+    method.value = result.method
+    command.value = result.command
+
+    window.api.onUpdateProgress(p => { progress.value = p.percent })
+    window.api.onUpdateDownloaded(() => {
+      downloading.value = false
+      readyToInstall.value = true
+    })
+    window.api.onUpdateError(e => {
+      downloading.value = false
+      error.value = e.message
+    })
+
     visible.value = true
   } catch {}
+})
+
+onUnmounted(() => {
+  window.api.removeUpdateListeners()
 })
 </script>
 

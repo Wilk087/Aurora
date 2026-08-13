@@ -1,14 +1,26 @@
-# Maintainer: Wilk087
-# NOTE: Update pkgver to match the version in package.json
+# Maintainer: Wilk087 <business@wilk087.dev>
+#
+# Source package: builds Aurora from the tagged release and runs it on the
+# system Electron. Most users want `aurora-player-bin` from the AUR instead,
+# which repackages the released AppImage and needs no build step.
+#
+# pkgver is kept in sync with package.json by scripts/sync-version.mjs.
+# Do not edit it by hand; run `npm run sync-version`.
+
 pkgname=aurora-player
-pkgver=2.8.0
+pkgver=2.9.0
 pkgrel=1
 pkgdesc="A beautiful local music player for Linux"
 arch=('x86_64')
 url="https://github.com/Wilk087/Aurora"
 license=('GPL-3.0-or-later')
-depends=('electron28' 'gstreamer' 'gst-plugins-base' 'gst-plugins-good')
+# Must stay on the same Electron major the app is developed and tested against
+# (see devDependencies.electron in package.json). Bumping one without the other
+# ships Arch users a runtime nobody tested.
+depends=('electron33' 'gstreamer' 'gst-plugins-base' 'gst-plugins-good')
 makedepends=('npm' 'nodejs')
+provides=("${pkgname}=${pkgver}")
+conflicts=("${pkgname}-bin")
 source=("${pkgname}-${pkgver}.tar.gz::${url}/archive/refs/tags/v${pkgver}.tar.gz")
 sha256sums=('SKIP')
 
@@ -16,6 +28,10 @@ build() {
   cd "${srcdir}/Aurora-${pkgver}"
   npm ci --ignore-scripts
   npm run build
+
+  # The packaged app only needs runtime dependencies. Without this the package
+  # would ship electron, electron-builder, vite, and typescript to every user.
+  npm prune --omit=dev --ignore-scripts
 }
 
 package() {
@@ -29,7 +45,7 @@ package() {
   install -dm755 "${pkgdir}/usr/bin"
   cat > "${pkgdir}/usr/bin/${pkgname}" << 'EOF'
 #!/bin/bash
-exec electron28 /usr/lib/aurora-player/dist-electron/main.js "$@"
+exec electron33 /usr/lib/aurora-player/dist-electron/main.js "$@"
 EOF
   chmod 755 "${pkgdir}/usr/bin/${pkgname}"
 
@@ -38,40 +54,19 @@ EOF
 [Desktop Entry]
 Name=Aurora Player
 Comment=A beautiful local music player
-Exec=${pkgname}
+Exec=${pkgname} %U
 Icon=${pkgname}
 Type=Application
 Categories=Audio;Music;Player;AudioVideo;
 Keywords=music;player;audio;flac;mp3;
+MimeType=audio/mpeg;audio/flac;audio/ogg;audio/opus;audio/wav;audio/x-wav;audio/mp4;audio/aac;audio/x-ms-wma;
 EOF
 
   # Icon
   install -Dm644 build/icon.png "${pkgdir}/usr/share/icons/hicolor/512x512/apps/${pkgname}.png"
 
-  # License
-  install -Dm644 /dev/stdin "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE" << 'EOF'
-GNU GENERAL PUBLIC LICENSE
-Version 3, 29 June 2007
-
-Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
-Everyone is permitted to copy and distribute verbatim copies
-of this license document, but changing it is not allowed.
-
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-EOF
+  # License — install the real GPL-3 text from the repository rather than
+  # embedding a copy here, which is how the previous heredoc ended up splicing
+  # MIT permission text into a GPL header.
+  install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
 }

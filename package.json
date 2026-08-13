@@ -11,7 +11,13 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
+    "typecheck": "vue-tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "build": "vite build",
+    "sync-version": "node scripts/sync-version.mjs",
+    "check-version": "node scripts/sync-version.mjs --check",
+    "version": "node scripts/sync-version.mjs && git add PKGBUILD flake.nix",
     "dist": "npm run build && electron-builder --linux",
     "dist:pacman": "npm run build && electron-builder --linux pacman",
     "dist:appimage": "npm run build && electron-builder --linux AppImage",
@@ -19,7 +25,8 @@
     "dist:rpm": "npm run build && electron-builder --linux rpm",
     "dist:win": "npm run build && electron-builder --win",
     "dist:all": "npm run build && electron-builder --linux --win",
-    "dist:pac-win": "npm run build && electron-builder --linux pacman --win"
+    "dist:pac-win": "npm run build && electron-builder --linux pacman --win",
+    "gen-aur": "node scripts/gen-aur-pkgbuild.mjs"
   },
   "build": {
     "appId": "com.wilk087.aurora-player",
@@ -88,11 +95,20 @@
         "role": "Viewer"
       }
     ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Wilk087",
+        "repo": "Aurora",
+        "releaseType": "draft"
+      }
+    ],
     "linux": {
       "target": [
-        "pacman",
         "AppImage",
-        "deb"
+        "pacman",
+        "deb",
+        "rpm"
       ],
       "icon": "build/icons",
       "category": "Audio",
@@ -188,6 +204,7 @@
     "@xhayper/discord-rpc": "^1.3.4",
     "bonjour-service": "^1.4.2",
     "dbus-next": "^0.10.2",
+    "electron-updater": "^6.6.2",
     "express": "^5.2.1",
     "gifenc": "^1.0.3",
     "hls.js": "^1.6.16",
@@ -211,6 +228,7 @@
     "vite": "^6.0.0",
     "vite-plugin-electron": "^0.29.0",
     "vite-plugin-electron-renderer": "^0.14.6",
+    "vitest": "^4.1.10",
     "vue-tsc": "^2.0.0"
   },
   "allowScripts": {

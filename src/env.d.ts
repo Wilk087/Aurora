@@ -287,7 +287,21 @@ interface Window {
     searchLyrics: (query: string, tracks: { id: string; path: string }[]) => Promise<string[]>
     // App version & update checking
     getAppVersion: () => Promise<string>
-    checkForUpdate: () => Promise<{ currentVersion: string; latestVersion: string; url: string } | null>
+    checkForUpdate: () => Promise<{
+      currentVersion: string
+      latestVersion: string
+      url: string
+      source: string
+      method: 'auto' | 'manual' | 'package-manager'
+      command?: string
+    } | null>
+    downloadUpdate: () => Promise<void>
+    installUpdate: () => Promise<void>
+    getInstallSource: () => Promise<string>
+    onUpdateProgress: (cb: (p: { percent: number; transferred: number; total: number }) => void) => void
+    onUpdateDownloaded: (cb: (info: { version: string }) => void) => void
+    onUpdateError: (cb: (info: { message: string }) => void) => void
+    removeUpdateListeners: () => void
     openExternal: (url: string) => Promise<void>
     // Animated covers
     getAnimatedCover: (album: string, artist: string) => Promise<string | null>

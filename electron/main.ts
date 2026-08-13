@@ -19,6 +19,10 @@ import { registerAnimatedCoverIPC, getAlbumArtworkUrl, getArtistArtworkUrl } fro
 import { registerAlbumTracklistIPC, clearTracklistCache } from './album-tracklist'
 import { logger, installGlobalLogHandlers, initLogger, getLogPath } from './logger'
 import { getAppPaths } from './paths'
+import {
+  checkForUpdate as checkForUpdateInfo, initAutoUpdater,
+  downloadUpdate, quitAndInstall, detectInstallSource,
+} from './updater'
 
 // Compute XDG-compliant paths and initialise the logger before anything else
 const appPaths = getAppPaths()
@@ -168,17 +172,10 @@ async function extractZip(zipPath: string, destDir: string): Promise<void> {
   }
 }
 
-/** Compare two semver strings. Returns > 0 if a > b, < 0 if a < b, 0 if equal. */
-function compareVersions(a: string, b: string): number {
-  const pa = a.split('.').map(Number)
-  const pb = b.split('.').map(Number)
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const va = pa[i] || 0
-    const vb = pb[i] || 0
-    if (va !== vb) return va - vb
-  }
-  return 0
-}
+// compareVersions now lives in ./updater — it is prerelease-aware, so a
+// "2.9.0-dev" build correctly sees the 2.9.0 release as newer. The old
+// implementation here produced NaN for any version carrying a suffix, which
+// silently disabled the update check on every dev build.
 
 async function getAlbumArtUrl(artist: string, album: string): Promise<string | null> {
   return getAlbumArtworkUrl(artist, album)
@@ -1893,6 +1890,11 @@ app.whenReady().then(async () => {
 
   await createWindow()
 
+  // ── Auto-updater ───────────────────────────────────────────────────────
+  // No-ops on package-managed installs (pacman/AUR, deb, rpm, Nix) — those
+  // update through their own package manager and must not be touched here.
+  initAutoUpdater(() => mainWindow)
+
   // ── Tray icon ──────────────────────────────────────────────────────────
   loadSettings().then((s) => {
     if (s.trayEnabled !== false) createTray()
@@ -2169,21 +2171,18 @@ app.whenReady().then(async () => {
   })
 
   // ── IPC: Update checker ──
-  ipcMain.handle('app:check-update', async () => {
-    try {
-      const currentVersion = app.getVersion()
-      const raw = await fetchJSON('https://api.github.com/repos/Wilk087/Aurora/releases/latest')
-      const data = JSON.parse(raw)
-      const latestTag: string = data.tag_name || ''
-      // Strip leading 'v' from tag (e.g. "v2.2.0" → "2.2.0")
-      const latestVersion = latestTag.replace(/^v/, '')
-      if (!latestVersion) return null
-      const isNewer = compareVersions(latestVersion, currentVersion) > 0
-      return isNewer ? { currentVersion, latestVersion, url: data.html_url || `https://github.com/Wilk087/Aurora/releases/tag/${latestTag}` } : null
-    } catch {
-      return null
-    }
-  })
+  // Returns the update *and* how the user should apply it, which depends on how
+  // Aurora was installed. See electron/updater.ts.
+  ipcMain.handle('app:check-update', () => checkForUpdateInfo(fetchJSON))
+
+  // Download the update in-place. Only valid when method === 'auto'
+  // (AppImage / Windows installer); throws otherwise.
+  ipcMain.handle('app:download-update', () => downloadUpdate())
+
+  // Restart into the downloaded update.
+  ipcMain.handle('app:install-update', () => quitAndInstall())
+
+  ipcMain.handle('app:get-install-source', () => detectInstallSource())
 
   ipcMain.handle('app:get-version', () => app.getVersion())
 
