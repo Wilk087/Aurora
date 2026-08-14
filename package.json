@@ -125,12 +125,14 @@
         "audio/x-ms-wma"
       ],
       "desktop": {
-        "Name": "Aurora Player",
-        "Comment": "A beautiful local music player",
-        "Categories": "Audio;Music;Player;AudioVideo;",
-        "Keywords": "music;player;audio;",
-        "StartupWMClass": "aurora-player",
-        "MimeType": "audio/mpeg;audio/flac;audio/ogg;audio/opus;audio/wav;audio/x-wav;audio/mp4;audio/aac;audio/x-ms-wma;"
+        "entry": {
+          "Name": "Aurora Player",
+          "Comment": "A beautiful local music player",
+          "Categories": "Audio;Music;Player;AudioVideo;",
+          "Keywords": "music;player;audio;",
+          "StartupWMClass": "aurora-player",
+          "MimeType": "audio/mpeg;audio/flac;audio/ogg;audio/opus;audio/wav;audio/x-wav;audio/mp4;audio/aac;audio/x-ms-wma;"
+        }
       }
     },
     "win": {
