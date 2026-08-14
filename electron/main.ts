@@ -19,6 +19,7 @@ import { registerAnimatedCoverIPC, getAlbumArtworkUrl, getArtistArtworkUrl } fro
 import { registerAlbumTracklistIPC, clearTracklistCache } from './album-tracklist'
 import { logger, installGlobalLogHandlers, initLogger, getLogPath } from './logger'
 import { getAppPaths } from './paths'
+import { needsFullParse } from './cover-art'
 import {
   checkForUpdate as checkForUpdateInfo, initAutoUpdater,
   downloadUpdate, quitAndInstall, detectInstallSource,
@@ -811,10 +812,23 @@ async function scanDirectory(dirPath: string): Promise<string[]> {
   return files
 }
 
+/** Counter for unique temp filenames when several tracks cache covers at once. */
+let coverWriteSeq = 0
+
 async function parseTrack(filePath: string): Promise<any> {
   try {
     const mm = await import('music-metadata')
-    const metadata = await mm.parseFile(filePath)
+    let metadata = await mm.parseFile(filePath)
+
+    // The fast parse gives up early on Ogg files whose comment header spans
+    // many pages, truncating the cover and leaving duration undefined. Retry
+    // with { duration: true } only for the files that actually came back
+    // short — it is roughly 10x slower, so a blanket retry would make a large
+    // library scan crawl. See electron/cover-art.ts.
+    if (needsFullParse(metadata.format.duration, metadata.common.picture?.[0])) {
+      metadata = await mm.parseFile(filePath, { duration: true })
+    }
+
     const id = generateId(filePath)
 
     // Extract & cache cover art
@@ -826,8 +840,29 @@ async function parseTrack(filePath: string): Promise<any> {
       const albumId = generateId(metadata.common.album || filePath)
       const coverFile = `${albumId}.${ext}`
       coverArtPath = join(coverCachePath, coverFile)
-      if (!existsSync(coverArtPath)) {
-        await writeFile(coverArtPath, pic.data)
+
+      // Rewrite when the cached file is a different size to what we just
+      // extracted. The old check only tested for existence, so a cover cached
+      // from a truncated parse stayed truncated forever.
+      let needsWrite = true
+      try {
+        needsWrite = (await stat(coverArtPath)).size !== pic.data.length
+      } catch {
+        needsWrite = true
+      }
+
+      if (needsWrite) {
+        // Write to a unique temp file and rename, so a reader never sees a
+        // half-written cover — the renderer requests these over localfile://
+        // as soon as the track appears in the library.
+        const tmp = `${coverArtPath}.${process.pid}.${coverWriteSeq++}.tmp`
+        try {
+          await writeFile(tmp, pic.data)
+          await rename(tmp, coverArtPath)
+        } catch (err) {
+          await unlink(tmp).catch(() => {})
+          throw err
+        }
       }
     }
 
