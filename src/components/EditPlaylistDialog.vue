@@ -20,7 +20,7 @@
             >
               <img
                 v-if="customImage"
-                :src="'localfile://' + customImage"
+                :src="customImageUrl"
                 class="w-full h-full object-cover"
               />
               <div v-else class="w-full h-full flex items-center justify-center text-white/20">
@@ -90,7 +90,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, computed } from 'vue'
 
 const props = defineProps<{
   show: boolean
@@ -106,6 +106,12 @@ const name        = ref('')
 const description = ref('')
 const customImage = ref<string | null>(null)
 const nameInput   = ref<HTMLInputElement | null>(null)
+
+// Must go through getMediaUrl — hand-concatenating localfile:// skips the host
+// prefix and the percent-encoding, so paths with spaces or #?&=+ silently 404.
+const customImageUrl = computed(() =>
+  customImage.value ? window.api.getMediaUrl(customImage.value) : ''
+)
 
 watch(
   () => props.playlist,

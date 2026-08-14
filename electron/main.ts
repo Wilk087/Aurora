@@ -298,12 +298,23 @@ async function destroyDiscordRPC() {
 }
 
 // ── Custom protocol for serving local media files ──────────────────────────
+// `standard` and `corsEnabled` are both required, and corsEnabled only works
+// when standard is also set. Without them Chromium treats localfile:// as a
+// non-standard scheme with an opaque origin and refuses every <img>/<audio>
+// load with "Cross origin requests are only supported for protocol schemes:
+// chrome, chrome-extension, chrome-untrusted, data, http, https".
+//
+// `standard` also means the URL is parsed as generic URI syntax, so it needs a
+// non-empty host — see LOCALFILE_HOST in preload.ts for why URLs are built as
+// localfile://local/<abs-path> rather than localfile:///<abs-path>.
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'localfile',
     privileges: {
+      standard: true,
       secure: true,
       supportFetchAPI: true,
+      corsEnabled: true,
       stream: true,
       bypassCSP: true,
     },
@@ -1821,12 +1832,25 @@ app.whenReady().then(async () => {
     '.webp': 'image/webp', '.gif': 'image/gif',
   }
 
+  // The scheme is corsEnabled, so Chromium runs a real CORS check against every
+  // response. Without these headers the check fails and the media never loads.
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+    'Access-Control-Allow-Headers': 'Range',
+    'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges',
+  }
+
   protocol.handle('localfile', async (request) => {
     try {
+      if (request.method === 'OPTIONS') {
+        return new Response(null, { status: 204, headers: corsHeaders })
+      }
+
       const url = new URL(request.url)
       let filePath = decodeURIComponent(url.pathname)
       if (!filePath || filePath === '/') {
-        return new Response('Not found', { status: 404 })
+        return new Response('Not found', { status: 404, headers: corsHeaders })
       }
       // On Windows, strip leading / from /C:/... paths
       if (process.platform === 'win32' && /^\/[a-zA-Z]:/.test(filePath)) {
@@ -1848,7 +1872,7 @@ app.whenReady().then(async () => {
           if (start >= fileSize) {
             return new Response('Range Not Satisfiable', {
               status: 416,
-              headers: { 'Content-Range': `bytes */${fileSize}` },
+              headers: { ...corsHeaders, 'Content-Range': `bytes */${fileSize}` },
             })
           }
           const chunkSize = end - start + 1
@@ -1864,6 +1888,7 @@ app.whenReady().then(async () => {
           return new Response(body, {
             status: 206,
             headers: {
+              ...corsHeaders,
               'Content-Range': `bytes ${start}-${end}/${fileSize}`,
               'Accept-Ranges': 'bytes',
               'Content-Length': String(chunkSize),
@@ -1887,13 +1912,14 @@ app.whenReady().then(async () => {
       return new Response(body, {
         status: 200,
         headers: {
+          ...corsHeaders,
           'Content-Length': String(fileSize),
           'Content-Type': contentType,
           'Accept-Ranges': 'bytes',
         },
       })
     } catch {
-      return new Response('Not found', { status: 404 })
+      return new Response('Not found', { status: 404, headers: corsHeaders })
     }
   })
 

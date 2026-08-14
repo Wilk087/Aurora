@@ -1,5 +1,41 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
+/**
+ * Placeholder host for localfile:// URLs.
+ *
+ * The scheme is registered as `standard` (required for `corsEnabled`, without
+ * which Chromium blocks every <img>/<audio> load from it). Standard schemes are
+ * parsed as generic URI syntax and need a non-empty host, so the old
+ * `localfile:///abs/path` form is not valid here. The real path lives in the
+ * pathname: `localfile://local/abs/path`.
+ *
+ * The main-process handler reads url.pathname, so it sees the same absolute
+ * path either way.
+ */
+export const LOCALFILE_HOST = 'local'
+
+/** Build a localfile:// URL for a local path. HTTP(S) URLs pass through. */
+export function buildMediaUrl(filePath: string): string {
+  if (!filePath) return ''
+  // Pass through HTTP(S) URLs (e.g. subsonic cover art or streams)
+  if (filePath.startsWith('http://') || filePath.startsWith('https://')) return filePath
+  // Already a localfile URL, don't double-prefix it
+  if (filePath.startsWith('localfile://')) return filePath
+  // Normalize Windows backslashes to forward slashes
+  let normalized = filePath.replace(/\\/g, '/')
+  // Ensure path starts with / so drive letters aren't parsed as part of the host
+  // (Windows: C:/Users/... → /C:/Users/..., Linux already starts with /)
+  if (!normalized.startsWith('/')) normalized = '/' + normalized
+  // encodeURI doesn't encode #, ?, &, =, +, etc. which break URL parsing
+  const encoded = encodeURI(normalized)
+    .replace(/#/g, '%23')
+    .replace(/\?/g, '%3F')
+    .replace(/&/g, '%26')
+    .replace(/\+/g, '%2B')
+    .replace(/=/g, '%3D')
+  return `localfile://${LOCALFILE_HOST}${encoded}`
+}
+
 contextBridge.exposeInMainWorld('api', {
   // Library
   scanFolder: (path: string) => ipcRenderer.invoke('library:scan-folder', path),
@@ -221,24 +257,7 @@ contextBridge.exposeInMainWorld('api', {
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('app:open-external', url),
 
   // Utility – build a localfile:// URL for local file playback (pass through http(s) URLs)
-  getMediaUrl: (filePath: string) => {
-    if (!filePath) return ''
-    // Pass through HTTP(S) URLs (e.g. subsonic cover art or streams)
-    if (filePath.startsWith('http://') || filePath.startsWith('https://')) return filePath
-    // Normalize Windows backslashes to forward slashes
-    let normalized = filePath.replace(/\\/g, '/')
-    // Ensure path starts with / so drive letters aren't parsed as URL host
-    // (Windows: C:/Users/... → /C:/Users/..., Linux already starts with /)
-    if (!normalized.startsWith('/')) normalized = '/' + normalized
-    // encodeURI doesn't encode #, ?, &, =, +, etc. which break URL parsing
-    const encoded = encodeURI(normalized)
-      .replace(/#/g, '%23')
-      .replace(/\?/g, '%3F')
-      .replace(/&/g, '%26')
-      .replace(/\+/g, '%2B')
-      .replace(/=/g, '%3D')
-    return `localfile://${encoded}`
-  },
+  getMediaUrl: (filePath: string) => buildMediaUrl(filePath),
 
   // Events
   onScanProgress: (callback: (data: { current: number; total: number }) => void) => {

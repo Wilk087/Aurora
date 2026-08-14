@@ -784,6 +784,51 @@ export const usePlayerStore = defineStore('player', () => {
     if (s.crossfadeDuration !== undefined) crossfadeDuration.value = s.crossfadeDuration
   })
 
+  // ── MediaSession artwork ─────────────────────────────────────────────────
+  // Chromium's MediaImage only accepts http, https, data and blob URLs, so
+  // localfile:// covers have to be converted. One blob is alive at a time;
+  // the previous one is revoked before the next is created.
+  let mediaSessionArtworkUrl: string | null = null
+
+  function revokeMediaSessionArtwork() {
+    if (mediaSessionArtworkUrl) {
+      URL.revokeObjectURL(mediaSessionArtworkUrl)
+      mediaSessionArtworkUrl = null
+    }
+  }
+
+  async function setMediaSessionArtwork(track: { title: string; artist: string; album: string; coverArt?: string | null }) {
+    const cover = track.coverArt
+    if (!cover) return
+    try {
+      const src = window.api.getMediaUrl(cover)
+      let artworkUrl: string
+
+      if (src.startsWith('http://') || src.startsWith('https://')) {
+        // Subsonic covers are already a scheme MediaSession accepts.
+        artworkUrl = src
+      } else {
+        const blob = await fetch(src).then(r => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))))
+        revokeMediaSessionArtwork()
+        artworkUrl = URL.createObjectURL(blob)
+        mediaSessionArtworkUrl = artworkUrl
+      }
+
+      // The track may have changed while the fetch was in flight.
+      const current = navigator.mediaSession.metadata
+      if (!current || current.title !== track.title || current.artist !== track.artist) return
+
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: track.title,
+        artist: track.artist,
+        album: track.album,
+        artwork: [{ src: artworkUrl, sizes: '512x512', type: 'image/jpeg' }],
+      })
+    } catch {
+      // Artwork is cosmetic; the rest of the metadata is already set.
+    }
+  }
+
   // ── MediaSession action handlers (MPRIS integration) ─────────────────────
   if ('mediaSession' in navigator) {
     navigator.mediaSession.setActionHandler('play', () => play())
@@ -1056,10 +1101,13 @@ export const usePlayerStore = defineStore('player', () => {
         title: track.title,
         artist: track.artist,
         album: track.album,
-        artwork: track.coverArt
-          ? [{ src: window.api.getMediaUrl(track.coverArt), sizes: '512x512', type: 'image/jpeg' }]
-          : [],
+        artwork: [],
       })
+      // MediaSession only accepts http/https/data/blob artwork URLs — a custom
+      // scheme is rejected outright, however it is registered. Fetch the cover
+      // and hand it over as a blob instead. Fire-and-forget: the metadata above
+      // is already set, this just fills in the image when it arrives.
+      if (track.coverArt) void setMediaSessionArtwork(track)
     }
 
     // MPRIS metadata (custom D-Bus service for Linux)

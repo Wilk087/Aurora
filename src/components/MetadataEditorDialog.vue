@@ -251,7 +251,9 @@ watch(
 )
 
 const coverPreviewUrl = computed(() => {
-  if (newCoverPath.value) return 'localfile://' + newCoverPath.value
+  // Must go through getMediaUrl — hand-concatenating skips the host prefix and
+  // the percent-encoding, so paths with spaces or #?&=+ silently 404.
+  if (newCoverPath.value) return window.api.getMediaUrl(newCoverPath.value)
   const cover = props.tracks[0]?.coverArt
   return cover ? window.api.getMediaUrl(cover) : ''
 })
