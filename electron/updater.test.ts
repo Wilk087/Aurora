@@ -110,3 +110,79 @@ describe('detectInstallSource', () => {
     expect(detectInstallSource()).toBe('flatpak')
   })
 })
+
+// electron-builder installs its deb/rpm/pacman targets to /opt/<productName>,
+// which for Aurora is "/opt/Aurora Player" — capitalised, with a space. An
+// earlier version matched the literal "/opt/aurora-player" and so reported
+// "unknown" for every packaged Linux install.
+describe('linux install detection', () => {
+  const OS_RELEASE = {
+    arch: 'NAME="Arch Linux"\nID=arch\n',
+    cachyos: 'NAME="CachyOS"\nID=cachyos\nID_LIKE=arch\n',
+    ubuntu: 'NAME="Ubuntu"\nID=ubuntu\nID_LIKE=debian\n',
+    fedora: 'NAME="Fedora Linux"\nID=fedora\n',
+    obscure: 'NAME="Something Else"\nID=somethingelse\n',
+  }
+
+  /**
+   * Load updater.ts with the filesystem and platform fully stubbed, so the
+   * result depends only on the inputs and not on whatever distro the tests
+   * happen to be running on.
+   */
+  async function detectWith(exe: string, osRelease: string) {
+    vi.resetModules()
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform')
+    Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+
+    vi.doMock('electron', () => ({
+      app: { isPackaged: true, getVersion: () => '2.9.0', getPath: () => exe },
+    }))
+    vi.doMock('./logger', () => ({
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+    }))
+    vi.doMock('node:fs', () => ({
+      existsSync: () => true,
+      readFileSync: () => osRelease,
+    }))
+
+    const mod = await import('./updater')
+    const result = {
+      source: mod.detectInstallSource(),
+      method: (s: any) => mod.updateMethodFor(s),
+    }
+    if (platform) Object.defineProperty(process, 'platform', platform)
+    return result
+  }
+
+  it('detects the electron-builder install path, which is /opt/<productName>', async () => {
+    const { source, method } = await detectWith('/opt/Aurora Player/aurora-player', OS_RELEASE.arch)
+    expect(source).toBe('pacman')
+    expect(method(source)).toBe('package-manager')
+  })
+
+  it('detects the AUR -bin install path', async () => {
+    const { source } = await detectWith('/opt/aurora-player/aurora-player', OS_RELEASE.cachyos)
+    expect(source).toBe('pacman')
+  })
+
+  it('detects the Arch source package under /usr', async () => {
+    const { source } = await detectWith('/usr/lib/aurora-player/aurora-player', OS_RELEASE.arch)
+    expect(source).toBe('pacman')
+  })
+
+  it('maps distro families to the right package manager', async () => {
+    expect((await detectWith('/opt/Aurora Player/aurora-player', OS_RELEASE.ubuntu)).source).toBe('deb')
+    expect((await detectWith('/opt/Aurora Player/aurora-player', OS_RELEASE.fedora)).source).toBe('rpm')
+  })
+
+  it('keeps a nix store path as nix', async () => {
+    const { source } = await detectWith('/nix/store/abc-aurora-player/bin/aurora-player', OS_RELEASE.arch)
+    expect(source).toBe('nix')
+  })
+
+  // Unrecognised distro still must not self-update over a package manager's files.
+  it('never reports auto for an unrecognised packaged install', async () => {
+    const { source, method } = await detectWith('/opt/Aurora Player/aurora-player', OS_RELEASE.obscure)
+    expect(method(source)).not.toBe('auto')
+  })
+})

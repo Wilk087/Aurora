@@ -91,14 +91,20 @@ export function detectInstallSource(): InstallSource {
 
     if (exe.startsWith('/nix/store/')) return 'nix'
 
-    // /opt is where the AUR -bin package unpacks the AppImage contents.
-    if (exe.startsWith('/opt/aurora-player')) return 'pacman'
-
-    if (exe.startsWith('/usr/')) {
+    // Anything under /opt or /usr was put there by a package manager.
+    //
+    // /opt is where electron-builder's deb, rpm and pacman targets install, as
+    // /opt/<productName> — note that is "Aurora Player" with a space and a
+    // capital, not the executable name. The AUR -bin package unpacks to
+    // /opt/aurora-player. Matching the prefix rather than a specific directory
+    // covers both without depending on how the product is named.
+    if (exe.startsWith('/opt/') || exe.startsWith('/usr/')) {
       const family = distroFamily()
-      if (/arch|manjaro|endeavour|cachyos/.test(family)) return 'pacman'
+      if (/arch|manjaro|endeavour|cachyos|garuda/.test(family)) return 'pacman'
       if (/debian|ubuntu|mint|pop/.test(family)) return 'deb'
-      if (/fedora|rhel|centos|suse/.test(family)) return 'rpm'
+      if (/fedora|rhel|centos|suse|opensuse/.test(family)) return 'rpm'
+      // Installed by something, just not one we recognise. Still must not
+      // self-update.
       return 'unknown'
     }
   }

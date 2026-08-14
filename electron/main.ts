@@ -444,6 +444,12 @@ function scheduleWaveformFlush() {
 // ── In-memory library cache ────────────────────────────────────────────────
 // Loaded once at startup, mutated in place, flushed to disk on changes.
 // This eliminates repeated disk reads on every IPC call.
+//
+// Resolves when the library, artist and waveform caches have all been read
+// from disk. Assigned in app.whenReady; handlers that read `cache` must await
+// this first, since registration deliberately does not block on the load.
+// Defaults to a resolved promise so nothing hangs if it is somehow never set.
+let cacheReady: Promise<void> = Promise.resolve()
 interface LibraryCache {
   folders: string[]
   tracks: any[]
@@ -760,6 +766,11 @@ interface Playlist {
 }
 
 let playlists: Playlist[] = []
+
+// Resolves once playlists.json has been read. Same reasoning as cacheReady:
+// handler registration must not block on disk I/O, or the renderer races ahead
+// and calls handlers that do not exist yet.
+let playlistsReady: Promise<void> = Promise.resolve()
 
 async function loadPlaylists(): Promise<Playlist[]> {
   try {
@@ -1990,11 +2001,23 @@ app.whenReady().then(async () => {
     stopRemoteServer()
   })
 
-  // Load library into memory cache on startup
-  await loadCache()
-  await loadArtistCache()
-  await loadWaveformCache()
-  logger.info(`Library cache loaded: ${cache.tracks.length} tracks, ${cache.folders.length} folders`)
+  // Load the library into the memory cache, but do NOT await it here.
+  //
+  // Almost every ipcMain.handle call happens below this line. Awaiting the
+  // cache load yields to the event loop for as long as it takes to read and
+  // parse the library JSON, and on a large library the renderer finishes
+  // booting first and calls handlers that do not exist yet, so every request
+  // fails with "No handler registered for ...". A packaged build hits this far
+  // more readily than the dev server, because loading the renderer from an
+  // asar is much faster than fetching modules over HTTP.
+  //
+  // Handlers that read the cache await cacheReady themselves.
+  cacheReady = (async () => {
+    await loadCache()
+    await loadArtistCache()
+    await loadWaveformCache()
+    logger.info(`Library cache loaded: ${cache.tracks.length} tracks, ${cache.folders.length} folders`)
+  })()
   // Start background lyrics fetch 30 s after startup so the UI can settle first
   setTimeout(runLyricsBackgroundFetch, 30_000)
 
@@ -2039,6 +2062,7 @@ app.whenReady().then(async () => {
 
   // ── IPC: Library ──
   ipcMain.handle('library:scan-folder', async (_, folderPath: string) => {
+    await cacheReady
     const audioFiles = await scanDirectory(folderPath)
     const newTracks: any[] = []
 
@@ -2087,14 +2111,17 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('library:get-data', async () => {
+    await cacheReady
     return cache.tracks
   })
 
   ipcMain.handle('library:get-folders', async () => {
+    await cacheReady
     return cache.folders
   })
 
   ipcMain.handle('library:remove-folder', async (_, folderPath: string) => {
+    await cacheReady
     cache.folders = cache.folders.filter((f: string) => f !== folderPath)
     cache.tracks = cache.tracks.filter((t: any) => !t.path.startsWith(folderPath))
     rebuildIndexes()
@@ -2394,17 +2421,22 @@ app.whenReady().then(async () => {
   })
 
   // ── IPC: Playlists ──
-  await loadPlaylists()
+  // Not awaited, so the 90-odd handlers below still register immediately.
+  // Handlers that touch `playlists` await playlistsReady themselves.
+  playlistsReady = loadPlaylists().then(() => undefined)
 
   ipcMain.handle('playlists:get-all', async () => {
+    await playlistsReady
     return playlists
   })
 
   ipcMain.handle('playlists:get', async (_, id: string) => {
+    await playlistsReady
     return playlists.find(p => p.id === id) || null
   })
 
   ipcMain.handle('playlists:create', async (_, name: string) => {
+    await playlistsReady
     const now = Date.now()
     const playlist: Playlist = {
       id: generateId(`playlist-${name}-${now}`),
@@ -2419,6 +2451,7 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('playlists:delete', async (_, id: string) => {
+    await playlistsReady
     playlists = playlists.filter(p => p.id !== id)
     await savePlaylists()
     // Track tombstone for cross-device sync
@@ -2431,6 +2464,7 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('playlists:rename', async (_, id: string, name: string) => {
+    await playlistsReady
     const pl = playlists.find(p => p.id === id)
     if (pl) {
       pl.name = name
@@ -2441,6 +2475,7 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('playlists:edit', async (_, id: string, data: { name?: string; description?: string; customImage?: string | null }) => {
+    await playlistsReady
     const pl = playlists.find(p => p.id === id)
     if (pl) {
       if (data.name !== undefined && data.name.trim()) pl.name = data.name.trim()
@@ -2465,6 +2500,7 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('playlists:set-custom-image', async (_, id: string, imagePath: string | null) => {
+    await playlistsReady
     const pl = playlists.find(p => p.id === id)
     if (pl) {
       if (imagePath === null) {
@@ -2479,6 +2515,7 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('playlists:add-tracks', async (_, id: string, trackIds: string[], trackMeta?: Record<string, TrackMetaSnapshot>) => {
+    await playlistsReady
     const pl = playlists.find(p => p.id === id)
     if (pl) {
       for (const tid of trackIds) {
@@ -2496,6 +2533,7 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('playlists:remove-track', async (_, id: string, trackId: string) => {
+    await playlistsReady
     const pl = playlists.find(p => p.id === id)
     if (pl) {
       pl.trackIds = pl.trackIds.filter(t => t !== trackId)
@@ -2507,6 +2545,7 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('playlists:reorder-tracks', async (_, id: string, fromIndex: number, toIndex: number) => {
+    await playlistsReady
     const pl = playlists.find(p => p.id === id)
     if (pl && !pl.smart) {
       const [removed] = pl.trackIds.splice(fromIndex, 1)
@@ -2518,6 +2557,8 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('playlists:export-m3u', async (_, id: string) => {
+    await playlistsReady
+    await cacheReady
     const pl = playlists.find(p => p.id === id)
     if (!pl) return { success: false }
     const result = await dialog.showSaveDialog(mainWindow!, {
@@ -2538,6 +2579,8 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('playlists:import-m3u', async () => {
+    await playlistsReady
+    await cacheReady
     const result = await dialog.showOpenDialog(mainWindow!, {
       filters: [{ name: 'M3U Playlist', extensions: ['m3u', 'm3u8'] }],
       properties: ['openFile'],
@@ -3253,6 +3296,7 @@ app.whenReady().then(async () => {
 
   // ── IPC: Reset caches ──
   ipcMain.handle('cache:reset', async (_, targets: string[]) => {
+    await cacheReady
     const results: Record<string, boolean> = {}
 
     if (targets.includes('library')) {
@@ -3362,6 +3406,7 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('scrobble:now-playing', async (_, data: { title: string; artist: string; album: string; duration: number }) => {
+    await playlistsReady
     const settings = await loadSettings()
 
     if (settings.lastfmSessionKey && settings.lastfmApiKey) {
@@ -3385,6 +3430,7 @@ app.whenReady().then(async () => {
 
   // ── IPC: Smart playlists ──
   ipcMain.handle('playlists:create-smart', async (_, name: string, rules: any[], ruleMatch: string) => {
+    await playlistsReady
     const now = Date.now()
     const playlist: Playlist = {
       id: generateId(`smart-${name}-${now}`),
@@ -3402,6 +3448,7 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('playlists:update-smart', async (_, id: string, rules: any[], ruleMatch: string) => {
+    await playlistsReady
     const pl = playlists.find(p => p.id === id)
     if (pl && pl.smart) {
       pl.rules = rules
@@ -3544,6 +3591,7 @@ app.whenReady().then(async () => {
   })
 
   ipcMain.handle('sync:apply-playlists', async (_, newPlaylists: any[]) => {
+    await playlistsReady
     playlists = newPlaylists
     await savePlaylists()
   })
@@ -3810,6 +3858,7 @@ app.whenReady().then(async () => {
     /** Path to an image file to embed as cover art (takes precedence over coverData) */
     coverPath?: string
   }) => {
+    await cacheReady
     const { promisify } = await import('util')
     const { rename, unlink, writeFile } = await import('fs/promises')
     const path = await import('path')
